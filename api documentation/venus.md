@@ -112,7 +112,7 @@ Response (200 OK)
 
 ## Get all venues by city ID
 
-GET https://ai.alviongs.com/webhook/V1/nibog/venues/get-by-city
+POST https://ai.alviongs.com/webhook/V1/nibog/venues/get-by-city
 {
     "city_id": 2
 }   

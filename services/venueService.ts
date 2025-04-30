@@ -270,6 +270,7 @@ export const getVenuesByCity = async (cityId: number): Promise<Venue[]> => {
     console.log(`Fetching venues for city ID: ${cityId}`);
 
     // Use our internal API route to avoid CORS issues
+    // Use POST method with request body as specified in the API documentation
     const response = await fetch('/api/venues/get-by-city', {
       method: "POST",
       headers: {
