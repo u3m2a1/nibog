@@ -12,7 +12,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { X, Wand2 } from "lucide-react"
+import { X, Wand2, Loader2 } from "lucide-react"
+import { createBabyGame } from "@/services/babyGameService"
+import { toast } from "@/components/ui/use-toast"
 
 export default function NewGameTemplate() {
   const router = useRouter()
@@ -25,6 +27,8 @@ export default function NewGameTemplate() {
   const [newCategory, setNewCategory] = useState("")
   const [categories, setCategories] = useState<string[]>([])
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -48,21 +52,53 @@ export default function NewGameTemplate() {
     }, 1500)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would be an API call
-    console.log({
-      name,
-      description,
-      minAge,
-      maxAge,
-      duration,
-      categories,
-      isActive,
-    })
+    setIsSubmitting(true)
+    setError(null)
 
-    // Redirect to the game templates list
-    router.push("/admin/games")
+    try {
+      // Format the data for the API
+      // Based on the API response, we need to use these exact field names
+      const gameData = {
+        game_name: name,
+        description: description,     // Use description directly
+        min_age: minAge,              // Use min_age directly
+        max_age: maxAge,              // Use max_age directly
+        duration_minutes: duration,
+        categories: categories,
+        is_active: isActive
+      }
+
+      // Log the data to verify it's being sent correctly
+      console.log("Submitting game data:", JSON.stringify(gameData, null, 2))
+
+      // Call the API to create the game
+      const result = await createBabyGame(gameData)
+
+      console.log("Game created successfully:", result)
+
+      // Show success message
+      toast({
+        title: "Game Created",
+        description: `${name} has been created successfully.`,
+        variant: "default",
+      })
+
+      // Redirect to the game templates list
+      router.push("/admin/games")
+    } catch (error: any) {
+      console.error("Error creating game:", error)
+      setError(error.message || "Failed to create game. Please try again.")
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create game. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -119,8 +155,40 @@ export default function NewGameTemplate() {
               <div className="space-y-4">
                 <div>
                   <div className="mb-2 flex justify-between text-sm">
-                    <span>Minimum Age: {minAge} months</span>
-                    <span>Maximum Age: {maxAge} months</span>
+                    <div className="flex items-center gap-2">
+                      <span>Minimum Age:</span>
+                      <Input
+                        type="number"
+                        value={minAge}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          if (!isNaN(value) && value >= 0 && value <= maxAge) {
+                            setMinAge(value);
+                          }
+                        }}
+                        className="w-16 h-8"
+                        min={0}
+                        max={maxAge}
+                      />
+                      <span>months</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>Maximum Age:</span>
+                      <Input
+                        type="number"
+                        value={maxAge}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          if (!isNaN(value) && value >= minAge && value <= 36) {
+                            setMaxAge(value);
+                          }
+                        }}
+                        className="w-16 h-8"
+                        min={minAge}
+                        max={36}
+                      />
+                      <span>months</span>
+                    </div>
                   </div>
                   <div className="px-1">
                     <Slider
@@ -143,7 +211,46 @@ export default function NewGameTemplate() {
               <div className="space-y-4">
                 <div>
                   <div className="mb-2 flex justify-between text-sm">
-                    <span>Duration: {duration} minutes</span>
+                    <div className="flex items-center gap-2">
+                      <span>Duration:</span>
+                      <Input
+                        type="number"
+                        value={duration}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          if (!isNaN(value) && value >= 30 && value <= 120) {
+                            // Round to nearest 15 minutes
+                            const rounded = Math.round(value / 15) * 15;
+                            setDuration(rounded);
+                          }
+                        }}
+                        className="w-16 h-8"
+                        min={30}
+                        max={120}
+                        step={15}
+                      />
+                      <span>minutes</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDuration(Math.max(30, duration - 15))}
+                        className="h-8 px-2"
+                      >
+                        -15
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDuration(Math.min(120, duration + 15))}
+                        className="h-8 px-2"
+                      >
+                        +15
+                      </Button>
+                    </div>
                   </div>
                   <div className="px-1">
                     <Slider
@@ -199,11 +306,32 @@ export default function NewGameTemplate() {
               <Label htmlFor="active">Active</Label>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => router.push("/admin/games")}>
-              Cancel
-            </Button>
-            <Button type="submit">Save Game Template</Button>
+          <CardFooter className="flex flex-col gap-4">
+            {error && (
+              <div className="w-full rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <div className="flex w-full justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/admin/games")}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Save Game Template"
+                )}
+              </Button>
+            </div>
           </CardFooter>
         </Card>
       </form>

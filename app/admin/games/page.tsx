@@ -1,11 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Eye, Plus, Trash, AlertTriangle } from "lucide-react"
+import { Edit, Eye, Plus, Trash, AlertTriangle, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,71 +17,56 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-
-// Mock data - in a real app, this would come from an API
-const gameTemplates = [
-  {
-    id: "1",
-    name: "Baby Crawling",
-    description: "Let your little crawler compete in a fun and safe environment.",
-    ageRange: "5-13 months",
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: "Baby Walker",
-    description: "Fun-filled baby walker race in a safe environment.",
-    ageRange: "5-13 months",
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-  },
-  {
-    id: "3",
-    name: "Running Race",
-    description: "Exciting running race for toddlers in a fun and safe environment.",
-    ageRange: "13-84 months",
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-  },
-  {
-    id: "4",
-    name: "Hurdle Toddle",
-    description: "Fun hurdle race for toddlers to develop coordination and balance.",
-    ageRange: "13-84 months",
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-  },
-  {
-    id: "5",
-    name: "Cycle Race",
-    description: "Exciting cycle race for children to showcase their skills.",
-    ageRange: "13-84 months",
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-  },
-  {
-    id: "6",
-    name: "Ring Holding",
-    description: "Fun ring holding game to develop hand-eye coordination.",
-    ageRange: "13-84 months",
-    duration: 60,
-    categories: ["olympics", "physical", "coordination"],
-    isActive: true,
-  },
-]
+import { useToast } from "@/components/ui/use-toast"
+import { getAllBabyGames, deleteBabyGame } from "@/services/babyGameService"
+import { BabyGame } from "@/types"
 
 export default function GameTemplatesPage() {
-  const [gameTemplatesList, setGameTemplatesList] = useState(gameTemplates)
+  const [games, setGames] = useState<BabyGame[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const handleDeleteGame = (id: string) => {
-    // In a real app, this would be an API call to delete the game
-    setGameTemplatesList(gameTemplatesList.filter(game => game.id !== id))
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await getAllBabyGames()
+        setGames(data)
+      } catch (err: any) {
+        console.error("Error fetching games:", err)
+        setError(err.message || "Failed to fetch games")
+        toast({
+          title: "Error",
+          description: err.message || "Failed to fetch games",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchGames()
+  }, [toast])
+
+  const handleDeleteGame = async (id: number) => {
+    try {
+      await deleteBabyGame(id)
+      setGames(games.filter(game => game.id !== id))
+      toast({
+        title: "Game Deleted",
+        description: "The game has been deleted successfully.",
+        variant: "default",
+      })
+    } catch (err: any) {
+      console.error("Error deleting game:", err)
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete game",
+        variant: "destructive",
+      })
+    }
   }
   return (
     <div className="space-y-6">
@@ -98,95 +83,123 @@ export default function GameTemplatesPage() {
         </Button>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Age Range</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Categories</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {gameTemplatesList.map((game) => (
-              <TableRow key={game.id}>
-                <TableCell className="font-medium">{game.name}</TableCell>
-                <TableCell>{game.ageRange} months</TableCell>
-                <TableCell>{game.duration} minutes</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {game.categories.map((category) => (
-                      <Badge key={category} variant="outline">
-                        {category}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {game.isActive ? (
-                    <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                  ) : (
-                    <Badge variant="outline">Inactive</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="icon" asChild>
-                      <a href={`/admin/games/${game.id}`}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">View</span>
-                      </a>
-                    </Button>
-                    <Button variant="ghost" size="icon" asChild>
-                      <a href={`/admin/games/${game.id}/edit`}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </a>
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Trash className="h-4 w-4" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Game Template</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            <div className="flex items-start gap-2">
-                              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
-                              <div className="space-y-2">
-                                <div className="font-medium">This action cannot be undone.</div>
-                                <div>
-                                  This will permanently delete the "{game.name}" game template.
-                                  Deleting it will not affect existing events, but you won't be able to create new events with this template.
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading games...</span>
+        </div>
+      ) : error ? (
+        <div className="rounded-md bg-destructive/15 p-4 text-center text-destructive">
+          <p>{error}</p>
+          <Button
+            variant="outline"
+            className="mt-2"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </Button>
+        </div>
+      ) : games.length === 0 ? (
+        <div className="rounded-md border p-8 text-center">
+          <p className="text-muted-foreground mb-4">No games found</p>
+          <Button asChild>
+            <a href="/admin/games/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Your First Game
+            </a>
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Age Range</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Categories</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {games.map((game) => (
+                <TableRow key={game.id}>
+                  <TableCell className="font-medium">{game.game_name}</TableCell>
+                  <TableCell>{game.min_age} - {game.max_age} months</TableCell>
+                  <TableCell>{game.duration_minutes} minutes</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {game.categories && game.categories.map((category) => (
+                        <Badge key={category} variant="outline">
+                          {category}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {game.is_active ? (
+                      <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
+                    ) : (
+                      <Badge variant="outline">Inactive</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" asChild>
+                        <a href={`/admin/games/${game.id}`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View</span>
+                        </a>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild>
+                        <a href={`/admin/games/${game.id}/edit`}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                        </a>
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash className="h-4 w-4" />
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Game Template</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                <div className="space-y-2">
+                                  <div className="font-medium">This action cannot be undone.</div>
+                                  <div>
+                                    This will permanently delete the "{game.game_name}" game template.
+                                    Deleting it will not affect existing events, but you won't be able to create new events with this template.
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-red-500 hover:bg-red-600"
-                            onClick={() => handleDeleteGame(game.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-500 hover:bg-red-600"
+                              onClick={() => handleDeleteGame(game.id!)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 ## create baby game 
-POST https://ai.alviongs.com/webhook-test/v1/nibog/babygame/create
+POST https://ai.alviongs.com/webhook/v1/nibog/babygame/create
 
 {
   "game_name": "Baby Crawling",
@@ -28,9 +28,15 @@ Response (201 Created)
   }
 ]
 
+
+
+
+
+
+
 ## Get baby game list
 
-GET https://ai.alviongs.com/webhook-test/v1/nibog/babygame/get-all
+GET https://ai.alviongs.com/webhook/v1/nibog/babygame/get-all
 
 Response (200 OK)
 [
@@ -51,9 +57,15 @@ Response (200 OK)
   }
 ]
 
+
+
+
+
+
+
 ## Get baby game by id
 
-GET https://ai.alviongs.com/webhook-test/v1/nibog/babygame/get
+POST https://ai.alviongs.com/webhook/v1/nibog/babygame/get
 {
     "id": 1
 }
@@ -77,9 +89,15 @@ Response (200 OK)
   }
 ]
 
+
+
+
+
+
+
 ## Update baby game
 
-PUT https://ai.alviongs.com/webhook-test/v1/nibog/babygame/update
+PUT https://ai.alviongs.com/webhook/v1/nibog/babygame/update
 {
   "id": 1,
   "game_name": "Obstacle Course",
@@ -114,9 +132,15 @@ Response (200 OK)
   }
 ]
 
+
+
+
+
+
+
 ## Delete baby game
 
-DELETE https://ai.alviongs.com/webhook-test/v1/nibog/babygame/delete
+DELETE https://ai.alviongs.com/webhook/v1/nibog/babygame/delete
 {
   "id": 1
 }
@@ -128,5 +152,9 @@ Response (200 OK)
     "success": true
   }
 ]
+
+
+
+
 
 

@@ -216,3 +216,16 @@ export type BookingAddOn = {
   status: "pending" | "fulfilled" | "cancelled"
   fulfillmentDate?: string
 }
+
+export type BabyGame = {
+  id?: number
+  game_name: string
+  description: string
+  min_age: number
+  max_age: number
+  duration_minutes: number
+  categories: string[]
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+}
