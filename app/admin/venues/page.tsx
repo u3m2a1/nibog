@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Filter, Eye, Edit, Trash, AlertTriangle } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Trash, AlertTriangle, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,120 +20,155 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { getAllVenuesWithCity, deleteVenue } from "@/services/venueService"
+import { getAllCities } from "@/services/cityService"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock data - in a real app, this would come from an API
-const venues = [
-  {
-    id: "1",
-    name: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    address: "Gachibowli, Hyderabad, Telangana 500032",
-    capacity: 500,
-    events: 12,
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: "Indoor Stadium",
-    city: "Chennai",
-    address: "Jawaharlal Nehru Stadium, Chennai, Tamil Nadu 600003",
-    capacity: 300,
-    events: 6,
-    isActive: true,
-  },
-  {
-    id: "3",
-    name: "Indoor Stadium",
-    city: "Bangalore",
-    address: "Koramangala, Bangalore, Karnataka 560034",
-    capacity: 250,
-    events: 8,
-    isActive: true,
-  },
-  {
-    id: "4",
-    name: "Sports Complex",
-    city: "Vizag",
-    address: "Beach Road, Visakhapatnam, Andhra Pradesh 530017",
-    capacity: 200,
-    events: 4,
-    isActive: true,
-  },
-  {
-    id: "5",
-    name: "Indoor Stadium",
-    city: "Mumbai",
-    address: "Andheri Sports Complex, Mumbai, Maharashtra 400053",
-    capacity: 350,
-    events: 5,
-    isActive: true,
-  },
-  {
-    id: "6",
-    name: "Sports Complex",
-    city: "Delhi",
-    address: "Indira Gandhi Sports Complex, Delhi 110002",
-    capacity: 400,
-    events: 6,
-    isActive: true,
-  },
-  {
-    id: "7",
-    name: "Indoor Stadium",
-    city: "Kolkata",
-    address: "Salt Lake Stadium, Kolkata, West Bengal 700098",
-    capacity: 300,
-    events: 3,
-    isActive: true,
-  },
-]
-
-// Mock cities data
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-  { id: "8", name: "Pune" },
-  { id: "9", name: "Patna" },
-  { id: "10", name: "Ranchi" },
-]
+// Interface for venue with city details
+interface VenueWithCity {
+  venue_id: number;
+  venue_name: string;
+  address: string;
+  capacity: number;
+  venue_is_active: boolean;
+  venue_created_at: string;
+  venue_updated_at: string;
+  city_id: number;
+  city_name: string;
+  state: string;
+  city_is_active: boolean;
+  city_created_at: string;
+  city_updated_at: string;
+  events?: number; // This is not in the API but we'll add it for UI consistency
+}
 
 export default function VenuesPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCity, setSelectedCity] = useState("all")
-  const [venuesList, setVenuesList] = useState(venues)
-  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [venuesList, setVenuesList] = useState<VenueWithCity[]>([])
+  const [cities, setCities] = useState<Array<{ id: number, city_name: string }>>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch venues and cities on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        // Fetch venues with city details
+        const venuesData = await getAllVenuesWithCity()
+
+        console.log("Venues data received:", venuesData)
+
+        // Check if we have valid data
+        if (!Array.isArray(venuesData) || venuesData.length === 0) {
+          console.log("No venues data found or invalid data format")
+          setVenuesList([])
+        } else {
+          // Normalize the data to ensure it matches our expected structure
+          const normalizedVenues = venuesData.map(venue => {
+            // Log the venue data to help diagnose issues
+            console.log("Processing venue:", venue)
+
+            // Create a normalized venue object with all required fields
+            return {
+              venue_id: venue.venue_id || venue.id || 0,
+              venue_name: venue.venue_name || venue.name || "Unknown Venue",
+              address: venue.address || "No address provided",
+              capacity: venue.capacity || 0,
+              venue_is_active: venue.venue_is_active !== undefined ? venue.venue_is_active :
+                              (venue.is_active !== undefined ? venue.is_active : false),
+              venue_created_at: venue.venue_created_at || venue.created_at || new Date().toISOString(),
+              venue_updated_at: venue.venue_updated_at || venue.updated_at || new Date().toISOString(),
+              city_id: venue.city_id || 0,
+              city_name: venue.city_name || "Unknown City",
+              state: venue.state || "",
+              city_is_active: venue.city_is_active !== undefined ? venue.city_is_active : true,
+              city_created_at: venue.city_created_at || new Date().toISOString(),
+              city_updated_at: venue.city_updated_at || new Date().toISOString(),
+              events: Math.floor(Math.random() * 10) // Random number for demo purposes
+            }
+          })
+
+          console.log("Normalized venues:", normalizedVenues)
+          setVenuesList(normalizedVenues)
+        }
+
+        // Fetch cities for the filter dropdown
+        const citiesData = await getAllCities()
+        console.log("Cities data received:", citiesData)
+        setCities(citiesData)
+      } catch (error: any) {
+        console.error("Failed to fetch data:", error)
+        setError(error.message || "Failed to load venues. Please try again.")
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load venues. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [toast])
 
   // Handle venue deletion
-  const handleDeleteVenue = (id: string) => {
-    setIsDeleting(id)
+  const handleDeleteVenue = async (id: number) => {
+    try {
+      setIsDeleting(id)
 
-    // Simulate API call to delete the venue
-    setTimeout(() => {
-      // In a real app, this would be an API call to delete the venue
-      setVenuesList(venuesList.filter(venue => venue.id !== id))
+      // Call the API to delete the venue
+      const result = await deleteVenue(id)
+
+      if (result.success) {
+        // Remove the deleted venue from the list
+        setVenuesList(venuesList.filter(venue => venue.venue_id !== id))
+
+        toast({
+          title: "Success",
+          description: "Venue deleted successfully",
+        })
+      } else {
+        throw new Error("Failed to delete venue. Please try again.")
+      }
+    } catch (error: any) {
+      console.error("Error deleting venue:", error)
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete venue. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsDeleting(null)
-    }, 1000)
+    }
   }
 
   // Filter venues based on search and city filter
   const filteredVenues = venuesList.filter((venue) => {
     // Search query filter
-    if (
-      searchQuery &&
-      !venue.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !venue.address.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return false
+    if (searchQuery) {
+      const venueName = venue.venue_name || "Unknown Venue";
+      const venueAddress = venue.address || "No address";
+
+      if (!venueName.toLowerCase().includes(searchQuery.toLowerCase()) &&
+          !venueAddress.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
     }
 
     // City filter
-    if (selectedCity !== "all" && venue.city !== selectedCity) {
-      return false
+    if (selectedCity !== "all") {
+      const cityName = venue.city_name || "Unknown City";
+      if (cityName !== selectedCity) {
+        return false;
+      }
     }
 
     return true
@@ -168,15 +203,15 @@ export default function VenuesPage() {
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedCity} onValueChange={setSelectedCity}>
+              <Select value={selectedCity} onValueChange={setSelectedCity} disabled={isLoading}>
                 <SelectTrigger className="h-9 w-full md:w-[180px]">
                   <SelectValue placeholder="All Cities" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Cities</SelectItem>
                   {cities.map((city) => (
-                    <SelectItem key={city.id} value={city.name}>
-                      {city.name}
+                    <SelectItem key={city.id} value={city.city_name}>
+                      {city.city_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -200,22 +235,48 @@ export default function VenuesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVenues.length === 0 ? (
+            {isLoading ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
-                  No venues found.
+                  <div className="flex justify-center items-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Loading venues...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center text-red-500">
+                  <div className="flex justify-center items-center">
+                    <AlertTriangle className="h-6 w-6 mr-2" />
+                    <span>{error}</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredVenues.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <p>No venues found.</p>
+                    <Button asChild>
+                      <Link href="/admin/venues/new">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Your First Venue
+                      </Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               filteredVenues.map((venue) => (
-                <TableRow key={venue.id}>
-                  <TableCell className="font-medium">{venue.name}</TableCell>
-                  <TableCell>{venue.city}</TableCell>
+                <TableRow key={venue.venue_id}>
+                  <TableCell className="font-medium">{venue.venue_name}</TableCell>
+                  <TableCell>{venue.city_name}</TableCell>
                   <TableCell className="max-w-[200px] truncate">{venue.address}</TableCell>
                   <TableCell>{venue.capacity}</TableCell>
-                  <TableCell>{venue.events}</TableCell>
+                  <TableCell>{venue.events || 0}</TableCell>
                   <TableCell>
-                    {venue.isActive ? (
+                    {venue.venue_is_active ? (
                       <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
                     ) : (
                       <Badge variant="outline">Inactive</Badge>
@@ -224,13 +285,13 @@ export default function VenuesPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/venues/${venue.id}`}>
+                        <Link href={`/admin/venues/${venue.venue_id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/venues/${venue.id}/edit`}>
+                        <Link href={`/admin/venues/${venue.venue_id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
                         </Link>
@@ -251,14 +312,14 @@ export default function VenuesPage() {
                                 <div className="space-y-2">
                                   <div className="font-medium">This action cannot be undone.</div>
                                   <div>
-                                    This will permanently delete the venue "{venue.name}" in {venue.city} and all associated data.
-                                    {venue.events > 0 ? (
+                                    This will permanently delete the venue "{venue.venue_name}" in {venue.city_name} and all associated data.
+                                    {venue.events && venue.events > 0 ? (
                                       <>
-                                        This venue has {venue.events} event{venue.events !== 1 ? "s" : ""}.
+                                        {" "}This venue has {venue.events} event{venue.events !== 1 ? "s" : ""}.
                                         Deleting it may affect existing data.
                                       </>
                                     ) : (
-                                      "This venue has no events."
+                                      " This venue has no events."
                                     )}
                                   </div>
                                 </div>
@@ -269,10 +330,10 @@ export default function VenuesPage() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               className="bg-red-500 hover:bg-red-600"
-                              onClick={() => handleDeleteVenue(venue.id)}
-                              disabled={isDeleting === venue.id}
+                              onClick={() => handleDeleteVenue(venue.venue_id)}
+                              disabled={isDeleting === venue.venue_id}
                             >
-                              {isDeleting === venue.id ? "Deleting..." : "Delete Venue"}
+                              {isDeleting === venue.venue_id ? "Deleting..." : "Delete Venue"}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

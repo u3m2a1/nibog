@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Edit, Trash, AlertTriangle, MapPin } from "lucide-react"
+import { ArrowLeft, Edit, Trash, AlertTriangle, MapPin, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,80 +20,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { getVenueById, deleteVenue } from "@/services/venueService"
+import { getCityById } from "@/services/cityService"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock data - in a real app, this would come from an API
-const venues = [
-  {
-    id: "1",
-    name: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    address: "Gachibowli, Hyderabad, Telangana 500032",
-    capacity: 500,
-    events: 12,
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: "Indoor Stadium",
-    city: "Chennai",
-    address: "Jawaharlal Nehru Stadium, Chennai, Tamil Nadu 600003",
-    capacity: 300,
-    events: 6,
-    isActive: true,
-  },
-  {
-    id: "3",
-    name: "Indoor Stadium",
-    city: "Bangalore",
-    address: "Koramangala, Bangalore, Karnataka 560034",
-    capacity: 250,
-    events: 8,
-    isActive: true,
-  },
-  {
-    id: "4",
-    name: "Sports Complex",
-    city: "Vizag",
-    address: "Beach Road, Visakhapatnam, Andhra Pradesh 530017",
-    capacity: 200,
-    events: 4,
-    isActive: true,
-  },
-  {
-    id: "5",
-    name: "Indoor Stadium",
-    city: "Mumbai",
-    address: "Andheri Sports Complex, Mumbai, Maharashtra 400053",
-    capacity: 350,
-    events: 5,
-    isActive: true,
-  },
-  {
-    id: "6",
-    name: "Sports Complex",
-    city: "Delhi",
-    address: "Indira Gandhi Sports Complex, Delhi 110002",
-    capacity: 400,
-    events: 6,
-    isActive: true,
-  },
-  {
-    id: "7",
-    name: "Indoor Stadium",
-    city: "Kolkata",
-    address: "Salt Lake Stadium, Kolkata, West Bengal 700098",
-    capacity: 300,
-    events: 3,
-    isActive: true,
-  },
-]
-
-// Mock events data
-const events = [
+// Mock events data - in a real app, this would come from an API
+const mockEvents = [
   {
     id: "E001",
     title: "Baby Sensory Play",
-    venue: "Gachibowli Indoor Stadium",
+    venue: "NIBOG Stadium",
     city: "Hyderabad",
     date: "2025-04-15",
     registrations: 45,
@@ -102,7 +38,7 @@ const events = [
   {
     id: "E002",
     title: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
+    venue: "NIBOG Stadium",
     city: "Hyderabad",
     date: "2025-05-20",
     registrations: 38,
@@ -111,7 +47,7 @@ const events = [
   {
     id: "E003",
     title: "Running Race",
-    venue: "Gachibowli Indoor Stadium",
+    venue: "NIBOG Stadium",
     city: "Hyderabad",
     date: "2025-06-10",
     registrations: 52,
@@ -125,33 +61,144 @@ type Props = {
 
 export default function VenueDetailPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const venueId = unwrappedParams.id
-  
-  const venue = venues.find((v) => v.id === venueId)
+  const { toast } = useToast()
+  const venueId = parseInt(params.id)
+
+  const [venue, setVenue] = useState<any>(null)
+  const [city, setCity] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch venue data on component mount
+  useEffect(() => {
+    const fetchVenueData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        console.log(`Fetching venue with ID: ${venueId}`)
+
+        // First try to get all venues with city details and find the one we need
+        // This is more reliable than the individual venue endpoint
+        try {
+          console.log("Trying to fetch all venues with city details...")
+          const allVenuesWithCity = await fetch('/api/venues/getall-with-city').then(res => res.json())
+
+          if (Array.isArray(allVenuesWithCity) && allVenuesWithCity.length > 0) {
+            console.log(`Retrieved ${allVenuesWithCity.length} venues with city details`)
+
+            // Find the venue with the matching ID (could be venue_id or id)
+            const foundVenue = allVenuesWithCity.find(v =>
+              v.venue_id === venueId ||
+              v.id === venueId ||
+              (v.venue_id && v.venue_id.toString() === venueId.toString()) ||
+              (v.id && v.id.toString() === venueId.toString())
+            )
+
+            if (foundVenue) {
+              console.log("Found venue in all venues list:", foundVenue)
+              setVenue(foundVenue)
+
+              // City data is already included in the venue data
+              if (foundVenue.city_name) {
+                setCity({
+                  id: foundVenue.city_id,
+                  city_name: foundVenue.city_name,
+                  state: foundVenue.state || "",
+                  is_active: foundVenue.city_is_active
+                })
+
+                // We found everything we need, so we can return early
+                setIsLoading(false)
+                return
+              }
+            }
+          }
+        } catch (allVenuesError) {
+          console.error("Error fetching all venues with city:", allVenuesError)
+          // Continue to the next approach
+        }
+
+        // If we get here, we couldn't find the venue in the all venues list
+        // Try the direct API call
+        try {
+          // Fetch venue data from API
+          const venueData = await getVenueById(venueId)
+          setVenue(venueData)
+
+          // Fetch city data if venue has a city_id
+          if (venueData && venueData.city_id) {
+            try {
+              const cityData = await getCityById(venueData.city_id)
+              setCity(cityData)
+            } catch (cityError) {
+              console.error("Error fetching city data:", cityError)
+              // Don't set an error for city fetch failure, just log it
+            }
+          }
+        } catch (error: any) {
+          console.error("Failed to fetch venue data:", error)
+          setError(error.message || "Failed to load venue. Please try again.")
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVenueData()
+  }, [venueId])
+
   // Handle venue deletion
-  const handleDeleteVenue = () => {
-    setIsDeleting(true)
-    
-    // Simulate API call to delete the venue
-    setTimeout(() => {
-      console.log(`Deleting venue ${venueId}`)
+  const handleDeleteVenue = async () => {
+    try {
+      setIsDeleting(true)
+
+      // Call the API to delete the venue
+      const result = await deleteVenue(venueId)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "Venue deleted successfully",
+        })
+
+        // Redirect back to venues list
+        router.push("/admin/venues")
+      } else {
+        throw new Error("Failed to delete venue. Please try again.")
+      }
+    } catch (error: any) {
+      console.error("Error deleting venue:", error)
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete venue. Please try again.",
+        variant: "destructive",
+      })
+
       setIsDeleting(false)
-      // In a real app, you would delete the venue and then redirect
-      router.push("/admin/venues")
-    }, 1000)
+    }
   }
-  
-  if (!venue) {
+
+  if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-semibold">Loading venue details...</h2>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !venue) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold">Venue not found</h2>
-          <p className="text-muted-foreground">The venue you are looking for does not exist.</p>
+          <p className="text-muted-foreground">{error || "The venue you are looking for does not exist."}</p>
           <Button className="mt-4" onClick={() => router.push("/admin/venues")}>
             Back to Venues
           </Button>
@@ -159,10 +206,16 @@ export default function VenueDetailPage({ params }: Props) {
       </div>
     )
   }
-  
-  // Filter events for this venue
-  const venueEvents = events.filter(e => e.venue === venue.name && e.city === venue.city)
-  
+
+  // Get the venue name (could be venue_name or name depending on the API response)
+  const venueName = venue.venue_name || venue.name
+
+  // Filter mock events for this venue - in a real app, you would fetch events for this venue from an API
+  const venueEvents = mockEvents.filter(e => e.venue === venueName)
+
+  // Calculate event stats - in a real app, this would come from the API
+  const eventCount = venueEvents.length
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -174,8 +227,8 @@ export default function VenueDetailPage({ params }: Props) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{venue.name}</h1>
-            <p className="text-muted-foreground">{venue.city}</p>
+            <h1 className="text-3xl font-bold tracking-tight">{venueName}</h1>
+            <p className="text-muted-foreground">{city ? city.city_name : `City ID: ${venue.city_id}`}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -201,14 +254,14 @@ export default function VenueDetailPage({ params }: Props) {
                     <div className="space-y-2">
                       <div className="font-medium">This action cannot be undone.</div>
                       <div>
-                        This will permanently delete the venue "{venue.name}" in {venue.city} and all associated data.
-                        {venue.events > 0 ? (
+                        This will permanently delete the venue "{venueName}" in {city ? city.city_name : `City ID: ${venue.city_id}`} and all associated data.
+                        {eventCount > 0 ? (
                           <>
-                            This venue has {venue.events} event{venue.events !== 1 ? "s" : ""}.
+                            {" "}This venue has {eventCount} event{eventCount !== 1 ? "s" : ""}.
                             Deleting it may affect existing data.
                           </>
                         ) : (
-                          "This venue has no events."
+                          " This venue has no events."
                         )}
                       </div>
                     </div>
@@ -217,7 +270,7 @@ export default function VenueDetailPage({ params }: Props) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
+                <AlertDialogAction
                   className="bg-red-500 hover:bg-red-600"
                   onClick={handleDeleteVenue}
                   disabled={isDeleting}
@@ -247,7 +300,7 @@ export default function VenueDetailPage({ params }: Props) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <h3 className="mb-2 font-medium">City</h3>
-                <p className="text-sm text-muted-foreground">{venue.city}</p>
+                <p className="text-sm text-muted-foreground">{city ? city.city_name : `City ID: ${venue.city_id}`}</p>
               </div>
               <div>
                 <h3 className="mb-2 font-medium">Capacity</h3>
@@ -257,7 +310,7 @@ export default function VenueDetailPage({ params }: Props) {
             <Separator />
             <div>
               <h3 className="mb-2 font-medium">Status</h3>
-              {venue.isActive ? (
+              {venue.is_active || venue.venue_is_active ? (
                 <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
               ) : (
                 <Badge variant="outline">Inactive</Badge>
@@ -265,7 +318,7 @@ export default function VenueDetailPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Statistics</CardTitle>
@@ -273,15 +326,15 @@ export default function VenueDetailPage({ params }: Props) {
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4">
               <h3 className="text-sm font-medium text-muted-foreground">Total Events</h3>
-              <p className="mt-2 text-2xl font-bold">{venue.events}</p>
+              <p className="mt-2 text-2xl font-bold">{eventCount}</p>
             </div>
             <div className="rounded-lg border p-4">
               <h3 className="text-sm font-medium text-muted-foreground">Upcoming Events</h3>
-              <p className="mt-2 text-2xl font-bold">{Math.floor(venue.events * 0.7)}</p>
+              <p className="mt-2 text-2xl font-bold">{Math.floor(eventCount * 0.7)}</p>
             </div>
             <div className="rounded-lg border p-4">
               <h3 className="text-sm font-medium text-muted-foreground">Past Events</h3>
-              <p className="mt-2 text-2xl font-bold">{Math.floor(venue.events * 0.3)}</p>
+              <p className="mt-2 text-2xl font-bold">{Math.floor(eventCount * 0.3)}</p>
             </div>
           </CardContent>
         </Card>

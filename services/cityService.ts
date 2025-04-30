@@ -19,20 +19,31 @@ export const getAllCities = async (): Promise<City[]> => {
   try {
     console.log("Fetching all cities...");
 
-    // According to the API documentation, we should use GET method without a body
-    const response = await fetch(CITY_API.GET_ALL, {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/cities/get-all', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
-      // No body needed for GET_ALL
     });
 
     // Log the response status for debugging
     console.log(`Get all cities response status: ${response.status}`);
 
     if (!response.ok) {
-      throw new Error(`Error fetching cities: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `Error fetching cities: ${response.status}`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

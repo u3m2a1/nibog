@@ -71,7 +71,6 @@ Response (200 OK)
 
 
 
-
 ## get all city
 
 GET https://ai.alviongs.com/webhook/v1/nibog/city/get-all

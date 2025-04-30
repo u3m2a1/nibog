@@ -10,15 +10,15 @@ export const CITY_API = {
   DELETE: `${API_BASE_URL}/city/delete`,     // DELETE with body
 };
 
-// Venue API endpoints
+// Venue API endpoints - Exactly as specified in the API documentation with correct case
 export const VENUE_API = {
-  CREATE: `${API_BASE_URL}/venues/create`,
-  UPDATE: `${API_BASE_URL}/venues/update`,
-  GET: `${API_BASE_URL}/venues/get`,
-  GET_ALL: `${API_BASE_URL}/venues/get-all`,
-  GET_BY_CITY: `${API_BASE_URL}/venues/get-by-city`,
-  GET_ALL_WITH_CITY: `${API_BASE_URL}/venues/getall-with-city`,
-  DELETE: `${API_BASE_URL}/venues/delete`,
+  CREATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/create`,
+  UPDATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/update`,
+  GET: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get`,
+  GET_ALL: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-all`,
+  GET_BY_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-by-city`,
+  GET_ALL_WITH_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/getall-with-city`,
+  DELETE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/delete`,
 };
 
 // Baby Game API endpoints
