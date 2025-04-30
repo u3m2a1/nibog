@@ -154,8 +154,13 @@ export default function VenueDetailPage({ params }: Props) {
     try {
       setIsDeleting(true)
 
+      // Get the correct venue ID (could be venue_id or id)
+      const actualVenueId = venue.venue_id || venue.id
+
+      console.log(`Deleting venue with ID: ${actualVenueId}`)
+
       // Call the API to delete the venue
-      const result = await deleteVenue(venueId)
+      const result = await deleteVenue(actualVenueId)
 
       if (result.success) {
         toast({
@@ -233,7 +238,7 @@ export default function VenueDetailPage({ params }: Props) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/admin/venues/${venue.id}/edit`}>
+            <Link href={`/admin/venues/${venue.venue_id || venue.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Venue
             </Link>
