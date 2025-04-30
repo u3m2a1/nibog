@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, Trash, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Edit, Trash, AlertTriangle, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,100 +19,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-
-// Mock data - in a real app, this would come from an API
-const gameTemplates = [
-  {
-    id: "1",
-    name: "Baby Crawling",
-    description: "Let your little crawler compete in a fun and safe environment. This engaging activity is designed for babies aged 5-13 months. During this 60-minute session, babies will explore their crawling abilities in a safe and stimulating environment. Parents will be guided through age-appropriate activities that promote development and bonding.",
-    minAge: 5,
-    maxAge: 13,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 12,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "2",
-    name: "Baby Walker",
-    description: "Fun-filled baby walker race in a safe environment. This exciting activity is designed for babies aged 5-13 months who are beginning to use walkers. During this 60-minute session, babies will develop balance and coordination skills while having fun. Parents will assist their little ones through a specially designed course.",
-    minAge: 5,
-    maxAge: 13,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 8,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "3",
-    name: "Running Race",
-    description: "Exciting running race for toddlers in a fun and safe environment. This activity is perfect for children aged 13-84 months who are confident walkers and beginning runners. During this 60-minute session, children will participate in age-appropriate races that develop coordination, balance, and healthy competition.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 15,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "4",
-    name: "Hurdle Toddle",
-    description: "Fun hurdle race for toddlers to develop coordination and balance. This activity is designed for children aged 13-84 months who are confident walkers. During this 60-minute session, children will navigate through a course with small, safe hurdles that help develop gross motor skills and spatial awareness.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 10,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "5",
-    name: "Cycle Race",
-    description: "Exciting cycle race for children to showcase their skills. This activity is perfect for children aged 13-84 months who can ride tricycles or bicycles with or without training wheels. During this 60-minute session, children will navigate through a safe course that develops balance, coordination, and confidence.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 7,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "6",
-    name: "Ring Holding",
-    description: "Fun ring holding game to develop hand-eye coordination. This activity is designed for children aged 13-84 months. During this 60-minute session, children will practice fine motor skills and hand-eye coordination by holding and placing rings on targets. The game progressively increases in difficulty to challenge growing skills.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "coordination"],
-    isActive: true,
-    events: 9,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-]
+import { getBabyGameById, deleteBabyGame } from "@/services/babyGameService"
+import { useToast } from "@/components/ui/use-toast"
 
 type Props = {
   params: { id: string }
@@ -120,19 +28,117 @@ type Props = {
 
 export default function GameDetailPage({ params }: Props) {
   const router = useRouter()
+  const { toast } = useToast()
 
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const gameId = unwrappedParams.id
+  const gameId = parseInt(params.id, 10)
 
-  const game = gameTemplates.find((g) => g.id === gameId)
+  const [game, setGame] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
-  if (!game) {
+  // Fetch game data when component mounts
+  useEffect(() => {
+    const fetchGameData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        // Validate gameId
+        if (isNaN(gameId) || gameId <= 0) {
+          setError(`Invalid game ID: ${params.id}. ID must be a positive number.`)
+          setIsLoading(false)
+          return
+        }
+
+        console.log(`Fetching game data for ID: ${gameId}`)
+        const gameData = await getBabyGameById(gameId)
+        console.log("Game data received:", gameData)
+
+        if (!gameData) {
+          throw new Error("No game data returned from API")
+        }
+
+        // Add some default values for statistics since they're not in the API
+        const enhancedGameData = {
+          ...gameData,
+          events: 10, // Default value for statistics
+          createdBy: "Admin User",
+          createdAt: gameData.created_at ? new Date(gameData.created_at).toLocaleDateString() : "N/A",
+          lastUpdatedBy: "Admin User",
+          lastUpdatedAt: gameData.updated_at ? new Date(gameData.updated_at).toLocaleDateString() : "N/A",
+        }
+
+        setGame(enhancedGameData)
+      } catch (error: any) {
+        console.error("Failed to fetch game data:", error)
+        setError(error.message || "Failed to load game data. Please try again.")
+
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load game data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchGameData()
+  }, [gameId, params.id, toast])
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true)
+
+      // Call the API to delete the game
+      await deleteBabyGame(gameId)
+
+      toast({
+        title: "Game Deleted",
+        description: "The game has been deleted successfully.",
+        variant: "default",
+      })
+
+      // Redirect to the games list
+      router.push("/admin/games")
+    } catch (error: any) {
+      console.error("Error deleting game:", error)
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete game. Please try again.",
+        variant: "destructive",
+      })
+
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <h2 className="mt-4 text-xl font-semibold">Loading Game Data</h2>
+          <p className="text-muted-foreground">Please wait while we fetch the game details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !game) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Game Not Found</h2>
-          <p className="text-muted-foreground">The game template you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">
+            {error || "The game template you're looking for doesn't exist or has been removed."}
+          </p>
           <Button className="mt-4" asChild>
             <Link href="/admin/games">Back to Games</Link>
           </Button>
@@ -152,9 +158,9 @@ export default function GameDetailPage({ params }: Props) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{game.name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{game.game_name}</h1>
             <p className="text-muted-foreground">
-              {game.minAge}-{game.maxAge} months | {game.duration} minutes
+              {game.min_age}-{game.max_age} months | {game.duration_minutes} minutes
             </p>
           </div>
         </div>
@@ -165,7 +171,7 @@ export default function GameDetailPage({ params }: Props) {
               Edit Game
             </Link>
           </Button>
-          <AlertDialog>
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20">
                 <Trash className="mr-2 h-4 w-4" />
@@ -181,7 +187,7 @@ export default function GameDetailPage({ params }: Props) {
                     <div className="space-y-2">
                       <div className="font-medium">This action cannot be undone.</div>
                       <div>
-                        This will permanently delete the "{game.name}" game template. This template is used in {game.events} events.
+                        This will permanently delete the "{game.game_name}" game template. This template is used in {game.events} events.
                         Deleting it will not affect existing events, but you won't be able to create new events with this template.
                       </div>
                     </div>
@@ -189,8 +195,21 @@ export default function GameDetailPage({ params }: Props) {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction className="bg-red-500 hover:bg-red-600">Delete</AlertDialogAction>
+                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-500 hover:bg-red-600"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -212,16 +231,16 @@ export default function GameDetailPage({ params }: Props) {
               <div>
                 <h3 className="mb-2 font-medium">Age Range</h3>
                 <p className="text-sm text-muted-foreground">
-                  {game.minAge}-{game.maxAge} months
+                  {game.min_age}-{game.max_age} months
                 </p>
               </div>
               <div>
                 <h3 className="mb-2 font-medium">Duration</h3>
-                <p className="text-sm text-muted-foreground">{game.duration} minutes</p>
+                <p className="text-sm text-muted-foreground">{game.duration_minutes} minutes</p>
               </div>
               <div>
                 <h3 className="mb-2 font-medium">Status</h3>
-                {game.isActive ? (
+                {game.is_active ? (
                   <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
                 ) : (
                   <Badge variant="outline">Inactive</Badge>
@@ -232,7 +251,7 @@ export default function GameDetailPage({ params }: Props) {
             <div>
               <h3 className="mb-2 font-medium">Categories</h3>
               <div className="flex flex-wrap gap-2">
-                {game.categories.map((category) => (
+                {game.categories && game.categories.map((category) => (
                   <Badge key={category} variant="secondary">
                     {category}
                   </Badge>

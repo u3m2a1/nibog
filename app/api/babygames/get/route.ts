@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     console.log(`Server API route: Fetching baby game with ID: ${id}`);
 
     // Forward the request to the external API with the correct URL
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {
-      method: "GET",
+      method: "POST", // According to API documentation, this should be POST
       headers: {
         "Content-Type": "application/json",
       },
@@ -34,21 +34,21 @@ export async function POST(request: Request) {
     if (!response.ok) {
       // If the first attempt fails, try with the webhook-test URL
       console.log("Server API route: First attempt failed, trying with webhook-test URL");
-      
+
       const alternativeUrl = apiUrl.replace("webhook/v1", "webhook-test/v1");
       console.log("Server API route: Trying alternative URL:", alternativeUrl);
-      
+
       const alternativeResponse = await fetch(alternativeUrl, {
-        method: "GET",
+        method: "POST", // According to API documentation, this should be POST
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ id }),
         cache: "no-store",
       });
-      
+
       console.log(`Server API route: Alternative response status: ${alternativeResponse.status}`);
-      
+
       if (!alternativeResponse.ok) {
         const errorText = await alternativeResponse.text();
         console.error(`Server API route: Error response from alternative attempt: ${errorText}`);
@@ -57,19 +57,19 @@ export async function POST(request: Request) {
           { status: alternativeResponse.status }
         );
       }
-      
+
       // Get the response data from successful alternative attempt
       const responseText = await alternativeResponse.text();
       console.log(`Server API route: Raw response from alternative attempt: ${responseText}`);
-      
+
       try {
         const responseData = JSON.parse(responseText);
         return NextResponse.json(responseData, { status: 200 });
       } catch (parseError) {
         console.error("Server API route: Error parsing alternative response:", parseError);
         return NextResponse.json(
-          { 
-            error: "Failed to parse API response", 
+          {
+            error: "Failed to parse API response",
             rawResponse: responseText.substring(0, 500) // Limit the size of the raw response
           },
           { status: 500 }
@@ -80,19 +80,19 @@ export async function POST(request: Request) {
     // Get the response data
     const responseText = await response.text();
     console.log(`Server API route: Raw response: ${responseText}`);
-    
+
     try {
       // Try to parse the response as JSON
       const responseData = JSON.parse(responseText);
       console.log("Server API route: Retrieved baby game:", responseData);
-      
+
       return NextResponse.json(responseData, { status: 200 });
     } catch (parseError) {
       console.error("Server API route: Error parsing response:", parseError);
       // If parsing fails, return the error
       return NextResponse.json(
-        { 
-          error: "Failed to parse API response", 
+        {
+          error: "Failed to parse API response",
           rawResponse: responseText.substring(0, 500) // Limit the size of the raw response
         },
         { status: 500 }

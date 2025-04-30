@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -13,101 +13,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { X, Wand2, ArrowLeft } from "lucide-react"
-
-// Mock data - in a real app, this would come from an API
-const gameTemplates = [
-  {
-    id: "1",
-    name: "Baby Crawling",
-    description: "Let your little crawler compete in a fun and safe environment. This engaging activity is designed for babies aged 5-13 months. During this 60-minute session, babies will explore their crawling abilities in a safe and stimulating environment. Parents will be guided through age-appropriate activities that promote development and bonding.",
-    minAge: 5,
-    maxAge: 13,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 12,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "2",
-    name: "Baby Walker",
-    description: "Fun-filled baby walker race in a safe environment. This exciting activity is designed for babies aged 5-13 months who are beginning to use walkers. During this 60-minute session, babies will develop balance and coordination skills while having fun. Parents will assist their little ones through a specially designed course.",
-    minAge: 5,
-    maxAge: 13,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 8,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "3",
-    name: "Running Race",
-    description: "Exciting running race for toddlers in a fun and safe environment. This activity is perfect for children aged 13-84 months who are confident walkers and beginning runners. During this 60-minute session, children will participate in age-appropriate races that develop coordination, balance, and healthy competition.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 15,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "4",
-    name: "Hurdle Toddle",
-    description: "Fun hurdle race for toddlers to develop coordination and balance. This activity is designed for children aged 13-84 months who are confident walkers. During this 60-minute session, children will navigate through a course with small, safe hurdles that help develop gross motor skills and spatial awareness.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 10,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "5",
-    name: "Cycle Race",
-    description: "Exciting cycle race for children to showcase their skills. This activity is perfect for children aged 13-84 months who can ride tricycles or bicycles with or without training wheels. During this 60-minute session, children will navigate through a safe course that develops balance, coordination, and confidence.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "competition"],
-    isActive: true,
-    events: 7,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-  {
-    id: "6",
-    name: "Ring Holding",
-    description: "Fun ring holding game to develop hand-eye coordination. This activity is designed for children aged 13-84 months. During this 60-minute session, children will practice fine motor skills and hand-eye coordination by holding and placing rings on targets. The game progressively increases in difficulty to challenge growing skills.",
-    minAge: 13,
-    maxAge: 84,
-    duration: 60,
-    categories: ["olympics", "physical", "coordination"],
-    isActive: true,
-    events: 9,
-    createdBy: "Admin User",
-    createdAt: "2024-10-15",
-    lastUpdatedBy: "Admin User",
-    lastUpdatedAt: "2024-11-02",
-  },
-]
+import { X, Wand2, ArrowLeft, Loader2 } from "lucide-react"
+import { getBabyGameById, updateBabyGame } from "@/services/babyGameService"
+import { useToast } from "@/components/ui/use-toast"
 
 type Props = {
   params: { id: string }
@@ -115,13 +23,15 @@ type Props = {
 
 export default function EditGameTemplate({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const gameId = unwrappedParams.id
-  
-  const gameData = gameTemplates.find((g) => g.id === gameId)
-  
+  const { toast } = useToast()
+
+  const gameId = parseInt(params.id, 10)
+
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [game, setGame] = useState<any>(null)
+
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [minAge, setMinAge] = useState(0)
@@ -133,17 +43,55 @@ export default function EditGameTemplate({ params }: Props) {
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
 
+  // Fetch game data when component mounts
   useEffect(() => {
-    if (gameData) {
-      setName(gameData.name)
-      setDescription(gameData.description)
-      setMinAge(gameData.minAge)
-      setMaxAge(gameData.maxAge)
-      setDuration(gameData.duration)
-      setIsActive(gameData.isActive)
-      setCategories([...gameData.categories])
+    const fetchGameData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        // Validate gameId
+        if (isNaN(gameId) || gameId <= 0) {
+          setError(`Invalid game ID: ${params.id}. ID must be a positive number.`)
+          setIsLoading(false)
+          return
+        }
+
+        console.log(`Fetching game data for ID: ${gameId}`)
+        const gameData = await getBabyGameById(gameId)
+        console.log("Game data received:", gameData)
+
+        if (!gameData) {
+          throw new Error("No game data returned from API")
+        }
+
+        setGame(gameData)
+
+        // Set form values
+        setName(gameData.game_name || "")
+        setDescription(gameData.description || "")
+        setMinAge(gameData.min_age || 0)
+        setMaxAge(gameData.max_age || 36)
+        setDuration(gameData.duration_minutes || 60)
+        setIsActive(gameData.is_active || false)
+        setCategories(gameData.categories || [])
+
+      } catch (error: any) {
+        console.error("Failed to fetch game data:", error)
+        setError(error.message || "Failed to load game data. Please try again.")
+
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load game data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [gameData])
+
+    fetchGameData()
+  }, [gameId, params.id, toast])
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -167,35 +115,83 @@ export default function EditGameTemplate({ params }: Props) {
     }, 1500)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would be an API call
-    console.log({
-      id: gameId,
-      name,
-      description,
-      minAge,
-      maxAge,
-      duration,
-      categories,
-      isActive,
-    })
 
-    // Show saved state
-    setIsSaved(true)
-    setTimeout(() => {
-      setIsSaved(false)
-      // Redirect to the game details page
-      router.push(`/admin/games/${gameId}`)
-    }, 1500)
+    try {
+      setIsSubmitting(true)
+      setError(null)
+
+      // Prepare the game data for the API
+      const gameData = {
+        id: gameId,
+        game_name: name,
+        description: description,
+        min_age: minAge,
+        max_age: maxAge,
+        duration_minutes: duration,
+        categories: categories,
+        is_active: isActive,
+      }
+
+      console.log("Submitting game data:", gameData)
+
+      // Call the API to update the game
+      const result = await updateBabyGame(gameData)
+
+      console.log("Game updated successfully:", result)
+
+      // Show success message
+      toast({
+        title: "Game Updated",
+        description: `${name} has been updated successfully.`,
+        variant: "default",
+      })
+
+      // Show saved state
+      setIsSaved(true)
+      setTimeout(() => {
+        setIsSaved(false)
+        // Redirect to the game details page
+        router.push(`/admin/games`)
+      }, 1500)
+
+    } catch (error: any) {
+      console.error("Error updating game:", error)
+      setError(error.message || "Failed to update game. Please try again.")
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update game. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  if (!gameData) {
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <h2 className="mt-4 text-xl font-semibold">Loading Game Data</h2>
+          <p className="text-muted-foreground">Please wait while we fetch the game details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !game) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Game Not Found</h2>
-          <p className="text-muted-foreground">The game template you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">
+            {error || "The game template you're looking for doesn't exist or has been removed."}
+          </p>
           <Button className="mt-4" asChild>
             <Link href="/admin/games">Back to Games</Link>
           </Button>
@@ -215,7 +211,7 @@ export default function EditGameTemplate({ params }: Props) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit Game Template</h1>
-          <p className="text-muted-foreground">Update the details for {gameData.name}</p>
+          <p className="text-muted-foreground">Update the details for {game.game_name}</p>
         </div>
       </div>
 
@@ -350,8 +346,17 @@ export default function EditGameTemplate({ params }: Props) {
             <Button type="button" variant="outline" onClick={() => router.push(`/admin/games/${gameId}`)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaved}>
-              {isSaved ? "Saved!" : "Save Changes"}
+            <Button type="submit" disabled={isSubmitting || isSaved}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : isSaved ? (
+                "Saved!"
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </CardFooter>
         </Card>
