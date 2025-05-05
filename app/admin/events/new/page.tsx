@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { TimePickerDemo } from "@/components/time-picker"
 import { getAllCities } from "@/services/cityService"
 import { getVenuesByCity } from "@/services/venueService"
+import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
+import { createEvent, formatEventDataForAPI } from "@/services/eventService"
 
 const venues = [
   { id: "1", name: "Little Explorers Center", city: "Mumbai" },
@@ -32,7 +34,8 @@ const venues = [
   { id: "7", name: "Little Movers Gym", city: "Hyderabad" },
 ]
 
-const gameTemplates = [
+// Fallback game templates in case API fails
+const fallbackGameTemplates = [
   {
     id: "1",
     name: "Baby Sensory Play",
@@ -66,6 +69,7 @@ export default function NewEventPage() {
   const router = useRouter()
   const [cities, setCities] = useState<Array<{ id: number; name: string }>>([])
   const [apiVenues, setApiVenues] = useState<Array<{ id: number; name: string }>>([])
+  const [babyGames, setBabyGames] = useState<BabyGame[]>([])
   const [selectedCity, setSelectedCity] = useState("")
   const [selectedVenue, setSelectedVenue] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date>()
@@ -88,8 +92,10 @@ export default function NewEventPage() {
   const [activeGameIndex, setActiveGameIndex] = useState<number | null>(null)
   const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingVenues, setIsLoadingVenues] = useState(false)
+  const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [cityError, setCityError] = useState<string | null>(null)
   const [venueError, setVenueError] = useState<string | null>(null)
+  const [gamesError, setGamesError] = useState<string | null>(null)
 
   // Fetch cities from API when component mounts
   useEffect(() => {
@@ -199,12 +205,56 @@ export default function NewEventPage() {
     }
   }, [selectedCity, cities])
 
+  // Fetch baby games from API when component mounts
+  useEffect(() => {
+    const fetchBabyGames = async () => {
+      try {
+        setIsLoadingGames(true)
+        setGamesError(null)
+
+        console.log("Fetching baby games from API...")
+
+        // Fetch baby games from the API
+        const gamesData = await getAllBabyGames()
+        console.log("Baby games data from API:", gamesData)
+
+        if (gamesData.length === 0) {
+          console.warn("No baby games found in the API response")
+          setGamesError("No games found. Please add games first.")
+        } else {
+          setBabyGames(gamesData)
+        }
+      } catch (error: any) {
+        console.error("Failed to fetch baby games:", error)
+        setGamesError("Failed to load games. Please try again.")
+      } finally {
+        setIsLoadingGames(false)
+      }
+    }
+
+    fetchBabyGames()
+  }, [])
+
   // Get filtered venues based on selected city (fallback to mock data if API fails)
   const filteredVenues = selectedCity
     ? apiVenues.length > 0
       ? apiVenues
       : venues.filter((venue) => venue.city === selectedCity)
     : []
+
+  // Get game templates (either from API or fallback)
+  const gameTemplates = babyGames.length > 0
+    ? babyGames.map(game => ({
+        id: game.id?.toString() || "",
+        name: game.game_name,
+        description: game.description || "",
+        minAgeMonths: game.min_age || 0,
+        maxAgeMonths: game.max_age || 0,
+        durationMinutes: game.duration_minutes,
+        suggestedPrice: 799, // Default price since API doesn't provide price
+        categories: game.categories || []
+      }))
+    : fallbackGameTemplates
 
   // Add a game to the event
   const addGame = (templateId: string) => {
@@ -306,7 +356,7 @@ export default function NewEventPage() {
   }
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Validate form
@@ -322,18 +372,41 @@ export default function NewEventPage() {
       return
     }
 
-    // In a real app, this would be an API call to create the event
-    console.log({
-      title: eventTitle,
-      description: eventDescription,
-      venueId: selectedVenue,
-      date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
-      status: eventStatus,
-      games: selectedGames
-    })
+    try {
+      // Get the city ID from the selected city name
+      const cityObj = cities.find(c => c.name === selectedCity)
+      const cityId = cityObj?.id || 0
 
-    // Redirect to events list
-    router.push("/admin/events")
+      // Format the data for the API
+      const formData = {
+        title: eventTitle,
+        description: eventDescription,
+        venueId: selectedVenue,
+        date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
+        status: eventStatus,
+        games: selectedGames,
+        cityId: cityId
+      }
+
+      console.log("Form data:", formData)
+
+      // Format the data for the API
+      const apiData = formatEventDataForAPI(formData)
+      console.log("API data:", apiData)
+
+      // Call the API to create the event
+      const createdEvent = await createEvent(apiData)
+      console.log("Created event:", createdEvent)
+
+      // Show success message
+      alert("Event created successfully!")
+
+      // Redirect to events list
+      router.push("/admin/events")
+    } catch (error: any) {
+      console.error("Error creating event:", error)
+      alert(`Failed to create event: ${error.message || "Unknown error"}`)
+    }
   }
 
   return (
@@ -502,20 +575,31 @@ export default function NewEventPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="gameTemplate">Game Templates</Label>
-                  <div className="flex gap-2">
-                    <Select onValueChange={addGame}>
-                      <SelectTrigger id="gameTemplate" className="flex-1">
-                        <SelectValue placeholder="Select a game to add" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {gameTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.id}>
-                            {template.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {isLoadingGames ? (
+                    <div className="flex h-10 items-center rounded-md border border-input px-3 py-2 text-sm">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="text-muted-foreground">Loading games...</span>
+                    </div>
+                  ) : gamesError ? (
+                    <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
+                      {gamesError}
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Select onValueChange={addGame} disabled={gameTemplates.length === 0}>
+                        <SelectTrigger id="gameTemplate" className="flex-1">
+                          <SelectValue placeholder={gameTemplates.length === 0 ? "No games available" : "Select a game to add"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {gameTemplates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 {selectedGames.length === 0 ? (
@@ -597,7 +681,7 @@ export default function NewEventPage() {
                             </div>
                             <div>
                               <span className="font-medium">Age Range:</span>{" "}
-                              <span>{template.minAgeMonths}-{template.maxAgeMonths} months</span>
+                              <span>{template.minAgeMonths}-{template.maxAgeMonths} {template.minAgeMonths < 12 ? "months" : "years"}</span>
                             </div>
                             <div>
                               <span className="font-medium">Duration:</span>{" "}
@@ -607,6 +691,16 @@ export default function NewEventPage() {
                               <span className="font-medium">Suggested Price:</span>{" "}
                               <span>₹{template.suggestedPrice}</span>
                             </div>
+                            {template.categories && template.categories.length > 0 && (
+                              <div>
+                                <span className="font-medium">Categories:</span>{" "}
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {template.categories.map((category, idx) => (
+                                    <Badge key={idx} variant="secondary">{category}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 

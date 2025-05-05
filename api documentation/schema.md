@@ -15,7 +15,6 @@ CREATE TABLE event_games_with_slots (
   FOREIGN KEY (game_id) REFERENCES baby_games(id)  -- Changed reference from games to baby_games
 );
 
-
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,  -- Use SERIAL for auto-incrementing in PostgreSQL
   title VARCHAR(255) NOT NULL,
@@ -29,6 +28,28 @@ CREATE TABLE events (
   FOREIGN KEY (city_id) REFERENCES cities(id),
   FOREIGN KEY (venue_id) REFERENCES venues(id)
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -154,6 +175,51 @@ CREATE TABLE employee (
     
 );
 
+
+
+
+CREATE TABLE social_media_settings (
+    id SERIAL PRIMARY KEY,
+    facebook_url TEXT NOT NULL DEFAULT 'https://facebook.com/nibog',
+    instagram_url TEXT NOT NULL DEFAULT 'https://instagram.com/nibog',
+    twitter_url TEXT NOT NULL DEFAULT 'https://twitter.com/nibog',
+    youtube_url TEXT NOT NULL DEFAULT 'https://youtube.com/nibog',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_facebook_url CHECK (facebook_url LIKE 'https://facebook.com/%'),
+    CONSTRAINT chk_instagram_url CHECK (instagram_url LIKE 'https://instagram.com/%'),
+    CONSTRAINT chk_twitter_url CHECK (twitter_url LIKE 'https://twitter.com/%'),
+    CONSTRAINT chk_youtube_url CHECK (youtube_url LIKE 'https://youtube.com/%')
+);
+
+
+
+CREATE TABLE general_settings (
+    id SERIAL PRIMARY KEY,
+    site_name TEXT NOT NULL,
+    site_tagline TEXT NOT NULL,
+    contact_email TEXT NOT NULL CHECK (contact_email ~* '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$'),
+    contact_phone TEXT NOT NULL,
+    address TEXT NOT NULL,
+    logo_path TEXT,
+    favicon_path TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE email_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    smtp_host TEXT NOT NULL,
+    smtp_port INTEGER NOT NULL CHECK (smtp_port > 0 AND smtp_port <= 65535),
+    smtp_username TEXT NOT NULL,
+    smtp_password TEXT NOT NULL,
+    sender_name TEXT NOT NULL,
+    sender_email TEXT NOT NULL CHECK (sender_email ~* '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$'),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_smtp_host CHECK (smtp_host ~* '^[a-zA-Z0-9.-]+$')
+);
 
 
 

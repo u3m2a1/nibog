@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, use, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { getEventById, EventListItem } from "@/services/eventService"
+import { useToast } from "@/components/ui/use-toast"
 
 // Mock data - in a real app, this would come from an API
 const events = [
@@ -93,18 +95,54 @@ type Props = {
 
 export default function EventDetailPage({ params }: Props) {
   const router = useRouter()
+  const { toast } = useToast()
 
   // Unwrap params using React.use()
   const unwrappedParams = use(params)
   const eventId = unwrappedParams.id
 
-  const event = events.find((e) => e.id === eventId)
+  const [event, setEvent] = useState<EventListItem | null>(null)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("details")
   const [isLoading, setIsLoading] = useState({
     pause: false,
     resume: false,
-    cancel: false
+    cancel: false,
+    fetchingEvent: true
   })
+
+  // Fetch event data when component mounts
+  useEffect(() => {
+    const fetchEventData = async () => {
+      try {
+        setIsLoading(prev => ({ ...prev, fetchingEvent: true }))
+        setApiError(null)
+
+        console.log(`Fetching event data for ID: ${eventId}`)
+        const eventData = await getEventById(Number(eventId))
+        console.log("Event data received:", eventData)
+
+        if (!eventData) {
+          throw new Error("No event data returned from API")
+        }
+
+        setEvent(eventData)
+      } catch (error: any) {
+        console.error("Failed to fetch event data:", error)
+        setApiError(error.message || "Failed to load event data. Please try again.")
+
+        toast({
+          title: "Error",
+          description: error.message || "Failed to load event data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(prev => ({ ...prev, fetchingEvent: false }))
+      }
+    }
+
+    fetchEventData()
+  }, [eventId, toast])
 
   // Handle pause event
   const handlePauseEvent = () => {
@@ -146,6 +184,36 @@ export default function EventDetailPage({ params }: Props) {
     }, 1000)
   }
 
+  // Show loading state
+  if (isLoading.fetchingEvent) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <h2 className="text-xl font-semibold">Loading Event</h2>
+          <p className="text-muted-foreground">Please wait while we fetch the event details...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (apiError) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+          <h2 className="text-2xl font-bold">Error Loading Event</h2>
+          <p className="text-muted-foreground">{apiError}</p>
+          <Button className="mt-4" asChild>
+            <Link href="/admin/events">Back to Events</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show not found state
   if (!event) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -160,8 +228,10 @@ export default function EventDetailPage({ params }: Props) {
     )
   }
 
-  const totalBookings = event.slots.reduce((acc, slot) => acc + slot.currentParticipants, 0)
-  const totalCapacity = event.slots.reduce((acc, slot) => acc + slot.maxParticipants, 0)
+  // Calculate total bookings and capacity from the API data
+  // Since the API doesn't provide booking counts, we'll use 0 as a placeholder
+  const totalBookings = 0 // In a real implementation, this would come from the API
+  const totalCapacity = event.games.reduce((acc, game) => acc + game.max_participants, 0)
   const fillRate = totalCapacity > 0 ? Math.round((totalBookings / totalCapacity) * 100) : 0
 
   return (
@@ -175,26 +245,26 @@ export default function EventDetailPage({ params }: Props) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{event.title}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{event.event_title}</h1>
             <p className="text-muted-foreground">
-              {event.venue.name}, {event.venue.city} | {event.date}
+              {event.venue_name}, {event.city_name} | {event.event_date.split('T')[0]}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/admin/events/${event.id}/edit`}>
+            <Link href={`/admin/events/${event.event_id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Event
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href={`/admin/events/clone/${event.id}`}>
+            <Link href={`/admin/events/clone/${event.event_id}`}>
               <Copy className="mr-2 h-4 w-4" />
               Clone Event
             </Link>
           </Button>
-          {event.status === "scheduled" && (
+          {event.event_status.toLowerCase() === "published" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline">
@@ -218,7 +288,7 @@ export default function EventDetailPage({ params }: Props) {
               </AlertDialogContent>
             </AlertDialog>
           )}
-          {event.status === "paused" && (
+          {event.event_status.toLowerCase() === "paused" && (
             <Button
               variant="outline"
               onClick={handleResumeEvent}
@@ -228,7 +298,7 @@ export default function EventDetailPage({ params }: Props) {
               {isLoading.resume ? "Resuming..." : "Resume Event"}
             </Button>
           )}
-          {(event.status === "scheduled" || event.status === "paused") && (
+          {(event.event_status.toLowerCase() === "published" || event.event_status.toLowerCase() === "paused") && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20">
@@ -269,19 +339,19 @@ export default function EventDetailPage({ params }: Props) {
               <div className="flex flex-col gap-1 rounded-lg border p-3">
                 <span className="text-sm text-muted-foreground">Status</span>
                 <div className="flex items-center gap-2">
-                  {event.status === "scheduled" && (
-                    <Badge className="bg-green-500 hover:bg-green-600">Scheduled</Badge>
+                  {event.event_status.toLowerCase() === "published" && (
+                    <Badge className="bg-green-500 hover:bg-green-600">Published</Badge>
                   )}
-                  {event.status === "draft" && (
+                  {event.event_status.toLowerCase() === "draft" && (
                     <Badge variant="outline">Draft</Badge>
                   )}
-                  {event.status === "paused" && (
+                  {event.event_status.toLowerCase() === "paused" && (
                     <Badge className="bg-amber-500 hover:bg-amber-600">Paused</Badge>
                   )}
-                  {event.status === "cancelled" && (
+                  {event.event_status.toLowerCase() === "cancelled" && (
                     <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
                   )}
-                  {event.status === "completed" && (
+                  {event.event_status.toLowerCase() === "completed" && (
                     <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
                   )}
                 </div>
@@ -315,49 +385,49 @@ export default function EventDetailPage({ params }: Props) {
           </CardHeader>
           <CardContent className="space-y-2">
             <Button className="w-full justify-start" asChild>
-              <Link href={`/admin/events/${event.id}/edit`}>
+              <Link href={`/admin/events/${event.event_id}/edit`}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Event Details
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/slots`}>
+              <Link href={`/admin/events/${event.event_id}/slots`}>
                 <Clock className="mr-2 h-4 w-4" />
                 Manage Time Slots
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/participants`}>
+              <Link href={`/admin/events/${event.event_id}/participants`}>
                 <Users className="mr-2 h-4 w-4" />
                 View Participants
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/scan`}>
+              <Link href={`/admin/events/${event.event_id}/scan`}>
                 <QrCode className="mr-2 h-4 w-4" />
                 Scan QR Codes
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/certificates`}>
+              <Link href={`/admin/events/${event.event_id}/certificates`}>
                 <FileText className="mr-2 h-4 w-4" />
                 Manage Certificates
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/add-ons`}>
+              <Link href={`/admin/events/${event.event_id}/add-ons`}>
                 <Package className="mr-2 h-4 w-4" />
                 Add-on Collections
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.id}/waiting-list`}>
+              <Link href={`/admin/events/${event.event_id}/waiting-list`}>
                 <ClipboardList className="mr-2 h-4 w-4" />
                 Waiting List
               </Link>
             </Button>
             <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/events/${event.id}`} target="_blank">
+              <Link href={`/events/${event.event_id}`} target="_blank">
                 <Eye className="mr-2 h-4 w-4" />
                 View Public Page
               </Link>
@@ -383,38 +453,38 @@ export default function EventDetailPage({ params }: Props) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <h3 className="mb-2 font-medium">Game Template</h3>
-                  <p>{event.gameTemplate.name}</p>
+                  <p>{event.games[0]?.game_title || "No game template"}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Age Range: {event.gameTemplate.minAgeMonths}-{event.gameTemplate.maxAgeMonths} months
+                    Age Range: {event.games[0]?.min_age || 0}-{event.games[0]?.max_age || 0} months
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Duration: {event.gameTemplate.durationMinutes} minutes
+                    Duration: {event.games[0]?.game_duration_minutes || 0} minutes
                   </p>
                 </div>
                 <div>
                   <h3 className="mb-2 font-medium">Venue</h3>
-                  <p>{event.venue.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{event.venue.address}</p>
-                  <p className="text-sm text-muted-foreground">{event.venue.city}</p>
+                  <p>{event.venue_name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{event.venue_address || "No address provided"}</p>
+                  <p className="text-sm text-muted-foreground">{event.city_name}</p>
                 </div>
               </div>
               <Separator />
               <div>
                 <h3 className="mb-2 font-medium">Description</h3>
-                <p className="text-sm text-muted-foreground">{event.description}</p>
+                <p className="text-sm text-muted-foreground">{event.event_description}</p>
               </div>
               <Separator />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <h3 className="mb-2 font-medium">Created By</h3>
+                  <h3 className="mb-2 font-medium">Created At</h3>
                   <p className="text-sm text-muted-foreground">
-                    {event.createdBy} on {event.createdAt}
+                    {new Date(event.event_created_at).toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <h3 className="mb-2 font-medium">Last Updated By</h3>
+                  <h3 className="mb-2 font-medium">Last Updated At</h3>
                   <p className="text-sm text-muted-foreground">
-                    {event.lastUpdatedBy} on {event.lastUpdatedAt}
+                    {new Date(event.event_updated_at).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -442,122 +512,95 @@ export default function EventDetailPage({ params }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {event.slots.map((slot) => (
-                      <TableRow key={slot.id}>
+                    {event.games.map((game) => (
+                      <TableRow key={`${event.event_id}-${game.game_id}`}>
                         <TableCell>
-                          {slot.startTime} - {slot.endTime}
+                          {game.start_time} - {game.end_time}
                         </TableCell>
-                        <TableCell>₹{slot.price}</TableCell>
-                        <TableCell>{slot.maxParticipants}</TableCell>
+                        <TableCell>₹{game.slot_price}</TableCell>
+                        <TableCell>{game.max_participants}</TableCell>
                         <TableCell>
-                          {slot.currentParticipants}/{slot.maxParticipants}
+                          {/* Since the API doesn't provide booking counts, we'll use 0 as a placeholder */}
+                          0/{game.max_participants}
                           <div className="mt-1 h-2 w-full rounded-full bg-muted">
                             <div
                               className="h-full rounded-full bg-primary"
                               style={{
-                                width: `${(slot.currentParticipants / slot.maxParticipants) * 100}%`,
+                                width: `${(0 / game.max_participants) * 100}%`,
                               }}
                             />
                           </div>
                         </TableCell>
                         <TableCell>
-                          {slot.status === "active" && (
-                            <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                          )}
-                          {slot.status === "paused" && (
-                            <Badge className="bg-amber-500 hover:bg-amber-600">Paused</Badge>
-                          )}
-                          {slot.status === "cancelled" && (
-                            <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
-                          )}
-                          {slot.status === "completed" && (
-                            <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
-                          )}
-                          {slot.status === "full" && (
-                            <Badge className="bg-purple-500 hover:bg-purple-600">Full</Badge>
-                          )}
+                          {/* Since the API doesn't provide slot status, we'll assume all slots are active */}
+                          <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/admin/events/${event.id}/slots/${slot.id}/edit`}>
+                              <Link href={`/admin/events/${event.event_id}/slots/${game.game_id}/edit`}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
                             </Button>
                             <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/admin/events/${event.id}/slots/${slot.id}/participants`}>
+                              <Link href={`/admin/events/${event.event_id}/slots/${game.game_id}/participants`}>
                                 <Users className="mr-2 h-4 w-4" />
                                 Participants
                               </Link>
                             </Button>
-                            {slot.status === "active" && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Pause className="mr-2 h-4 w-4" />
-                                    Pause
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Pause Time Slot</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will pause this time slot. No new bookings will be allowed, but existing bookings will be maintained. Are you sure you want to continue?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction>Pause Slot</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
-                            {slot.status === "paused" && (
-                              <Button variant="ghost" size="sm">
-                                <Play className="mr-2 h-4 w-4" />
-                                Resume
-                              </Button>
-                            )}
-                            {(slot.status === "active" || slot.status === "paused") && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
-                                  >
-                                    <X className="mr-2 h-4 w-4" />
-                                    Cancel
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Cancel Time Slot</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      {slot.currentParticipants > 0 ? (
-                                        <>
-                                          <AlertTriangle className="mb-2 h-5 w-5 text-amber-500" />
-                                          <p>
-                                            This slot has {slot.currentParticipants} existing bookings. Cancelling will notify all participants and may require refunds.
-                                          </p>
-                                        </>
-                                      ) : (
-                                        <p>
-                                          This will cancel this time slot. Are you sure you want to continue?
-                                        </p>
-                                      )}
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>No, Keep Slot</AlertDialogCancel>
-                                    <AlertDialogAction className="bg-red-500 hover:bg-red-600">
-                                      Yes, Cancel Slot
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <Pause className="mr-2 h-4 w-4" />
+                                  Pause
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Pause Time Slot</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will pause this time slot. No new bookings will be allowed, but existing bookings will be maintained. Are you sure you want to continue?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction>Pause Slot</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <Button variant="ghost" size="sm">
+                              <Play className="mr-2 h-4 w-4" />
+                              Resume
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
+                                >
+                                  <X className="mr-2 h-4 w-4" />
+                                  Cancel
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel Time Slot</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    <p>
+                                      This will cancel this time slot. Are you sure you want to continue?
+                                    </p>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>No, Keep Slot</AlertDialogCancel>
+                                  <AlertDialogAction className="bg-red-500 hover:bg-red-600">
+                                    Yes, Cancel Slot
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -567,7 +610,7 @@ export default function EventDetailPage({ params }: Props) {
               </div>
               <div className="mt-4 flex justify-end">
                 <Button asChild>
-                  <Link href={`/admin/events/${event.id}/slots/new`}>
+                  <Link href={`/admin/events/${event.event_id}/slots/new`}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add New Slot
                   </Link>
@@ -584,16 +627,21 @@ export default function EventDetailPage({ params }: Props) {
               <CardDescription>View all bookings for this event</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue={event.slots[0].id} className="space-y-4">
+              <Tabs defaultValue={event.games.length > 0 ? `${event.games[0].game_id}` : "no-games"} className="space-y-4">
                 <TabsList className="flex w-full flex-wrap">
-                  {event.slots.map((slot) => (
-                    <TabsTrigger key={slot.id} value={slot.id} className="flex-grow">
-                      {slot.startTime} ({slot.currentParticipants}/{slot.maxParticipants})
+                  {event.games.map((game) => (
+                    <TabsTrigger key={game.game_id} value={`${game.game_id}`} className="flex-grow">
+                      {game.start_time} - {game.end_time} (0/{game.max_participants})
                     </TabsTrigger>
                   ))}
+                  {event.games.length === 0 && (
+                    <TabsTrigger value="no-games" className="flex-grow">
+                      No games available
+                    </TabsTrigger>
+                  )}
                 </TabsList>
-                {event.slots.map((slot) => (
-                  <TabsContent key={slot.id} value={slot.id}>
+                {event.games.map((game) => (
+                  <TabsContent key={game.game_id} value={`${game.game_id}`}>
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
@@ -607,64 +655,43 @@ export default function EventDetailPage({ params }: Props) {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {slot.bookings.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="h-24 text-center">
-                                No bookings for this slot.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            slot.bookings.map((booking) => (
-                              <TableRow key={booking.id}>
-                                <TableCell className="font-medium">{booking.id}</TableCell>
-                                <TableCell>{booking.user}</TableCell>
-                                <TableCell>{booking.childName}</TableCell>
-                                <TableCell>{booking.childAge}</TableCell>
-                                <TableCell>
-                                  {booking.status === "confirmed" && (
-                                    <Badge className="bg-green-500 hover:bg-green-600">Confirmed</Badge>
-                                  )}
-                                  {booking.status === "pending" && (
-                                    <Badge variant="outline">Pending</Badge>
-                                  )}
-                                  {booking.status === "cancelled" && (
-                                    <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
-                                  )}
-                                  {booking.status === "attended" && (
-                                    <Badge className="bg-blue-500 hover:bg-blue-600">Attended</Badge>
-                                  )}
-                                  {booking.status === "no_show" && (
-                                    <Badge className="bg-amber-500 hover:bg-amber-600">No Show</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <Button variant="ghost" size="sm" asChild>
-                                    <Link href={`/admin/bookings/${booking.id}`}>
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      View
-                                    </Link>
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
+                          <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                              No bookings for this slot.
+                            </TableCell>
+                          </TableRow>
                         </TableBody>
                       </Table>
                     </div>
                     <div className="mt-4 flex justify-end gap-2">
                       <Button variant="outline" asChild>
-                        <Link href={`/admin/events/${event.id}/slots/${slot.id}/participants/export`}>
+                        <Link href={`/admin/events/${event.event_id}/slots/${game.game_id}/participants/export`}>
                           Export Participants
                         </Link>
                       </Button>
                       <Button asChild>
-                        <Link href={`/admin/events/${event.id}/slots/${slot.id}/participants`}>
+                        <Link href={`/admin/events/${event.event_id}/slots/${game.game_id}/participants`}>
                           Manage Participants
                         </Link>
                       </Button>
                     </div>
                   </TabsContent>
                 ))}
+                {event.games.length === 0 && (
+                  <TabsContent value="no-games">
+                    <div className="flex h-[200px] items-center justify-center rounded-md border">
+                      <div className="text-center">
+                        <p className="text-muted-foreground">No games available for this event.</p>
+                        <Button className="mt-4" asChild>
+                          <Link href={`/admin/events/${event.event_id}/slots/new`}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add New Slot
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </TabsContent>
+                )}
               </Tabs>
             </CardContent>
           </Card>

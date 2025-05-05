@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,11 +10,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building, Trash2 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { getAllEvents, EventListItem, deleteEvent } from "@/services/eventService"
+import { useToast } from "@/components/ui/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 // Mock data - in a real app, this would come from an API
 const events = [
@@ -155,15 +168,88 @@ const gameTemplates = [
 ]
 
 export default function EventsPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCity, setSelectedCity] = useState("")
   const [selectedVenue, setSelectedVenue] = useState("")
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date>()
+  const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false)
+  const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+
+  // Fetch events from API when component mounts
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        console.log("Fetching events from API...")
+
+        // Fetch events from the API
+        const eventsData = await getAllEvents()
+        console.log("Events data from API:", eventsData)
+        console.log(`Received ${eventsData.length} events from API`)
+
+        if (eventsData.length === 0) {
+          console.warn("No events found in the API response")
+          toast({
+            title: "No Events Found",
+            description: "There are no events in the database. You can create a new event using the 'Create New Event' button.",
+            variant: "default",
+          })
+        }
+
+        setApiEvents(eventsData)
+      } catch (err: any) {
+        console.error("Failed to fetch events:", err)
+        setError(err.message || "Failed to load events")
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load events",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchEvents()
+  }, [])
+
+  // Convert API events to the format expected by the UI
+  const convertedEvents = apiEvents.map(apiEvent => {
+    // Get all games for the event
+    const gameNames = apiEvent.games.map(game => game.game_title);
+    const uniqueGameNames = [...new Set(gameNames)]; // Remove duplicates
+
+    return {
+      id: apiEvent.event_id.toString(),
+      title: apiEvent.event_title,
+      gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
+      venue: apiEvent.venue_name,
+      city: apiEvent.city_name,
+      date: apiEvent.event_date.split('T')[0], // Format date to YYYY-MM-DD
+      slots: apiEvent.games.map(game => ({
+        id: `${apiEvent.event_id}-${game.game_id}`,
+        time: `${game.start_time} - ${game.end_time}`,
+        capacity: game.max_participants,
+        booked: 0, // API doesn't provide this information
+        status: "active" // Assuming all slots are active
+      })),
+      status: apiEvent.event_status.toLowerCase()
+    };
+  });
+
+  // Always use API data, even if it's empty
+  const eventsToUse = convertedEvents;
 
   // Filter events based on search and filters
-  const filteredEvents = events.filter((event) => {
+  const filteredEvents = eventsToUse.filter((event) => {
     // Search query filter
     if (
       searchQuery &&
@@ -202,6 +288,58 @@ export default function EventsPage() {
 
     return true
   })
+
+  // Handle event deletion
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return;
+
+    console.log(`Starting deletion process for event ID: ${eventToDelete}`);
+
+    try {
+      setIsDeletingEvent(true);
+
+      // Call the API to delete the event
+      console.log(`Calling deleteEvent with ID: ${eventToDelete}`);
+      const result = await deleteEvent(Number(eventToDelete));
+      console.log("Delete event result:", JSON.stringify(result));
+
+      // Check if the result indicates success (either directly or as an array with success property)
+      const isSuccess = result.success || (Array.isArray(result) && result[0]?.success === true);
+      console.log(`Delete operation success: ${isSuccess}`);
+
+      if (isSuccess) {
+        toast({
+          title: "Success",
+          description: "Event deleted successfully",
+        });
+
+        // Remove the deleted event from the state
+        console.log(`Removing event with ID ${eventToDelete} from state`);
+        console.log(`Current events: ${apiEvents.map(e => e.event_id).join(', ')}`);
+
+        setApiEvents(prevEvents => {
+          const filteredEvents = prevEvents.filter(event => event.event_id.toString() !== eventToDelete);
+          console.log(`Events after filtering: ${filteredEvents.map(e => e.event_id).join(', ')}`);
+          return filteredEvents;
+        });
+
+        // Reset the event to delete
+        setEventToDelete(null);
+      } else {
+        throw new Error("Failed to delete event. Please try again.");
+      }
+    } catch (error: any) {
+      console.error("Error deleting event:", error);
+
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete event. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingEvent(false);
+    }
+  };
 
   // Get filtered venues based on selected city
   const filteredVenues = selectedCity
@@ -315,7 +453,7 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Statuses</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                        <SelectItem value="published">Published</SelectItem>
                         <SelectItem value="paused">Paused</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
@@ -385,17 +523,55 @@ export default function EventsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEvents.length === 0 ? (
+                {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      No events found.
+                      <div className="flex justify-center items-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="ml-2">Loading events...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center text-destructive">
+                      Error loading events: {error}
+                    </TableCell>
+                  </TableRow>
+                ) : filteredEvents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      {apiEvents.length === 0 ? (
+                        <div>
+                          <p>No events found in the database.</p>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Click the "Create New Event" button to add your first event.
+                          </p>
+                          <Button className="mt-4" asChild>
+                            <Link href="/admin/events/new">
+                              <Plus className="mr-2 h-4 w-4" />
+                              Create New Event
+                            </Link>
+                          </Button>
+                        </div>
+                      ) : (
+                        <p>No events match your current filters.</p>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredEvents.map((event) => (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.title}</TableCell>
-                      <TableCell>{event.gameTemplate}</TableCell>
+                      <TableCell>
+                        <div className="max-w-[200px]">
+                          {event.gameTemplate.split(", ").map((game, index) => (
+                            <Badge key={index} variant="outline" className="mr-1 mb-1">
+                              {game}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Link
                           href={`/admin/events/venues/${encodeURIComponent(event.venue)}`}
@@ -436,8 +612,8 @@ export default function EventsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {event.status === "scheduled" && (
-                          <Badge className="bg-green-500 hover:bg-green-600">Scheduled</Badge>
+                        {event.status === "published" && (
+                          <Badge className="bg-green-500 hover:bg-green-600">Published</Badge>
                         )}
                         {event.status === "draft" && (
                           <Badge variant="outline">Draft</Badge>
@@ -450,6 +626,9 @@ export default function EventsPage() {
                         )}
                         {event.status === "completed" && (
                           <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
+                        )}
+                        {!["published", "draft", "paused", "cancelled", "completed"].includes(event.status) && (
+                          <Badge>{event.status}</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -472,7 +651,7 @@ export default function EventsPage() {
                               <span className="sr-only">Clone event</span>
                             </Link>
                           </Button>
-                          {event.status === "scheduled" && (
+                          {event.status === "published" && (
                             <Button variant="ghost" size="icon">
                               <Pause className="h-4 w-4" />
                               <span className="sr-only">Pause event</span>
@@ -484,12 +663,52 @@ export default function EventsPage() {
                               <span className="sr-only">Resume event</span>
                             </Button>
                           )}
-                          {(event.status === "scheduled" || event.status === "paused" || event.status === "draft") && (
+                          {(event.status === "published" || event.status === "paused" || event.status === "draft") && (
                             <Button variant="ghost" size="icon">
                               <X className="h-4 w-4" />
                               <span className="sr-only">Cancel event</span>
                             </Button>
                           )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <span className="sr-only">Delete event</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this event? This action cannot be undone.
+                                  All registrations and data associated with this event will be permanently removed.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    console.log(`Setting event to delete: ${event.id}`);
+                                    setEventToDelete(event.id);
+                                    setTimeout(() => {
+                                      handleDeleteEvent();
+                                    }, 100); // Small delay to ensure state is updated
+                                  }}
+                                  disabled={isDeletingEvent}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  {isDeletingEvent && eventToDelete === event.id ? (
+                                    <>
+                                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    "Delete Event"
+                                  )}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
