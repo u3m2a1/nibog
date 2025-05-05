@@ -36,9 +36,11 @@ export const EVENT_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/create", // POST - This is the endpoint for creating events with games and slots
   GET: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get",       // POST with id in body
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get-all", // GET
-  UPDATE: `${API_BASE_URL}/events/update`,        // PUT
+  UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/update", // POST with full event data
   DELETE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/delete", // POST with id in body
 };
+
+
 
 // Social Media API endpoints
 export const SOCIAL_MEDIA_API = {
@@ -46,20 +48,21 @@ export const SOCIAL_MEDIA_API = {
   GET: "https://ai.alviongs.com/webhook/v1/nibog/socialmedia/get", // GET
 };
 
+
+
 // Email Settings API endpoints
 export const EMAIL_SETTING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/emailsetting/create", // POST
   GET: "https://ai.alviongs.com/webhook/v1/nibog/emailsetting/get", // GET
 };
 
+
+
 // General Settings API endpoints
 export const GENERAL_SETTING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/generalsetting/create", // POST
   GET: "https://ai.alviongs.com/webhook/v1/nibog/generalsetting/get", // GET
 };
-
-
-
 
 
 

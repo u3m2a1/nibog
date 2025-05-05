@@ -257,6 +257,126 @@ export async function getEventById(id: number): Promise<EventListItem> {
 }
 
 /**
+ * Update an existing event
+ * @param eventData The event data to update
+ * @returns Promise with the updated event or success status
+ */
+export async function updateEvent(eventData: Event): Promise<Event | { success: boolean }> {
+  console.log("Updating event:", eventData);
+
+  // Ensure the event has an ID
+  if (!eventData.id) {
+    console.error("Cannot update event without an ID");
+    throw new Error("Event ID is required for updates");
+  }
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/events/update', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(eventData),
+    });
+
+    console.log(`Update event response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Updated event response:", data);
+
+    // The API might return a success object or the updated event
+    if (Array.isArray(data) && data[0]?.success === true) {
+      return { success: true };
+    } else if (data?.success === true) {
+      return { success: true };
+    }
+
+    // If it's the updated event data, return it
+    return eventData;
+  } catch (error) {
+    console.error("Error updating event:", error);
+    throw error;
+  }
+}
+
+/**
+ * Format event data for updating
+ * @param eventId The event ID to update
+ * @param formData The form data
+ * @returns The formatted event data for the API
+ */
+export function formatEventDataForUpdate(
+  eventId: number,
+  formData: {
+    title: string;
+    description: string;
+    venueId: string;
+    date: string;
+    status: string;
+    games: Array<{
+      templateId: string;
+      customTitle?: string;
+      customDescription?: string;
+      customPrice?: number;
+      slots: Array<{
+        id: string;
+        startTime: string;
+        endTime: string;
+        price: number;
+        maxParticipants: number;
+      }>;
+    }>;
+    cityId?: number;
+  }
+): Event {
+  // Get current date and time for updated_at
+  const now = new Date();
+  const formattedNow = now.toISOString();
+
+  // Format games data
+  const formattedGames: EventGame[] = [];
+
+  // Process each game and its slots
+  formData.games.forEach(game => {
+    game.slots.forEach(slot => {
+      formattedGames.push({
+        game_id: parseInt(game.templateId),
+        custom_title: game.customTitle || "",
+        custom_description: game.customDescription || "",
+        custom_price: typeof game.customPrice === 'number' ? game.customPrice : 0,
+        start_time: slot.startTime + ":00", // Add seconds
+        end_time: slot.endTime + ":00", // Add seconds
+        slot_price: typeof slot.price === 'number' ? slot.price : 0,
+        max_participants: typeof slot.maxParticipants === 'number' ? slot.maxParticipants : 10,
+        updated_at: formattedNow
+      });
+    });
+  });
+
+  // Create the formatted event data
+  const formattedEvent: Event = {
+    id: eventId,
+    title: formData.title,
+    description: formData.description,
+    city_id: formData.cityId || 0,
+    venue_id: parseInt(formData.venueId),
+    event_date: formData.date,
+    status: formData.status === "draft" ? "Draft" : "Published",
+    updated_at: formattedNow,
+    games: formattedGames
+  };
+
+  return formattedEvent;
+}
+
+/**
  * Delete an event by ID
  * @param id Event ID to delete
  * @returns Promise with success status
