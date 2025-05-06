@@ -381,6 +381,46 @@ export function formatEventDataForUpdate(
  * @param id Event ID to delete
  * @returns Promise with success status
  */
+/**
+ * Get events by city ID
+ * @param cityId City ID to retrieve events for
+ * @returns Promise with array of events for the specified city
+ */
+export async function getEventsByCityId(cityId: number): Promise<EventListItem[]> {
+  console.log(`Fetching events for city ID: ${cityId}`);
+
+  if (!cityId || isNaN(Number(cityId)) || Number(cityId) <= 0) {
+    throw new Error("Invalid city ID. ID must be a positive number.");
+  }
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/events/get-by-city', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ city_id: Number(cityId) }),
+    });
+
+    console.log(`Get events by city response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`Retrieved ${data.length} events for city ID ${cityId}`);
+
+    return data;
+  } catch (error) {
+    console.error(`Error fetching events for city ID ${cityId}:`, error);
+    throw error;
+  }
+}
+
 export async function deleteEvent(id: number): Promise<{ success: boolean } | Array<{ success: boolean }>> {
   console.log(`Attempting to delete event with ID: ${id}`);
 
