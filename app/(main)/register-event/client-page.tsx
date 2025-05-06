@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import AddOnSelector from "@/components/add-on-selector"
 import { addOns } from "@/data/add-ons"
 import { AddOn } from "@/types"
@@ -185,8 +186,8 @@ export default function RegisterEventClientPage() {
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<string>("")
 
-  // Mock authentication state - in a real app, this would come from an auth context
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+  // Get authentication state from auth context
+  const { isAuthenticated } = useAuth()
 
   // Calculate child's age on event date
   const calculateAge = (birthDate: Date, onDate: Date) => {
@@ -744,6 +745,11 @@ export default function RegisterEventClientPage() {
 
     fetchCities()
   }, []) // Empty dependency array means this effect runs once on mount
+
+  // Log authentication state for debugging
+  useEffect(() => {
+    console.log("Authentication state:", isAuthenticated)
+  }, [isAuthenticated])
 
   // Load city from URL or saved registration data
   useEffect(() => {

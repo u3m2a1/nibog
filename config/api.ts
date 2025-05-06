@@ -58,11 +58,22 @@ export const EMAIL_SETTING_API = {
 
 
 
+
 // General Settings API endpoints
 export const GENERAL_SETTING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/generalsetting/create", // POST
   GET: "https://ai.alviongs.com/webhook/v1/nibog/generalsetting/get", // GET
 };
+
+
+
+
+// User Authentication API endpoints
+export const USER_AUTH_API = {
+  REGISTER: "https://ai.alviongs.com/webhook/v1/nibog/user/register", // POST
+  LOGIN: "https://ai.alviongs.com/webhook/v1/nibog/user/login", // POST
+};
+
 
 
 

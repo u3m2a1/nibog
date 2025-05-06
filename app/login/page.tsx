@@ -7,13 +7,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+// import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
+  const { login } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
@@ -24,25 +28,85 @@ export default function LoginPage() {
   const returnUrl = searchParams.get("returnUrl") || "/"
 
   // Handle login form submission
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    // Simulate login process
-    setTimeout(() => {
-      // In a real app, this would be an API call to authenticate the user
-      if (email && password) {
-        // Mock successful login
-        // In a real app, you would set authentication tokens, etc.
+    // Validate form
+    if (!email || !password) {
+      setError("Please enter both email and password")
+      setIsLoading(false)
+      return
+    }
 
-        // Redirect to the return URL
-        router.push(returnUrl)
-      } else {
-        setError("Please enter both email and password")
-        setIsLoading(false)
+    try {
+      // Get browser and device info
+      const deviceInfo = {
+        device_id: `web-${Math.random().toString(36).substring(2, 15)}`,
+        os: navigator.userAgent.includes('Win') ? 'Windows' :
+            navigator.userAgent.includes('Mac') ? 'MacOS' :
+            navigator.userAgent.includes('Linux') ? 'Linux' :
+            navigator.userAgent.includes('Android') ? 'Android' :
+            navigator.userAgent.includes('iOS') ? 'iOS' : 'Unknown',
+        os_version: navigator.userAgent,
+        browser: navigator.userAgent.includes('Chrome') ? 'Chrome' :
+                 navigator.userAgent.includes('Firefox') ? 'Firefox' :
+                 navigator.userAgent.includes('Safari') ? 'Safari' :
+                 navigator.userAgent.includes('Edge') ? 'Edge' : 'Unknown',
+        ip_address: "0.0.0.0" // This will be set by the server
       }
-    }, 1000)
+
+      // Call our API route
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          device_info: deviceInfo
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed')
+      }
+
+      // Check if the response is an empty array (login failed)
+      if (Array.isArray(data) && data.length === 0) {
+        throw new Error('Invalid email or password')
+      }
+
+      // Check if we have the expected data structure
+      if (!data || !Array.isArray(data) || !data[0] || !data[0].object) {
+        console.error('Unexpected API response format:', data)
+        throw new Error('Unexpected response from server')
+      }
+
+      // Login successful
+      toast({
+        title: "Login successful",
+        description: "You have been logged in successfully.",
+      })
+
+      // Log the user data for debugging
+      console.log('Login successful, user data:', data[0].object)
+
+      // Store user data in auth context
+      login(data[0].object)
+
+      // Redirect to the return URL
+      router.push(returnUrl)
+
+    } catch (error: any) {
+      setError(error.message || 'An error occurred during login')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -105,6 +169,7 @@ export default function LoginPage() {
               {isLoading ? "Logging in..." : "Login"}
             </Button>
           </form>
+          {/* Commented out Google and Phone OTP login options
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <Separator className="w-full" />
@@ -121,6 +186,7 @@ export default function LoginPage() {
               Phone OTP
             </Button>
           </div>
+          */}
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-center text-sm text-muted-foreground">

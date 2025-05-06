@@ -223,3 +223,210 @@ CREATE TABLE email_settings (
 
 
 
+
+
+
+
+
+
+
+
+## authentication
+
+
+-- Enable essential extensions
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- For cryptographic functions
+
+-- Users table (main entity)
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    phone VARCHAR(20) NOT NULL,
+    phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    password_hash TEXT,
+    default_city VARCHAR(100),
+    accepted_terms BOOLEAN NOT NULL DEFAULT FALSE,
+    terms_accepted_at TIMESTAMPTZ,
+    
+    -- Account status fields
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_locked BOOLEAN NOT NULL DEFAULT FALSE,
+    locked_until TIMESTAMPTZ,
+    deactivated_at TIMESTAMPTZ,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_login_at TIMESTAMPTZ,
+    
+    -- Constraints
+    CONSTRAINT valid_email CHECK (email ~* '^[A-Za-z0-9._%-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$'),
+    CONSTRAINT valid_phone CHECK (phone ~ '^\+?[0-9]{10,15}$')
+);
+
+-- Indexes for users table
+CREATE UNIQUE INDEX idx_users_email ON users(LOWER(email));
+CREATE UNIQUE INDEX idx_users_phone ON users(phone);
+CREATE INDEX idx_users_status ON users(is_active, is_locked);
+
+-- Google authentication
+CREATE TABLE google_auth (
+    google_auth_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    google_id VARCHAR(128) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
+    access_token TEXT,
+    refresh_token TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Phone verification OTPs
+CREATE TABLE phone_verification_otps (
+    otp_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
+    phone VARCHAR(20) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT numeric_code CHECK (code ~ '^[0-9]+$')
+);
+
+-- Email verification tokens
+CREATE TABLE email_verification_tokens (
+    token_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    token VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Password reset tokens
+CREATE TABLE password_reset_tokens (
+    token_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    token VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Login attempts tracking
+CREATE TABLE login_attempts (
+    attempt_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    attempt_type VARCHAR(20) NOT NULL CHECK (attempt_type IN ('password', 'otp', 'google')),
+    successful BOOLEAN NOT NULL,
+    ip_address INET NOT NULL,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- User sessions
+CREATE TABLE user_sessions (
+    session_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    session_token TEXT NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    device_info JSONB,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Audit log for security tracking
+CREATE TABLE auth_audit_log (
+    log_id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    action VARCHAR(50) NOT NULL,
+    ip_address INET,
+    user_agent TEXT,
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Timestamp update function
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers for automatic timestamps
+CREATE TRIGGER update_user_modtime
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+CREATE TRIGGER update_google_auth_modtime
+BEFORE UPDATE ON google_auth
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Function to validate at least one auth method exists
+CREATE OR REPLACE FUNCTION validate_user_auth_method(user_id INTEGER)
+RETURNS BOOLEAN AS $$
+DECLARE
+    has_password BOOLEAN;
+    has_google BOOLEAN;
+BEGIN
+    SELECT password_hash IS NOT NULL INTO has_password FROM users WHERE users.user_id = validate_user_auth_method.user_id;
+    SELECT EXISTS(SELECT 1 FROM google_auth WHERE google_auth.user_id = validate_user_auth_method.user_id) INTO has_google;
+    
+    RETURN has_password OR has_google;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to enforce at least one auth method
+CREATE OR REPLACE FUNCTION check_auth_method()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT validate_user_auth_method(NEW.user_id) THEN
+        RAISE EXCEPTION 'User must have at least one authentication method (password or Google auth)';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER ensure_auth_method_exists
+AFTER INSERT OR UPDATE ON users
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_auth_method();
+
+CREATE CONSTRAINT TRIGGER ensure_auth_method_exists_google
+AFTER INSERT OR UPDATE OR DELETE ON google_auth
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION check_auth_method();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

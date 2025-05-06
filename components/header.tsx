@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User, Baby, Calendar, LogOut } from "lucide-react"
@@ -11,14 +11,28 @@ import { ModeToggle } from "./mode-toggle"
 import { UserNav } from "./user-nav"
 import { Badge } from "./ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "./ui/use-toast"
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, isAuthenticated, logout } = useAuth()
+  const { toast } = useToast()
 
-  // Mock authentication state - in a real app, this would come from an auth context
-  const isAuthenticated = false
+  // For now, we'll consider any user as a regular user
   const isAdmin = false
+
+  const handleLogout = () => {
+    logout()
+    setIsOpen(false)
+    toast({
+      title: "Logged out",
+      description: "You have been logged out successfully.",
+    })
+    router.push('/')
+  }
 
   const routes = [
     {
@@ -141,12 +155,23 @@ export default function Header() {
                     <div className="space-y-4">
                       <div className="flex items-center gap-4 px-2">
                         <Avatar>
-                          <AvatarImage src="https://ui-avatars.com/api/?name=PS&background=random&color=fff" />
-                          <AvatarFallback>PS</AvatarFallback>
+                          <AvatarImage
+                            src={`https://ui-avatars.com/api/?name=${user?.full_name?.split(' ').map(n => n[0]).join('') || 'U'}&background=random&color=fff`}
+                          />
+                          <AvatarFallback>
+                            {user?.full_name
+                              ? user.full_name
+                                  .split(' ')
+                                  .map(name => name[0])
+                                  .join('')
+                                  .toUpperCase()
+                                  .substring(0, 2)
+                              : 'U'}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">Priya Sharma</p>
-                          <p className="text-xs text-muted-foreground">priya@example.com</p>
+                          <p className="text-sm font-medium">{user?.full_name || 'User'}</p>
+                          <p className="text-xs text-muted-foreground">{user?.email || 'No email'}</p>
                         </div>
                       </div>
 
@@ -172,6 +197,7 @@ export default function Header() {
                         <Button
                           variant="ghost"
                           className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                          onClick={handleLogout}
                         >
                           <LogOut className="mr-2 h-4 w-4" />
                           Logout
