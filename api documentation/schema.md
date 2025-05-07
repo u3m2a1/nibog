@@ -246,7 +246,7 @@ CREATE TABLE users (
     phone VARCHAR(20) NOT NULL,
     phone_verified BOOLEAN NOT NULL DEFAULT FALSE,
     password_hash TEXT,
-    default_city VARCHAR(100),
+    city_id INTEGER REFERENCES cities(city_id),  -- Changed to reference city_id
     accepted_terms BOOLEAN NOT NULL DEFAULT FALSE,
     terms_accepted_at TIMESTAMPTZ,
     

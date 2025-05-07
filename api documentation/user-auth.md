@@ -95,3 +95,119 @@ if login failed
 
 
 
+GET https://ai.alviongs.com/webhook/v1/nibog/user/get-all
+
+response
+
+[
+  {
+    "user_id": 2,
+    "full_name": "John Doe",
+    "email": "john.doe@example.com",
+    "email_verified": false,
+    "phone": "+1234567890",
+    "phone_verified": false,
+    "password_hash": "SecurePassword123!",
+    "city_id": 1,
+    "accepted_terms": false,
+    "terms_accepted_at": null,
+    "is_active": true,
+    "is_locked": false,
+    "locked_until": null,
+    "deactivated_at": null,
+    "created_at": "2025-05-06T13:18:53.107Z",
+    "updated_at": "2025-05-06T13:18:53.107Z",
+    "last_login_at": null,
+    "city_name": "Hyderbad",
+    "state": "AP"
+  },
+  {
+    "user_id": 3,
+    "full_name": "sunil",
+    "email": "user@gmail.com",
+    "email_verified": false,
+    "phone": "6303727148",
+    "phone_verified": false,
+    "password_hash": "Neelarani@10",
+    "city_id": 1,
+    "accepted_terms": false,
+    "terms_accepted_at": null,
+    "is_active": true,
+    "is_locked": false,
+    "locked_until": null,
+    "deactivated_at": null,
+    "created_at": "2025-05-06T15:33:06.754Z",
+    "updated_at": "2025-05-06T15:33:06.754Z",
+    "last_login_at": null,
+    "city_name": "Hyderbad",
+    "state": "AP"
+  }
+]
+
+
+
+
+
+
+POST https://ai.alviongs.com/webhook/v1/nibog/user/delete
+
+payload
+
+{
+  "user_id": 2
+}
+
+
+response
+
+[
+  {
+    "success": true
+  }
+]
+
+
+
+
+POST https://ai.alviongs.com/webhook/v1/nibog/user/edit
+
+
+payload
+
+{
+    "user_id":"1",
+  "full_name": "John Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "password": "SecurePassword123!",
+  "city_id": 1,  // Reference to cities table
+  "accept_terms": true
+}
+
+response
+
+
+[
+    {
+        "user_id": 2,
+        "full_name": "John Doe",
+        "email": "john.doe@example.com",
+        "email_verified": false,
+        "phone": "+1234567890",
+        "phone_verified": false,
+        "password_hash": "SecurePassword123!",
+        "city_id": 1,
+        "accepted_terms": false,
+        "terms_accepted_at": null,
+        "is_active": true,
+        "is_locked": false,
+        "locked_until": null,
+        "deactivated_at": null,
+        "created_at": "2025-05-06T13:18:53.107Z",
+        "updated_at": "2025-05-06T13:18:53.107Z",
+        "last_login_at": null
+    }
+]
+
+
+

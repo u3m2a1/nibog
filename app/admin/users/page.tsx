@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Filter, Eye, Edit, Trash, AlertTriangle, X, Check } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Trash, AlertTriangle, X, Check, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,70 +20,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { getAllUsers, toggleUserActiveStatus, toggleUserLockedStatus, deleteUser, User } from "@/services/userService"
+import { useToast } from "@/components/ui/use-toast"
 
-// Mock data - in a real app, this would come from an API
-const users = [
-  {
-    id: "1",
-    name: "Harikrishna",
-    email: "harikrishna@example.com",
-    phone: "+91 9876543210",
-    city: "Hyderabad",
-    bookings: 3,
-    role: "user",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "Durga Prasad",
-    email: "durgaprasad@example.com",
-    phone: "+91 9876543211",
-    city: "Bangalore",
-    bookings: 2,
-    role: "user",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Srujana",
-    email: "srujana@example.com",
-    phone: "+91 9876543212",
-    city: "Vizag",
-    bookings: 4,
-    role: "user",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Ramesh Kumar",
-    email: "ramesh@example.com",
-    phone: "+91 9876543213",
-    city: "Chennai",
-    bookings: 1,
-    role: "user",
-    status: "active",
-  },
-  {
-    id: "5",
-    name: "Suresh Reddy",
-    email: "suresh@example.com",
-    phone: "+91 9876543214",
-    city: "Mumbai",
-    bookings: 2,
-    role: "user",
-    status: "active",
-  },
-  {
-    id: "6",
-    name: "Admin User",
-    email: "admin@nibog.in",
-    phone: "+91 9876543215",
-    city: "Hyderabad",
-    bookings: 0,
-    role: "admin",
-    status: "active",
-  },
-]
+// User roles - We'll keep this for now, but it's not used with the current API
+// In the future, we might want to add role information to the API response
 
 // User roles
 const roles = [
@@ -95,46 +36,138 @@ const roles = [
 const statuses = [
   { id: "1", name: "active" },
   { id: "2", name: "inactive" },
-  { id: "3", name: "blocked" },
+  { id: "3", name: "locked" },
 ]
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRole, setSelectedRole] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
-  const [usersList, setUsersList] = useState(users)
-  const [isProcessing, setIsProcessing] = useState<string | null>(null)
+  const [usersList, setUsersList] = useState<User[]>([])
+  const [isProcessing, setIsProcessing] = useState<number | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const data = await getAllUsers()
+        setUsersList(data)
+      } catch (error) {
+        console.error('Failed to fetch users:', error)
+        setError('Failed to load users. Please try again.')
+        toast({
+          title: "Error",
+          description: "Failed to load users. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUsers()
+  }, [toast])
 
   // Handle delete user
-  const handleDeleteUser = (id: string) => {
-    setIsProcessing(id)
+  const handleDeleteUser = async (userId: number) => {
+    setIsProcessing(userId)
 
-    // Simulate API call to delete the user
-    setTimeout(() => {
-      // In a real app, this would be an API call to delete the user
-      setUsersList(usersList.filter(user => user.id !== id))
+    try {
+      // Call the API to delete the user
+      await deleteUser(userId)
+
+      // Update the local state
+      setUsersList(usersList.filter(user => user.user_id !== userId))
+
+      toast({
+        title: "Success",
+        description: "User deleted successfully.",
+      })
+    } catch (error) {
+      console.error(`Failed to delete user ${userId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to delete user. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-    }, 1000)
+    }
   }
 
-  // Handle block/unblock user
-  const handleToggleUserStatus = (id: string, currentStatus: string) => {
-    setIsProcessing(id)
+  // Handle toggle active status
+  const handleToggleActiveStatus = async (userId: number, isActive: boolean) => {
+    setIsProcessing(userId)
 
-    // Simulate API call to update the user status
-    setTimeout(() => {
-      // In a real app, this would be an API call to update the user status
+    try {
+      // Call the API to toggle the user's active status
+      await toggleUserActiveStatus(userId, !isActive)
+
+      // Update the local state
       setUsersList(usersList.map(user => {
-        if (user.id === id) {
+        if (user.user_id === userId) {
           return {
             ...user,
-            status: currentStatus === "active" ? "blocked" : "active"
+            is_active: !isActive
           }
         }
         return user
       }))
+
+      toast({
+        title: "Success",
+        description: `User ${isActive ? 'deactivated' : 'activated'} successfully.`,
+      })
+    } catch (error) {
+      console.error(`Failed to toggle active status for user ${userId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to update user status. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-    }, 1000)
+    }
+  }
+
+  // Handle toggle locked status
+  const handleToggleLockedStatus = async (userId: number, isLocked: boolean) => {
+    setIsProcessing(userId)
+
+    try {
+      // Call the API to toggle the user's locked status
+      await toggleUserLockedStatus(userId, !isLocked)
+
+      // Update the local state
+      setUsersList(usersList.map(user => {
+        if (user.user_id === userId) {
+          return {
+            ...user,
+            is_locked: !isLocked
+          }
+        }
+        return user
+      }))
+
+      toast({
+        title: "Success",
+        description: `User ${isLocked ? 'unlocked' : 'locked'} successfully.`,
+      })
+    } catch (error) {
+      console.error(`Failed to toggle locked status for user ${userId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to update user status. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(null)
+    }
   }
 
   // Filter users based on search, role, and status
@@ -142,21 +175,25 @@ export default function UsersPage() {
     // Search query filter
     if (
       searchQuery &&
-      !user.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !user.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !user.phone.includes(searchQuery) &&
-      !user.city.toLowerCase().includes(searchQuery.toLowerCase())
+      !(user.city_name && user.city_name.toLowerCase().includes(searchQuery.toLowerCase()))
     ) {
       return false
     }
 
-    // Role filter
-    if (selectedRole !== "all" && user.role !== selectedRole) {
-      return false
-    }
+    // Role filter - We don't have role information in the API response, so we'll skip this filter for now
+    // if (selectedRole !== "all" && user.role !== selectedRole) {
+    //   return false
+    // }
 
     // Status filter
-    if (selectedStatus !== "all" && user.status !== selectedStatus) {
+    if (selectedStatus === "active" && !user.is_active) {
+      return false
+    } else if (selectedStatus === "inactive" && user.is_active) {
+      return false
+    } else if (selectedStatus === "locked" && !user.is_locked) {
       return false
     }
 
@@ -225,137 +262,171 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>City</TableHead>
-              <TableHead>Bookings</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading users...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-2 text-destructive">
+            <AlertTriangle className="h-8 w-8" />
+            <p>{error}</p>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="mt-2"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
-                  No users found.
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>City</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : (
-              filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.phone}</TableCell>
-                  <TableCell>{user.city}</TableCell>
-                  <TableCell>{user.bookings}</TableCell>
-                  <TableCell>
-                    {user.role === "admin" ? (
-                      <Badge className="bg-purple-500 hover:bg-purple-600">Admin</Badge>
-                    ) : (
-                      <Badge variant="outline">User</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {user.status === "active" ? (
-                      <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                    ) : user.status === "inactive" ? (
-                      <Badge variant="outline">Inactive</Badge>
-                    ) : (
-                      <Badge className="bg-red-500 hover:bg-red-600">Blocked</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/users/${user.id}`}>
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View</span>
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/users/${user.id}/edit`}>
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Link>
-                      </Button>
-                      {user.status === "active" ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleUserStatus(user.id, user.status)}
-                          disabled={isProcessing === user.id}
-                          title="Block User"
-                        >
-                          <X className="h-4 w-4 text-red-500" />
-                          <span className="sr-only">Block</span>
-                        </Button>
-                      ) : user.status === "blocked" ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleUserStatus(user.id, user.status)}
-                          disabled={isProcessing === user.id}
-                          title="Unblock User"
-                        >
-                          <Check className="h-4 w-4 text-green-500" />
-                          <span className="sr-only">Unblock</span>
-                        </Button>
-                      ) : null}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete User</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              <div className="flex items-start gap-2">
-                                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
-                                <div className="space-y-2">
-                                  <div className="font-medium">This action cannot be undone.</div>
-                                  <div>
-                                    This will permanently delete the user account for {user.name} ({user.email}).
-                                    {user.bookings > 0 ? (
-                                      <>
-                                        <br />
-                                        This user has {user.bookings} booking{user.bookings !== 1 ? "s" : ""}.
-                                        Deleting this user may affect existing booking data.
-                                      </>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              </div>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-red-500 hover:bg-red-600"
-                              onClick={() => handleDeleteUser(user.id)}
-                              disabled={isProcessing === user.id}
-                            >
-                              {isProcessing === user.id ? "Deleting..." : "Delete User"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center">
+                    No users found.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.user_id}>
+                    <TableCell className="font-medium">{user.full_name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.phone}</TableCell>
+                    <TableCell>{user.city_name || 'N/A'}</TableCell>
+                    <TableCell>{user.state || 'N/A'}</TableCell>
+                    <TableCell>
+                      {user.is_active ? (
+                        user.is_locked ? (
+                          <Badge className="bg-amber-500 hover:bg-amber-600">Locked</Badge>
+                        ) : (
+                          <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
+                        )
+                      ) : (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/users/${user.user_id}`}>
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">View</span>
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/users/${user.user_id}/edit`}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Link>
+                        </Button>
+                        {user.is_active && !user.is_locked ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleLockedStatus(user.user_id, user.is_locked)}
+                            disabled={isProcessing === user.user_id}
+                            title="Lock User"
+                          >
+                            <X className="h-4 w-4 text-amber-500" />
+                            <span className="sr-only">Lock</span>
+                          </Button>
+                        ) : user.is_locked ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleLockedStatus(user.user_id, user.is_locked)}
+                            disabled={isProcessing === user.user_id}
+                            title="Unlock User"
+                          >
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span className="sr-only">Unlock</span>
+                          </Button>
+                        ) : null}
+                        {user.is_active ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleActiveStatus(user.user_id, user.is_active)}
+                            disabled={isProcessing === user.user_id}
+                            title="Deactivate User"
+                          >
+                            <X className="h-4 w-4 text-red-500" />
+                            <span className="sr-only">Deactivate</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleActiveStatus(user.user_id, user.is_active)}
+                            disabled={isProcessing === user.user_id}
+                            title="Activate User"
+                          >
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span className="sr-only">Activate</span>
+                          </Button>
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                  <div className="space-y-2">
+                                    <div className="font-medium">This action cannot be undone.</div>
+                                    <div>
+                                      This will permanently delete the user account for {user.full_name} ({user.email}).
+                                      Deleting this user may affect existing booking data.
+                                    </div>
+                                  </div>
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-red-500 hover:bg-red-600"
+                                onClick={() => handleDeleteUser(user.user_id)}
+                                disabled={isProcessing === user.user_id}
+                              >
+                                {isProcessing === user.user_id ? "Deleting..." : "Delete User"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }

@@ -74,6 +74,14 @@ export const USER_AUTH_API = {
   LOGIN: "https://ai.alviongs.com/webhook/v1/nibog/user/login", // POST
 };
 
+// User Management API endpoints
+export const USER_API = {
+  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/user/get-all", // GET
+  GET: "https://ai.alviongs.com/webhook/v1/nibog/user/get", // GET with id
+  UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/user/edit", // POST - Using the edit endpoint as specified in the API docs
+  DELETE: "https://ai.alviongs.com/webhook/v1/nibog/user/delete", // POST
+};
+
 
 
 
