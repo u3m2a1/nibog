@@ -430,3 +430,72 @@ EXECUTE FUNCTION check_auth_method();
 
 
 
+CREATE TABLE parents (
+    parent_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    parent_name VARCHAR(200) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    additional_phone VARCHAR(20),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT valid_additional_phone CHECK (
+        additional_phone IS NULL OR additional_phone ~ '^\+?[0-9]{10,15}$'
+    ),
+    CONSTRAINT valid_email CHECK (
+        email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    )
+);
+
+
+CREATE TABLE children (
+    child_id SERIAL PRIMARY KEY,
+    parent_id INTEGER NOT NULL REFERENCES parents(parent_id) ON DELETE CASCADE,
+    full_name VARCHAR(200) NOT NULL,
+    date_of_birth DATE NOT NULL,
+    school_name VARCHAR(200),
+    gender VARCHAR(10) NOT NULL CHECK (gender IN ('Male', 'Female', 'Other')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+
+CREATE TABLE IF NOT EXISTS bookings (
+    booking_id SERIAL PRIMARY KEY,
+    booking_ref VARCHAR(12) NOT NULL,
+    user_id INTEGER NOT NULL,
+    parent_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+    total_amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(50),
+    payment_status VARCHAR(20) DEFAULT 'Unpaid',
+    terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+
+
+CREATE TABLE booking_games (
+    booking_game_id SERIAL PRIMARY KEY,
+    booking_id INTEGER NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
+    child_id INTEGER NOT NULL REFERENCES children(child_id),
+    game_id INTEGER NOT NULL REFERENCES baby_games(id),  -- Assumes baby_games is your game table
+    game_price DECIMAL(10,2) NOT NULL,
+    attendance_status VARCHAR(20) DEFAULT 'Registered'
+        CHECK (attendance_status IN ('Registered', 'Attended', 'No_Show')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+
+
+
+
