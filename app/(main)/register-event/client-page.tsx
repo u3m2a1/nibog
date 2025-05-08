@@ -26,6 +26,7 @@ import { getAllCities } from "@/services/cityService"
 import { getEventsByCityId, EventListItem, EventGameListItem } from "@/services/eventService"
 import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
+import { initiatePhonePePayment } from "@/services/paymentService"
 
 // Helper function to format price
 const formatPrice = (price: number) => {
@@ -822,8 +823,8 @@ export default function RegisterEventClientPage() {
         gameId: selectedGameObj.id,
         gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
         totalAmount: calculateTotalPrice(),
-        paymentMethod: "Credit Card", // This should be dynamic based on the selected payment method
-        paymentStatus: "Paid", // This should be dynamic based on the payment result
+        paymentMethod: "PhonePe", // Using PhonePe as the payment method
+        paymentStatus: "Pending", // Set to pending initially
         termsAccepted
       })
 
@@ -833,17 +834,31 @@ export default function RegisterEventClientPage() {
       const response = await registerBooking(bookingData)
       console.log("Booking registration response:", response)
 
-      // Set booking success and reference
-      setBookingSuccess(true)
-      if (response && response.length > 0) {
-        setBookingReference(response[0].booking_id.toString())
+      if (!response || response.length === 0) {
+        throw new Error("Failed to create booking. Please try again.")
       }
 
-      // Show success message
-      alert("Booking successful! Your booking reference is: " + (response && response.length > 0 ? response[0].booking_id : "N/A"))
+      const bookingId = response[0].booking_id.toString()
+      setBookingReference(bookingId)
 
-      // Redirect to the booking confirmation page
-      router.push(`/booking-confirmation?ref=${response && response.length > 0 ? response[0].booking_id : ""}`)
+      // Initiate PhonePe payment
+      console.log("Initiating PhonePe payment for booking ID:", bookingId)
+
+      // Get the total amount in rupees
+      const totalAmount = calculateTotalPrice()
+
+      // Initiate the payment
+      const paymentUrl = await initiatePhonePePayment(
+        bookingId,
+        userId,
+        totalAmount,
+        phone
+      )
+
+      console.log("PhonePe payment URL:", paymentUrl)
+
+      // Redirect to the PhonePe payment page
+      window.location.href = paymentUrl
     } catch (error: any) {
       console.error("Error processing payment and booking:", error)
       setPaymentError(error.message || "Failed to process payment and booking. Please try again.")
@@ -1659,56 +1674,50 @@ export default function RegisterEventClientPage() {
 
               <div className="space-y-2 mt-6">
                 <Label>Payment Method</Label>
-                <Tabs defaultValue="card" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="card">Card</TabsTrigger>
-                    <TabsTrigger value="upi">UPI</TabsTrigger>
-                    <TabsTrigger value="netbanking">Net Banking</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="card" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="card-number">Card Number</Label>
-                      <Input id="card-number" placeholder="1234 5678 9012 3456" />
+                <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
+                  <div className="flex items-center justify-center">
+                    <div className="bg-[#5f259f] p-4 rounded-lg text-white font-bold text-xl flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h16a2 2 0 0 1 2 2v13c0 1.1-.9 2-2 2h-3.5"></path>
+                        <path d="M2 10h20"></path>
+                        <path d="M7 15h.01"></path>
+                        <path d="M11 15h2"></path>
+                        <path d="M10.5 20a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0z"></path>
+                      </svg>
+                      PhonePe
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM/YY" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input id="cvv" placeholder="123" />
-                      </div>
+                  </div>
+                  <p className="text-center text-sm text-muted-foreground">
+                    You will be redirected to PhonePe to complete your payment securely.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    <div className="bg-gray-100 p-2 rounded-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                        <line x1="2" x2="22" y1="10" y2="10"></line>
+                      </svg>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="name-on-card">Name on Card</Label>
-                      <Input id="name-on-card" placeholder="Enter name as on card" />
+                    <div className="bg-gray-100 p-2 rounded-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16.7 8A3 3 0 0 0 14 6h-4a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-4a3 3 0 0 1-2.7-2"></path>
+                        <path d="M12 18V6"></path>
+                      </svg>
                     </div>
-                  </TabsContent>
-                  <TabsContent value="upi" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="upi-id">UPI ID</Label>
-                      <Input id="upi-id" placeholder="name@upi" />
+                    <div className="bg-gray-100 p-2 rounded-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2v20"></path>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                      </svg>
                     </div>
-                  </TabsContent>
-                  <TabsContent value="netbanking" className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Select Bank</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your bank" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sbi">State Bank of India</SelectItem>
-                          <SelectItem value="hdfc">HDFC Bank</SelectItem>
-                          <SelectItem value="icici">ICICI Bank</SelectItem>
-                          <SelectItem value="axis">Axis Bank</SelectItem>
-                          <SelectItem value="kotak">Kotak Mahindra Bank</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="bg-gray-100 p-2 rounded-md">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"></path>
+                        <path d="M2 9v1c0 1.1.9 2 2 2h1"></path>
+                        <path d="M16 11h0"></path>
+                      </svg>
                     </div>
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-4 mt-6">
@@ -1726,7 +1735,7 @@ export default function RegisterEventClientPage() {
                       Processing...
                     </>
                   ) : (
-                    <>Pay ₹{calculateTotalPrice()}</>
+                    <>Pay with PhonePe ₹{calculateTotalPrice()}</>
                   )}
                 </Button>
               </div>

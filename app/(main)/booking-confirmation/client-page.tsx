@@ -11,9 +11,44 @@ export default function BookingConfirmationClientPage() {
   const searchParams = useSearchParams()
   const bookingRef = searchParams.get('ref')
   const [currentDate] = useState(new Date())
+  const [isLoading, setIsLoading] = useState(true)
+  const [bookingDetails, setBookingDetails] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  // In a real app, you would fetch the booking details from the API using the booking reference
-  // For now, we'll just display the booking reference
+  // Fetch booking details when component mounts
+  useEffect(() => {
+    const fetchBookingDetails = async () => {
+      if (!bookingRef) {
+        setError("No booking reference provided")
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        // In a real app, you would fetch the booking details from the API
+        // For now, we'll just simulate a successful API call
+
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Set booking details
+        setBookingDetails({
+          id: bookingRef,
+          status: "Confirmed",
+          date: new Date().toISOString(),
+          paymentStatus: "Paid"
+        })
+      } catch (error: any) {
+        console.error("Error fetching booking details:", error)
+        setError(error.message || "Failed to fetch booking details")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBookingDetails()
+  }, [bookingRef])
 
   return (
     <div className="container py-8 px-4 sm:px-6 relative">
@@ -29,19 +64,39 @@ export default function BookingConfirmationClientPage() {
         {/* Decorative top pattern */}
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-green-500 via-teal-500 to-emerald-500"></div>
 
-        <CardHeader className="space-y-1 relative">
-          <div className="flex items-center gap-4">
-            <div className="bg-green-100 p-3 rounded-full">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Booking Confirmed!</CardTitle>
-              <CardDescription>
-                Thank you for registering with NIBOG
-              </CardDescription>
-            </div>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin h-12 w-12 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
+            <p className="text-gray-600">Loading booking details...</p>
           </div>
-        </CardHeader>
+        ) : error ? (
+          <div className="p-8 text-center">
+            <div className="bg-red-100 p-3 rounded-full inline-block mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-red-700 mb-2">Error Loading Booking</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <Button variant="outline" onClick={() => window.location.href = "/"}>Return to Home</Button>
+          </div>
+        ) : (
+          <>
+            <CardHeader className="space-y-1 relative">
+              <div className="flex items-center gap-4">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <CheckCircle className="h-8 w-8 text-green-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Booking Confirmed!</CardTitle>
+                  <CardDescription>
+                    Thank you for registering with NIBOG
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
 
         <CardContent className="space-y-6">
           <div className="p-4 rounded-lg border border-dashed border-green-500/20 bg-green-50/50 space-y-4">
@@ -51,7 +106,7 @@ export default function BookingConfirmationClientPage() {
               </div>
               Booking Details
             </h3>
-            
+
             <div className="grid gap-2">
               <div className="flex justify-between">
                 <span className="text-gray-600">Booking Reference:</span>
@@ -91,7 +146,7 @@ export default function BookingConfirmationClientPage() {
               </Link>
             </Button>
           </div>
-          
+
           <div className="text-center text-sm text-gray-500">
             Need help? Contact us at{" "}
             <Link href="mailto:support@nibog.in" className="text-green-600 font-medium underline-offset-4 hover:underline transition-colors">
@@ -99,6 +154,8 @@ export default function BookingConfirmationClientPage() {
             </Link>
           </div>
         </CardFooter>
+          </>
+        )}
       </Card>
     </div>
   )

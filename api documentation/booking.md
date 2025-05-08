@@ -63,6 +63,11 @@ response
 
 
 
+
+
+
+
+
 GET https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all
 
 
@@ -216,4 +221,25 @@ response
         "venue_updated_at": "2025-05-05T06:31:00.910Z"
     }
 ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

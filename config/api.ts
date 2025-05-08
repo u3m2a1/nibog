@@ -86,7 +86,7 @@ export const USER_API = {
 export const BOOKING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create", // POST
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all", // GET
+  UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update", // POST
 };
 
-
-
+// PhonePe API endpoints are now in config/phonepe.ts
