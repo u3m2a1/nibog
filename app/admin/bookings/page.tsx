@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle } from "lucide-react"
+import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle, Loader2 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { cn } from "@/lib/utils"
+import { useToast } from "@/components/ui/use-toast"
+import { getAllBookings, updateBookingStatus, Booking } from "@/services/bookingService"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,124 +27,35 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-// Mock data - in a real app, this would come from an API
-const bookings = [
-  {
-    id: "B001",
-    user: "Harikrishna",
-    email: "harikrishna@example.com",
-    phone: "+91 9876543210",
-    event: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "confirmed",
-  },
-  {
-    id: "B002",
-    user: "Durga Prasad",
-    email: "durgaprasad@example.com",
-    phone: "+91 9876543211",
-    event: "Baby Walker",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "pending_payment",
-  },
-  {
-    id: "B003",
-    user: "Srujana",
-    email: "srujana@example.com",
-    phone: "+91 9876543212",
-    event: "Running Race",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 2,
-    amount: 3600,
-    status: "confirmed",
-  },
-  {
-    id: "B004",
-    user: "Ramesh Kumar",
-    email: "ramesh@example.com",
-    phone: "+91 9876543213",
-    event: "Hurdle Toddle",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    date: "2025-03-16",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "cancelled_by_user",
-  },
-  {
-    id: "B005",
-    user: "Suresh Reddy",
-    email: "suresh@example.com",
-    phone: "+91 9876543214",
-    event: "Cycle Race",
-    venue: "Sports Complex",
-    city: "Vizag",
-    date: "2025-08-15",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "confirmed",
-  },
-]
-
-// Mock cities data
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-]
-
-// Mock events data
-const events = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
+// Booking statuses for filtering
+const statusOptions = [
+  { id: "1", name: "Confirmed", value: "confirmed" },
+  { id: "2", name: "Pending", value: "pending" },
+  { id: "3", name: "Cancelled", value: "cancelled" },
+  { id: "4", name: "Completed", value: "completed" },
+  { id: "5", name: "No Show", value: "no show" },
 ]
 
 // Booking statuses
 const statuses = [
-  { id: "1", name: "confirmed" },
-  { id: "2", name: "pending_payment" },
-  { id: "3", name: "cancelled_by_user" },
-  { id: "4", name: "cancelled_by_admin" },
-  { id: "5", name: "attended" },
-  { id: "6", name: "no_show" },
+  { id: "1", name: "Confirmed" },
+  { id: "2", name: "Pending" },
+  { id: "3", name: "Cancelled" },
+  { id: "4", name: "Completed" },
+  { id: "5", name: "No Show" },
 ]
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "confirmed":
       return <Badge className="bg-green-500 hover:bg-green-600">Confirmed</Badge>
-    case "pending_payment":
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending Payment</Badge>
-    case "cancelled_by_user":
-      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled by User</Badge>
-    case "cancelled_by_admin":
-      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled by Admin</Badge>
-    case "attended":
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Attended</Badge>
-    case "no_show":
+    case "pending":
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending</Badge>
+    case "cancelled":
+      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
+    case "completed":
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
+    case "no show":
       return <Badge variant="outline">No Show</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
@@ -150,74 +63,153 @@ const getStatusBadge = (status: string) => {
 }
 
 export default function BookingsPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCity, setSelectedCity] = useState("all")
   const [selectedEvent, setSelectedEvent] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedDate, setSelectedDate] = useState<Date>()
-  const [bookingsList, setBookingsList] = useState(bookings)
-  const [isProcessing, setIsProcessing] = useState<string | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState<number | null>(null)
+  const [cities, setCities] = useState<{id: string, name: string}[]>([])
+  const [events, setEvents] = useState<{id: string, name: string}[]>([])
+
+  // Fetch bookings from API
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const data = await getAllBookings()
+        setBookings(data)
+
+        // Extract unique cities and events from the bookings data
+        const uniqueCities = Array.from(new Set(data.map(booking => booking.city_name)))
+          .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
+
+        const uniqueEvents = Array.from(new Set(data.map(booking => booking.event_title)))
+          .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
+
+        setCities(uniqueCities)
+        setEvents(uniqueEvents)
+      } catch (error: any) {
+        console.error("Failed to fetch bookings:", error)
+        setError(error.message || "Failed to load bookings. Please try again.")
+        toast({
+          title: "Error",
+          description: "Failed to load bookings. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBookings()
+  }, [toast])
 
   // Handle confirm booking
-  const handleConfirmBooking = (id: string) => {
-    setIsProcessing(id)
+  const handleConfirmBooking = async (id: number) => {
+    try {
+      setIsProcessing(id)
 
-    // Simulate API call to confirm the booking
-    setTimeout(() => {
-      // In a real app, this would be an API call to update the booking status
-      setBookingsList(bookingsList.map(booking =>
-        booking.id === id ? { ...booking, status: "confirmed" } : booking
+      // Call the API to update the booking status
+      await updateBookingStatus(id, "Confirmed")
+
+      // Update the local state
+      setBookings(bookings.map(booking =>
+        booking.booking_id === id ? { ...booking, booking_status: "Confirmed" } : booking
       ))
+
+      toast({
+        title: "Success",
+        description: `Booking #${id} has been confirmed.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to confirm booking ${id}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to confirm booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-    }, 1000)
+    }
   }
 
   // Handle cancel booking
-  const handleCancelBooking = (id: string) => {
-    setIsProcessing(id)
+  const handleCancelBooking = async (id: number) => {
+    try {
+      setIsProcessing(id)
 
-    // Simulate API call to cancel the booking
-    setTimeout(() => {
-      // In a real app, this would be an API call to update the booking status
-      setBookingsList(bookingsList.map(booking =>
-        booking.id === id ? { ...booking, status: "cancelled_by_admin" } : booking
+      // Call the API to update the booking status
+      await updateBookingStatus(id, "Cancelled")
+
+      // Update the local state
+      setBookings(bookings.map(booking =>
+        booking.booking_id === id ? { ...booking, booking_status: "Cancelled" } : booking
       ))
+
+      toast({
+        title: "Success",
+        description: `Booking #${id} has been cancelled.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to cancel booking ${id}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-    }, 1000)
+    }
   }
 
   // Filter bookings based on search and filters
-  const filteredBookings = bookingsList.filter((booking) => {
+  const filteredBookings = bookings.filter((booking) => {
     // Search query filter
     if (
       searchQuery &&
-      !booking.id.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !booking.user.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !booking.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !booking.phone.includes(searchQuery) &&
-      !booking.event.toLowerCase().includes(searchQuery.toLowerCase())
+      !String(booking.booking_id).includes(searchQuery) &&
+      !booking.parent_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !booking.parent_email.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !booking.parent_additional_phone.includes(searchQuery) &&
+      !booking.event_title.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false
     }
 
     // City filter
-    if (selectedCity !== "all" && booking.city !== selectedCity) {
+    if (selectedCity !== "all" && booking.city_name !== selectedCity) {
       return false
     }
 
     // Event filter
-    if (selectedEvent !== "all" && booking.event !== selectedEvent) {
+    if (selectedEvent !== "all" && booking.event_title !== selectedEvent) {
       return false
     }
 
     // Status filter
-    if (selectedStatus !== "all" && booking.status !== selectedStatus) {
+    if (selectedStatus !== "all" && booking.booking_status.toLowerCase() !== selectedStatus.toLowerCase()) {
       return false
     }
 
     // Date filter
-    if (selectedDate && booking.date !== format(selectedDate, "yyyy-MM-dd")) {
-      return false
+    if (selectedDate) {
+      try {
+        const bookingDate = format(parseISO(booking.event_event_date), "yyyy-MM-dd")
+        const filterDate = format(selectedDate, "yyyy-MM-dd")
+        if (bookingDate !== filterDate) {
+          return false
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error)
+        return false
+      }
     }
 
     return true
@@ -343,18 +335,32 @@ export default function BookingsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Booking ID</TableHead>
-              <TableHead>User</TableHead>
+              <TableHead>Parent</TableHead>
+              <TableHead>Child</TableHead>
               <TableHead>Event</TableHead>
               <TableHead>City</TableHead>
-              <TableHead>Date & Time</TableHead>
-              <TableHead>Children</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredBookings.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-24 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                  <div className="mt-2">Loading bookings...</div>
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-24 text-center text-destructive">
+                  <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                  {error}
+                </TableCell>
+              </TableRow>
+            ) : filteredBookings.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="h-24 text-center">
                   No bookings found.
@@ -362,47 +368,51 @@ export default function BookingsPage() {
               </TableRow>
             ) : (
               filteredBookings.map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell className="font-medium">{booking.id}</TableCell>
+                <TableRow key={booking.booking_id}>
+                  <TableCell className="font-medium">{booking.booking_id}</TableCell>
                   <TableCell>
-                    {booking.user}
-                    <div className="text-xs text-muted-foreground">{booking.email}</div>
+                    {booking.parent_name}
+                    <div className="text-xs text-muted-foreground">{booking.parent_email}</div>
                   </TableCell>
-                  <TableCell>{booking.event}</TableCell>
-                  <TableCell>{booking.city}</TableCell>
                   <TableCell>
-                    {booking.date}
-                    <div className="text-xs text-muted-foreground">{booking.time}</div>
+                    {booking.child_full_name}
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(booking.child_date_of_birth).toLocaleDateString()}
+                    </div>
                   </TableCell>
-                  <TableCell>{booking.children}</TableCell>
-                  <TableCell>₹{booking.amount}</TableCell>
-                  <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                  <TableCell>{booking.event_title}</TableCell>
+                  <TableCell>{booking.city_name}</TableCell>
+                  <TableCell>
+                    {new Date(booking.event_event_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>₹{booking.total_amount}</TableCell>
+                  <TableCell>{getStatusBadge(booking.booking_status.toLowerCase())}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/bookings/${booking.id}`}>
+                        <Link href={`/admin/bookings/${booking.booking_id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
                       <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/bookings/${booking.id}/edit`}>
+                        <Link href={`/admin/bookings/${booking.booking_id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
                         </Link>
                       </Button>
-                      {booking.status === "pending_payment" && (
+                      {booking.booking_status.toLowerCase() === "pending" && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleConfirmBooking(booking.id)}
-                          disabled={isProcessing === booking.id}
+                          onClick={() => handleConfirmBooking(booking.booking_id)}
+                          disabled={isProcessing === booking.booking_id}
                         >
                           <Check className="h-4 w-4" />
                           <span className="sr-only">Confirm</span>
                         </Button>
                       )}
-                      {booking.status === "confirmed" && (
+                      {booking.booking_status.toLowerCase() === "confirmed" && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -419,7 +429,7 @@ export default function BookingsPage() {
                                   <div className="space-y-2">
                                     <div className="font-medium">Are you sure you want to cancel this booking?</div>
                                     <div>
-                                      This will cancel booking {booking.id} for {booking.user} for the {booking.event} event.
+                                      This will cancel booking {booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
                                       The user will be notified and may be eligible for a refund.
                                     </div>
                                   </div>
@@ -430,10 +440,15 @@ export default function BookingsPage() {
                               <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
                               <AlertDialogAction
                                 className="bg-red-500 hover:bg-red-600"
-                                onClick={() => handleCancelBooking(booking.id)}
-                                disabled={isProcessing === booking.id}
+                                onClick={() => handleCancelBooking(booking.booking_id)}
+                                disabled={isProcessing === booking.booking_id}
                               >
-                                {isProcessing === booking.id ? "Cancelling..." : "Yes, Cancel Booking"}
+                                {isProcessing === booking.booking_id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Cancelling...
+                                  </>
+                                ) : "Yes, Cancel Booking"}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>

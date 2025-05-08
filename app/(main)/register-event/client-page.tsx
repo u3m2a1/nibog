@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, addMonths, differenceInMonths, differenceInDays } from "date-fns"
 import { cn } from "@/lib/utils"
-import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin } from "lucide-react"
+import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -25,6 +25,7 @@ import { AddOn } from "@/types"
 import { getAllCities } from "@/services/cityService"
 import { getEventsByCityId, EventListItem, EventGameListItem } from "@/services/eventService"
 import { getGamesByAge, Game } from "@/services/gameService"
+import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 
 // Helper function to format price
 const formatPrice = (price: number) => {
@@ -185,9 +186,13 @@ export default function RegisterEventClientPage() {
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<string>("")
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
+  const [bookingReference, setBookingReference] = useState<string | null>(null)
 
   // Get authentication state from auth context
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
 
   // Calculate child's age on event date
   const calculateAge = (birthDate: Date, onDate: Date) => {
@@ -670,8 +675,8 @@ export default function RegisterEventClientPage() {
   // Get selected event details
   const selectedEventDetails = events.find(event => event.id === selectedEvent)
 
-  // Handle continue to add-ons
-  const handleContinueToAddOns = () => {
+  // Handle registration
+  const handleRegistration = async () => {
     if (!isAuthenticated) {
       // Save registration data to sessionStorage
       const registrationData = {
@@ -692,10 +697,73 @@ export default function RegisterEventClientPage() {
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
       // Redirect to login with return URL
-      router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=addons')}`)
+      router.push(`/login?returnUrl=${encodeURIComponent('/register-event')}`)
     } else {
-      // User is authenticated, proceed to add-ons step
-      setStep(2)
+      try {
+        setIsProcessingPayment(true)
+        setPaymentError(null)
+
+        // Get the selected game details
+        const selectedGameObj = eligibleGames.find(game => game.id.toString() === selectedGame)
+        if (!selectedGameObj) {
+          throw new Error("Selected game not found")
+        }
+
+        // Get the selected event details
+        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
+        if (!selectedApiEvent) {
+          throw new Error("Selected event not found")
+        }
+
+        // Get the user ID from the auth context
+        const userId = user?.user_id
+        if (!userId) {
+          throw new Error("User ID not found. Please log in again.")
+        }
+
+        // Format the booking data for the API
+        const bookingData = formatBookingDataForAPI({
+          userId,
+          parentName,
+          email,
+          phone,
+          childName,
+          childDob: dob!,
+          schoolName,
+          gender,
+          eventId: selectedApiEvent.event_id,
+          gameId: selectedGameObj.id,
+          gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
+          totalAmount: calculateTotalPrice(),
+          paymentMethod: "Credit Card", // This should be dynamic based on the selected payment method
+          paymentStatus: "Paid", // This should be dynamic based on the payment result
+          termsAccepted
+        })
+
+        console.log("Formatted booking data:", bookingData)
+
+        // Register the booking
+        const response = await registerBooking(bookingData)
+        console.log("Booking registration response:", response)
+
+        // Set booking success and reference
+        setBookingSuccess(true)
+        if (response && response.length > 0) {
+          setBookingReference(response[0].booking_id.toString())
+        }
+
+        // Show success message
+        alert("Registration successful! Your booking reference is: " + (response && response.length > 0 ? response[0].booking_id : "N/A"))
+
+        // Redirect to the booking confirmation page
+        router.push(`/booking-confirmation?ref=${response && response.length > 0 ? response[0].booking_id : ""}`)
+      } catch (error: any) {
+        console.error("Error processing registration:", error)
+        setPaymentError(error.message || "Failed to process registration. Please try again.")
+        alert("Error: " + (error.message || "Failed to process registration. Please try again."))
+      } finally {
+        setIsProcessingPayment(false)
+      }
     }
   }
 
@@ -714,6 +782,75 @@ export default function RegisterEventClientPage() {
     // Save add-ons to session storage
     saveAddOnsToSession()
     setStep(3)
+  }
+
+  // Handle payment and booking registration
+  const handlePayment = async () => {
+    try {
+      setIsProcessingPayment(true)
+      setPaymentError(null)
+
+      // Get the selected game details
+      const selectedGameObj = eligibleGames.find(game => game.id.toString() === selectedGame)
+      if (!selectedGameObj) {
+        throw new Error("Selected game not found")
+      }
+
+      // Get the selected event details
+      const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
+      if (!selectedApiEvent) {
+        throw new Error("Selected event not found")
+      }
+
+      // Get the user ID from the auth context
+      const userId = user?.user_id
+      if (!userId) {
+        throw new Error("User ID not found. Please log in again.")
+      }
+
+      // Format the booking data for the API
+      const bookingData = formatBookingDataForAPI({
+        userId,
+        parentName,
+        email,
+        phone,
+        childName,
+        childDob: dob!,
+        schoolName,
+        gender,
+        eventId: selectedApiEvent.event_id,
+        gameId: selectedGameObj.id,
+        gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
+        totalAmount: calculateTotalPrice(),
+        paymentMethod: "Credit Card", // This should be dynamic based on the selected payment method
+        paymentStatus: "Paid", // This should be dynamic based on the payment result
+        termsAccepted
+      })
+
+      console.log("Formatted booking data:", bookingData)
+
+      // Register the booking
+      const response = await registerBooking(bookingData)
+      console.log("Booking registration response:", response)
+
+      // Set booking success and reference
+      setBookingSuccess(true)
+      if (response && response.length > 0) {
+        setBookingReference(response[0].booking_id.toString())
+      }
+
+      // Show success message
+      alert("Booking successful! Your booking reference is: " + (response && response.length > 0 ? response[0].booking_id : "N/A"))
+
+      // Redirect to the booking confirmation page
+      router.push(`/booking-confirmation?ref=${response && response.length > 0 ? response[0].booking_id : ""}`)
+    } catch (error: any) {
+      console.error("Error processing payment and booking:", error)
+      setPaymentError(error.message || "Failed to process payment and booking. Please try again.")
+      alert("Error: " + (error.message || "Failed to process payment and booking. Please try again."))
+    } finally {
+      setIsProcessingPayment(false)
+    }
   }
 
   // Fetch cities from API when component mounts
@@ -1330,16 +1467,23 @@ export default function RegisterEventClientPage() {
                 className={cn(
                   "w-full relative overflow-hidden group transition-all duration-300",
                   (!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
-                 (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted)
+                 (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment)
                     ? "opacity-50"
                     : "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
                 )}
-                onClick={handleContinueToAddOns}
+                onClick={handleRegistration}
                 disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
-                         (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted}
+                         (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment}
               >
                 <span className="relative z-10 flex items-center">
-                  Continue to Add-ons <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                  {isProcessingPayment ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>Register <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" /></>
+                  )}
                 </span>
                 <span className="absolute inset-0 bg-white/10 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500"></span>
               </Button>
@@ -1385,7 +1529,7 @@ export default function RegisterEventClientPage() {
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button className="w-full" onClick={handleContinueToPayment}>
-                  Continue to Payment <ArrowRight className="ml-2 h-4 w-4" />
+                  Register <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </>
@@ -1497,6 +1641,22 @@ export default function RegisterEventClientPage() {
                 </div>
               </div>
 
+              {paymentError && (
+                <div className="rounded-lg bg-red-50 p-4 border border-red-100 shadow-inner mb-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 bg-red-100 rounded-full p-1">
+                      <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Payment Error</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>{paymentError}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 mt-6">
                 <Label>Payment Method</Label>
                 <Tabs defaultValue="card" className="w-full">
@@ -1555,8 +1715,19 @@ export default function RegisterEventClientPage() {
                 <Button variant="outline" className="w-full" onClick={() => setStep(2)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
-                <Button className="w-full">
-                  Pay ₹{calculateTotalPrice()}
+                <Button
+                  className="w-full"
+                  onClick={handlePayment}
+                  disabled={isProcessingPayment}
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>Pay ₹{calculateTotalPrice()}</>
+                  )}
                 </Button>
               </div>
             </>

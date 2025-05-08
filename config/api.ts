@@ -82,7 +82,11 @@ export const USER_API = {
   DELETE: "https://ai.alviongs.com/webhook/v1/nibog/user/delete", // POST
 };
 
-
+// Booking API endpoints
+export const BOOKING_API = {
+  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create", // POST
+  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all", // GET
+};
 
 
 
