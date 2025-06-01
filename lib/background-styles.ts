@@ -1,3 +1,15 @@
+interface BackgroundElement {
+  icon: string;
+  size: string;
+  position: string;
+  className?: string;
+}
+
+interface PageBackgroundConfig {
+  gradient: string;
+  elements: BackgroundElement[];
+}
+
 export const pageBackgrounds = {
   home: {
     gradient: 'bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100',
@@ -49,15 +61,15 @@ export const pageBackgrounds = {
     ],
   },
   about: {
-    gradient: 'bg-gradient-to-br from-orange-50 to-amber-100',
+    gradient: 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50',
     elements: [
-      { icon: '📚', size: 'text-3xl', position: 'top-1/3 left-1/4' },
-      { icon: '❤️', size: 'text-2xl', position: 'bottom-1/3 right-1/4' },
-      { icon: '👨‍👩‍👧‍👦', size: 'text-2xl', position: 'top-1/4 right-1/5' },
-      { icon: '🌱', size: 'text-3xl', position: 'top-1/6 left-1/6' },
-      { icon: '🌟', size: 'text-2xl', position: 'bottom-1/4 left-1/5' },
-      { icon: '🌍', size: 'text-3xl', position: 'top-2/3 right-1/6' },
-      { icon: '🎯', size: 'text-2xl', position: 'bottom-1/6 right-1/4' },
+      { icon: '🌱', size: 'text-3xl', position: 'top-1/3 left-1/4', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '🌿', size: 'text-2xl', position: 'bottom-1/3 right-1/4', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '👶', size: 'text-2xl', position: 'top-1/4 right-1/5', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '🌱', size: 'text-3xl', position: 'top-1/6 left-1/6', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '🌟', size: 'text-2xl', position: 'bottom-1/4 left-1/5', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '🏆', size: 'text-3xl', position: 'top-2/3 right-1/6', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
+      { icon: '🎯', size: 'text-2xl', position: 'bottom-1/6 right-1/4', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
     ],
   },
   contact: {
@@ -120,4 +132,4 @@ export const floatingAnimation = {
   }),
 };
 
-export type PageBackground = 'home' | 'events' | 'games' | 'register' | 'about' | 'contact' | 'olympics';
+export type PageBackground = keyof typeof pageBackgrounds;
