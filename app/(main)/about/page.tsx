@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { CheckCircle2, Users, Trophy, Calendar, MapPin, Heart } from "lucide-react"
+import { CheckCircle2, Users, Trophy, Calendar, MapPin, Heart, ChevronLeft, ChevronRight } from "lucide-react"
 import type { Metadata } from "next"
 import { AnimatedBackground } from "@/components/animated-background"
 import { ImageSlideshow } from "@/components/image-slideshow"
+import { TestimonialCarousel } from "@/components/testimonial-carousel"
 
 export const metadata: Metadata = {
   title: "About NIBOG | New India Baby Olympic Games",
@@ -275,38 +276,42 @@ export default function AboutPage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                quote: "NIBOG has been a wonderful experience for my son. He's gained so much confidence and made new friends. The events are well-organized and the staff is amazing!",
-                name: "Meera Reddy",
-                location: "Hyderabad",
-              },
-              {
-                quote: "My daughter looks forward to NIBOG events every year. It's become a family tradition for us. The joy on her face when she participates is priceless.",
-                name: "Arjun Malhotra",
-                location: "Bangalore",
-              },
-              {
-                quote: "The way NIBOG organizes age-appropriate competitions is commendable. My twins have developed healthy competitive spirit while having fun.",
-                name: "Lakshmi Nair",
-                location: "Chennai",
-              },
-            ].map((testimonial, i) => (
-              <Card key={i}>
-                <CardContent className="pt-6">
-                  <div className="mb-4 text-4xl text-yellow-500">"</div>
-                  <p className="mb-4 italic text-muted-foreground">{testimonial.quote}</p>
-                  <div className="flex items-center gap-2">
-                    <div className="h-10 w-10 rounded-full bg-slate-200"></div>
-                    <div>
-                      <p className="font-medium">{testimonial.name}</p>
-                      <p className="text-sm text-muted-foreground">{testimonial.location}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="mt-12">
+            <TestimonialCarousel
+              testimonials={[
+                {
+                  quote: "NIBOG has been a wonderful experience for my son. He's gained so much confidence and made new friends. The events are well-organized and the staff is amazing!",
+                  name: "Meera Reddy",
+                  location: "Hyderabad",
+                },
+                {
+                  quote: "My daughter looks forward to NIBOG events every year. It's become a family tradition for us. The joy on her face when she participates is priceless.",
+                  name: "Arjun Malhotra",
+                  location: "Bangalore",
+                },
+                {
+                  quote: "The way NIBOG organizes age-appropriate competitions is commendable. My twins have developed healthy competitive spirit while having fun.",
+                  name: "Lakshmi Nair",
+                  location: "Chennai",
+                },
+                {
+                  quote: "We traveled from Mumbai just for this event, and it was worth every mile! The organization was flawless.",
+                  name: "Rahul Verma",
+                  location: "Mumbai",
+                },
+                {
+                  quote: "My child was quite shy before joining NIBOG. Now, he's more confident and loves participating in events. Thank you for this platform!",
+                  name: "Priya Singh",
+                  location: "Delhi",
+                },
+                {
+                  quote: "The safety measures and care taken for the children are exceptional. We always feel comfortable at NIBOG events.",
+                  name: "Ananya Gupta",
+                  location: "Kolkata",
+                },
+              ]}
+              autoPlayInterval={5000}
+            />
           </div>
         </div>
       </section>
