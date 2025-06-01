@@ -29,12 +29,12 @@ export default function ContactPage() {
             </p>
           </div>
         </div>
-        <div className="absolute inset-0 z-0 opacity-20">
+        <div className="absolute inset-x-0 bottom-0 top-[-135px] z-0 [opacity-0.1]">
           <Image
             src="/images/contact/pattern-bg.jpg"
             alt="Background pattern"
             fill
-            className="object-cover"
+            className="object-cover blur-sm"
             priority
           />
         </div>
