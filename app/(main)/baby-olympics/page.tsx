@@ -117,7 +117,16 @@ export default function BabyOlympicsPage() {
       <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-yellow-100 via-amber-100 to-yellow-50" />
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/images/baby-olympics/hero-bg.jpg"
+            alt="NIBOG background"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-100 via-amber-100 to-yellow-50 opacity-40" />
+        </div>
         <div className="container relative flex flex-col items-center justify-center gap-4 py-16 text-center md:py-24 lg:py-32">
           <Badge className="bg-yellow-500 px-3.5 py-1.5 text-sm font-medium">New India Baby Olympics Games</Badge>
           <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">

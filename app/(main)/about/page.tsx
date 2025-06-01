@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, Users, Trophy, Calendar, MapPin, Heart } from "lucide-react"
 import type { Metadata } from "next"
 import { AnimatedBackground } from "@/components/animated-background"
+import { ImageSlideshow } from "@/components/image-slideshow"
 
 export const metadata: Metadata = {
   title: "About NIBOG | New India Baby Olympic Games",
@@ -65,14 +66,31 @@ export default function AboutPage() {
                 ))}
               </ul>
             </div>
-            <div className="relative aspect-square overflow-hidden rounded-xl">
-              <Image
-                src="/images/about/indian-children-playing.jpg"
-                alt="Indian children playing together"
-                fill
-                className="object-cover"
-              />
-            </div>
+            <ImageSlideshow
+              images={[
+                {
+                  src: "/images/about/children/children-1.jpg",
+                  alt: "Children playing together happily"
+                },
+                {
+                  src: "/images/about/children/children-2.jpg",
+                  alt: "Kids participating in fun activities"
+                },
+                {
+                  src: "/images/about/children/children-3.jpg",
+                  alt: "Children laughing and having fun"
+                },
+                {
+                  src: "/images/about/children/children-4.jpg",
+                  alt: "Kids playing outdoor games"
+                },
+                {
+                  src: "/images/about/children/children-5.jpg",
+                  alt: "Children celebrating together"
+                }
+              ]}
+              interval={4000}
+            />
           </div>
         </div>
       </section>
