@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, Users, Trophy, Calendar, MapPin, Heart } from "lucide-react"
 import type { Metadata } from "next"
+import { AnimatedBackground } from "@/components/animated-background"
 
 export const metadata: Metadata = {
   title: "About NIBOG | New India Baby Olympic Games",
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <>
+    <AnimatedBackground variant="about">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white py-16 dark:from-blue-950/20 dark:to-background md:py-24">
         <div className="container relative z-10">
@@ -313,6 +314,6 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
-    </>
+    </AnimatedBackground>
   )
 }

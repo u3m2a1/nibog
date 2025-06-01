@@ -9,10 +9,12 @@ import AgeSelector from "@/components/age-selector"
 import FeaturedEvents from "@/components/featured-events"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
 import { ArrowRight, MapPin, Star, Shield, Award, Sparkles } from "lucide-react"
+import { AnimatedBackground } from "@/components/animated-background"
 
 export default function Home() {
   return (
-    <div className="flex flex-col gap-12 pb-8">
+    <AnimatedBackground variant="home">
+      <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
         <div className="absolute inset-0 overflow-hidden">
@@ -390,5 +392,6 @@ export default function Home() {
         </div>
       </section>
     </div>
+    </AnimatedBackground>
   )
 }

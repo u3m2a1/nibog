@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, MapPin, Medal, Trophy, Award, Star } from "lucide-react"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
+import { AnimatedBackground } from "@/components/animated-background"
 import AgeSelector from "@/components/age-selector"
 import CitySelector from "@/components/city-selector"
 import { formatPrice } from "@/lib/utils"
@@ -112,10 +113,11 @@ const olympicsEvents = [
 
 export default function BabyOlympicsPage() {
   return (
-    <div className="flex flex-col gap-12 pb-8">
+    <AnimatedBackground variant="olympics">
+      <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-yellow-600/5" />
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-100 via-amber-100 to-yellow-50" />
         <div className="container relative flex flex-col items-center justify-center gap-4 py-16 text-center md:py-24 lg:py-32">
           <Badge className="bg-yellow-500 px-3.5 py-1.5 text-sm font-medium">New India Baby Olympics Games</Badge>
           <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
@@ -348,6 +350,7 @@ export default function BabyOlympicsPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </AnimatedBackground>
   );
 }
