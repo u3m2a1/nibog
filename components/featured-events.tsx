@@ -110,24 +110,34 @@ export default function FeaturedEvents() {
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {featuredEvents.map((event) => (
-        <Card key={event.id} className="group overflow-hidden transition-all hover:shadow-md">
-          <div className="relative h-48">
-            <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
+        <Card 
+          key={event.id} 
+          className="group overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg hover:scale-[1.02] transform-gpu"
+        >
+          <div className="relative h-48 overflow-hidden">
+            <div className="relative h-full w-full transition-transform duration-500 group-hover:scale-110">
+              <Image 
+                src={event.image || "/placeholder.svg"} 
+                alt={event.title} 
+                fill 
+                className="object-cover transition-transform duration-500 group-hover:scale-110" 
+              />
+            </div>
             <div className="absolute right-2 top-2 flex gap-2">
               {event.isOlympics && <Badge className="bg-yellow-500 hover:bg-yellow-600">NIBOG Olympics</Badge>}
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-2 h-8 w-8 rounded-full bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
+              className="absolute right-2 top-2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm opacity-0 transition-all duration-300 group-hover:opacity-100 hover:bg-primary/10"
               aria-label="Save event"
             >
-              <Heart className="h-4 w-4" />
+              <Heart className="h-4 w-4 transition-colors group-hover:fill-rose-500 group-hover:text-rose-500" />
             </Button>
           </div>
           <CardContent className="p-4">
             <div className="space-y-2">
-              <h3 className="font-semibold group-hover:text-primary">{event.title}</h3>
+              <h3 className="font-semibold transition-colors duration-300 group-hover:text-primary">{event.title}</h3>
               <p className="line-clamp-2 text-sm text-muted-foreground">{event.description}</p>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
@@ -143,7 +153,11 @@ export default function FeaturedEvents() {
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
                 {event.games.map((game, index) => (
-                  <Badge key={index} variant="secondary" className="text-xs">
+                  <Badge 
+                    key={index} 
+                    variant="secondary" 
+                    className="text-xs transition-all duration-300 group-hover:bg-primary/10 group-hover:text-foreground"
+                  >
                     {game}
                   </Badge>
                 ))}
@@ -168,7 +182,11 @@ export default function FeaturedEvents() {
                 />
               </div>
             </div>
-            <Button size="sm" asChild>
+            <Button 
+              size="sm" 
+              asChild
+              className="transition-all duration-300 hover:scale-105"
+            >
               <Link href={`/register-event?city=${event.city}`}>Register Now</Link>
             </Button>
           </CardFooter>

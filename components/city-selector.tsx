@@ -70,74 +70,76 @@ export default function CitySelector({ onCityChange }: CitySelectorProps) {
   }, [value, onCityChange, cities])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={loading}
-        >
-          {loading ? (
-            <div className="flex items-center text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading cities...
-            </div>
-          ) : error ? (
-            <div className="flex items-center text-destructive">
-              <MapPin className="mr-2 h-4 w-4" />
-              Error loading cities
-            </div>
-          ) : value ? (
-            <div className="flex items-center">
-              <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
-              {cities.find((city) => city.id.toString() === value)?.city_name}
-            </div>
-          ) : (
-            <div className="flex items-center text-muted-foreground">
-              <MapPin className="mr-2 h-4 w-4" />
-              Select a city...
-            </div>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
-          <CommandInput placeholder="Search city..." />
-          <CommandList>
-            <CommandEmpty>No city found.</CommandEmpty>
+    <div className="relative w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+            disabled={loading}
+          >
             {loading ? (
-              <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+              <div className="flex items-center text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading cities...
               </div>
             ) : error ? (
-              <div className="p-6 text-center text-sm text-destructive">
-                {error}
+              <div className="flex items-center text-destructive">
+                <MapPin className="mr-2 h-4 w-4" />
+                Error loading cities
+              </div>
+            ) : value ? (
+              <div className="flex items-center">
+                <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                {cities.find((city) => city.id.toString() === value)?.city_name}
               </div>
             ) : (
-              <CommandGroup>
-                {cities.map((city) => (
-                  <CommandItem
-                    key={city.id}
-                    value={city.id.toString()}
-                    onSelect={(currentValue) => {
-                      setValue(currentValue === value ? "" : currentValue)
-                      setOpen(false)
-                    }}
-                  >
-                    <Check className={cn("mr-2 h-4 w-4", value === city.id.toString() ? "opacity-100" : "opacity-0")} />
-                    {city.city_name}
-                    <span className="ml-2 text-xs text-muted-foreground">{city.state}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              <div className="flex items-center text-muted-foreground">
+                <MapPin className="mr-2 h-4 w-4" />
+                Select a city...
+              </div>
             )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0 z-[100]" align="start" sideOffset={4}>
+          <Command>
+            <CommandInput placeholder="Search city..." />
+            <CommandList>
+              <CommandEmpty>No city found.</CommandEmpty>
+              {loading ? (
+                <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading cities...
+                </div>
+              ) : error ? (
+                <div className="p-6 text-center text-sm text-destructive">
+                  {error}
+                </div>
+              ) : (
+                <CommandGroup>
+                  {cities.map((city) => (
+                    <CommandItem
+                      key={city.id}
+                      value={city.id.toString()}
+                      onSelect={(currentValue) => {
+                        setValue(currentValue === value ? "" : currentValue)
+                        setOpen(false)
+                      }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", value === city.id.toString() ? "opacity-100" : "opacity-0")} />
+                      {city.city_name}
+                      <span className="ml-2 text-xs text-muted-foreground">{city.state}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }

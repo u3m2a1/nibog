@@ -15,7 +15,34 @@ export default function Home() {
     <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-400/10 to-primary/5 dark:from-primary/10 dark:to-background" />
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Continuous scrolling row of images */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <div className="absolute inset-y-0 left-0 flex w-[400%] animate-slide-slow">
+              {[
+                // Duplicate the images to create a seamless loop
+                ...[
+                  // Original images
+                  'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/8033858/pexels-photo-8033858.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/5247758/pexels-photo-5247758.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/18830066/pexels-photo-18830066/free-photo-of-children-playing-outdoors.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                ],
+                // Duplicate the first image at the end for smooth looping
+                'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
+              ].map((src, i) => (
+                <div key={`kid-${i}`} className="flex-none w-[25%] h-full">
+                  <img 
+                    src={src} 
+                    alt="Children playing" 
+                    className="w-full h-full object-cover opacity-30 dark:opacity-20"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="container relative flex flex-col items-center justify-center gap-6 py-16 text-center md:py-24 lg:py-32">
           <Badge className="px-3.5 py-1.5 text-sm font-medium" variant="secondary">
             New India Baby Olympics Games
@@ -31,18 +58,26 @@ export default function Home() {
           </p>
           <div className="w-full max-w-md space-y-4 rounded-lg bg-background/80 p-4 shadow-lg backdrop-blur">
             <Tabs defaultValue="city" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="city">Find by City</TabsTrigger>
-                <TabsTrigger value="age">Find by Age</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="city" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  Find by City
+                </TabsTrigger>
+                <TabsTrigger value="age" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  Find by Age
+                </TabsTrigger>
               </TabsList>
-              <TabsContent value="city" className="mt-4">
-                <CitySelector />
-              </TabsContent>
-              <TabsContent value="age" className="mt-4">
-                <AgeSelector />
-              </TabsContent>
+              
+              <div className="min-h-[120px] w-full">
+                <TabsContent value="city" className="m-0">
+                  <CitySelector />
+                </TabsContent>
+                <TabsContent value="age" className="m-0">
+                  <AgeSelector />
+                </TabsContent>
+              </div>
             </Tabs>
-            <Button className="w-full" size="lg" asChild>
+            
+            <Button className="w-full mt-4" size="lg" asChild>
               <Link href="/events">Find Events</Link>
             </Button>
           </div>

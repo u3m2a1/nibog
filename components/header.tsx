@@ -13,6 +13,7 @@ import { Badge } from "./ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "./ui/use-toast"
+import { NibogLogo } from "./nibog-logo"
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -69,15 +70,10 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container flex h-20 items-center justify-between">
         <div className="flex items-center gap-6 md:gap-10">
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              NIBOG
-            </span>
-            <Badge variant="outline" className="hidden md:inline-flex">
-              India's Biggest Baby Games
-            </Badge>
+          <Link href="/" className="flex items-center h-full py-2">
+            <NibogLogo className="h-full w-auto" />
           </Link>
           <nav className="hidden gap-6 md:flex">
             {routes.map((route) => (
