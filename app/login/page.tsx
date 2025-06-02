@@ -24,7 +24,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  // Get the return URL from the query parameters
+  // Get the callback URL from the query parameters
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
   const returnUrl = searchParams.get("returnUrl") || "/"
 
   // Handle login form submission
@@ -87,20 +88,41 @@ export default function LoginPage() {
         throw new Error('Unexpected response from server')
       }
 
+      // Extract token from response headers or body
+      const authHeader = response.headers.get('authorization');
+      const token = authHeader ? authHeader.replace('Bearer ', '') : null;
+      
+      if (!token) {
+        throw new Error('No authentication token received');
+      }
+
+      // Store the token in localStorage for client-side access
+      localStorage.setItem('nibog-session', token);
+      
+      // Set the HTTP-only cookie for server-side access
+      await fetch('/api/auth/set-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
       // Login successful
       toast({
         title: "Login successful",
         description: "You have been logged in successfully.",
-      })
+      });
 
       // Log the user data for debugging
-      console.log('Login successful, user data:', data[0].object)
+      console.log('Login successful, user data:', data[0].object);
 
-      // Store user data in auth context
-      login(data[0].object)
+      // Store user data and token in auth context
+      login({ ...data[0].object, token }, token);
 
-      // Redirect to the return URL
-      router.push(returnUrl)
+      // Redirect to the callback URL or return URL after successful login
+      router.push(callbackUrl || returnUrl);
+      router.refresh(); // Refresh to update the layout with the new auth state
 
     } catch (error: any) {
       setError(error.message || 'An error occurred during login')
