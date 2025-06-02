@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, MapPin, Medal, Trophy, Award, Star } from "lucide-react"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
-import { AnimatedBackground } from "@/components/animated-background"
+// Direct gradient styling applied instead of using AnimatedBackground
 import AgeSelector from "@/components/age-selector"
 import CitySelector from "@/components/city-selector"
 import { formatPrice } from "@/lib/utils"
@@ -113,7 +113,7 @@ const olympicsEvents = [
 
 export default function BabyOlympicsPage() {
   return (
-    <AnimatedBackground variant="olympics">
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-yellow-300 via-amber-200 to-orange-300 dark:!from-gray-900 dark:!via-gray-800 dark:!to-gray-900" data-variant="olympics">
       <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
@@ -281,9 +281,6 @@ export default function BabyOlympicsPage() {
 
       {/* Testimonials Section */}
       <section className="relative py-16 md:py-24 overflow-hidden my-8">
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-50 via-orange-50 to-amber-50 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-yellow-950/20 -z-10"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(251,191,36,0.1),transparent_60%),radial-gradient(circle_at_70%_70%,rgba(245,158,11,0.1),transparent_60%)] blur-xl opacity-80 dark:opacity-30 -z-10"></div>
         
         {/* Decorative elements */}
         <div className="absolute top-12 left-8 text-4xl opacity-20 animate-pulse-slow">💬</div>
@@ -377,6 +374,6 @@ export default function BabyOlympicsPage() {
         </div>
       </section>
       </div>
-    </AnimatedBackground>
+    </div>
   );
 }

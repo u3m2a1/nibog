@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Phone, Mail, MapPin, Clock, Send, MessageSquare, HelpCircle } from "lucide-react"
 import type { Metadata } from "next"
-import { AnimatedBackground } from "@/components/animated-background"
+// Direct gradient styling applied instead of using AnimatedBackground
 
 export const metadata: Metadata = {
   title: "Contact Us | NIBOG - New India Baby Olympic Games",
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <AnimatedBackground variant="contact">
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-blue-100 via-blue-200 to-sky-100 dark:!from-gray-900 dark:!to-gray-800" data-variant="contact">
       {/* Hero Section */}
       <section className="relative overflow-hidden py-16 md:py-24">
         <div className="absolute inset-0 bg-gradient-to-b from-purple-50 to-white dark:from-slate-900 dark:to-background -z-10"></div>
@@ -330,6 +330,6 @@ export default function ContactPage() {
           </div>
         </div>
       </section>
-    </AnimatedBackground>
+    </div>
   )
 }

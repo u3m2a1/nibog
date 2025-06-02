@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle2, Users, Trophy, Calendar, MapPin, Heart, ChevronLeft, ChevronRight } from "lucide-react"
 import type { Metadata } from "next"
-import { AnimatedBackground } from "@/components/animated-background"
+// Direct gradient styling applied instead of using AnimatedBackground
 import { ImageSlideshow } from "@/components/image-slideshow"
 import { TestimonialCarousel } from "@/components/testimonial-carousel"
 
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <AnimatedBackground variant="about">
+    <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-emerald-300 via-green-200 to-teal-300 dark:!from-gray-900 dark:!via-gray-800 dark:!to-gray-900" data-variant="about">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50 to-white py-16 dark:from-blue-950/20 dark:to-background md:py-24">
         <div className="container relative z-10">
@@ -97,7 +97,7 @@ export default function AboutPage() {
       </section>
 
       {/* Our Story */}
-      <section className="bg-slate-50 py-16 dark:bg-slate-900/30 md:py-24">
+      <section className="py-16 md:py-24 bg-green-100 dark:bg-green-900/30">
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-block rounded-lg bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
@@ -211,7 +211,7 @@ export default function AboutPage() {
       </section>
 
       {/* Our Team */}
-      <section className="bg-slate-50 py-16 dark:bg-slate-900/30 md:py-24">
+      <section className="bg-teal-100 py-16 dark:bg-teal-900/30 md:py-24">
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-block rounded-lg bg-green-100 px-3 py-1 text-sm font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
@@ -337,6 +337,6 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
-    </AnimatedBackground>
+    </div>
   )
 }
