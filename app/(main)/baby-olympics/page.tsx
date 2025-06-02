@@ -204,7 +204,12 @@ export default function BabyOlympicsPage() {
           </div>
           <div className="flex items-center justify-center">
             <div className="relative h-80 w-full overflow-hidden rounded-lg">
-              <Image src="/placeholder.svg?height=320&width=480&text=NIBOG+Baby+Olympics" alt="NIBOG Baby Olympics" fill className="object-cover" />
+            <Image
+              src="/images/baby-olympics/about-image.jpg"
+              alt="NIBOG Baby Olympics"
+              fill
+              className="object-cover object-[10%_30%]"
+            />
             </div>
           </div>
         </div>
