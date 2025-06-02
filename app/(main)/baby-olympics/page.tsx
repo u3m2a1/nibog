@@ -159,7 +159,7 @@ export default function BabyOlympicsPage() {
       <section className="container">
         <div className="grid gap-8 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col justify-center space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-black">What is NIBOG?</h2>
+            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">What is NIBOG?</h2>
             <p className="text-muted-foreground">
               NIBOG (New India Baby Olympics Games) is India's biggest baby Olympic games platform, executing in 21 cities across India. Our games are designed to encourage physical development, confidence, and social interaction in a fun, competitive environment for babies and young children.
             </p>
@@ -169,7 +169,7 @@ export default function BabyOlympicsPage() {
                   <Trophy className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium dark:text-black">16 Different Games</h3>
+                  <h3 className="font-medium dark:text-white">16 Different Games</h3>
                   <p className="text-sm text-muted-foreground">From crawling races to running races, we have games for all ages from 5-84 months</p>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function BabyOlympicsPage() {
                   <Medal className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium dark:text-black">21 Cities Across India</h3>
+                  <h3 className="font-medium dark:text-white">21 Cities Across India</h3>
                   <p className="text-sm text-muted-foreground">NIBOG events are held in 21 cities across India, making it accessible to families nationwide</p>
                 </div>
               </div>
@@ -187,7 +187,7 @@ export default function BabyOlympicsPage() {
                   <Award className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium dark:text-black">Medals & Certificates</h3>
+                  <h3 className="font-medium dark:text-white">Medals & Certificates</h3>
                   <p className="text-sm text-muted-foreground">Every participant receives a medal and certificate, recognizing their achievement</p>
                 </div>
               </div>
@@ -196,7 +196,7 @@ export default function BabyOlympicsPage() {
                   <Star className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium dark:text-black">Professional Photography</h3>
+                  <h3 className="font-medium dark:text-white">Professional Photography</h3>
                   <p className="text-sm text-muted-foreground">Capture these precious moments with our professional photographers at every event</p>
                 </div>
               </div>
@@ -220,7 +220,7 @@ export default function BabyOlympicsPage() {
         <div className="container">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2 text-center">
-              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-black">Upcoming NIBOG Events</h2>
+              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Upcoming NIBOG Events</h2>
               <p className="mx-auto max-w-[700px] text-muted-foreground dark:text-white">
                 Register for our upcoming baby Olympic games in cities across India
               </p>
@@ -294,8 +294,8 @@ export default function BabyOlympicsPage() {
         <div className="container">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2 text-center">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-black">Children's Parents Speak for Us</h2>
-            <p className="mx-auto max-w-[700px] text-slate-700 dark:text-slate-900 font-medium">
+            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Children's Parents Speak for Us</h2>
+            <p className="mx-auto max-w-[700px] text-slate-700 dark:text-slate-500 font-medium">
               Hear what parents have to say about NIBOG events
             </p>
           </div>
@@ -348,8 +348,8 @@ export default function BabyOlympicsPage() {
         <div className="mx-auto max-w-3xl">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2 text-center">
-              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-black">Frequently Asked Questions</h2>
-              <p className="text-slate-700 dark:text-slate-900 font-medium">Everything you need to know about NIBOG events</p>
+              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Frequently Asked Questions</h2>
+              <p className="text-slate-700 dark:text-slate-500 font-medium">Everything you need to know about NIBOG events</p>
             </div>
             <div className="space-y-4">
               <div className="rounded-lg border p-4">
