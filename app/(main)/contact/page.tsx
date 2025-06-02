@@ -20,11 +20,13 @@ export default function ContactPage() {
   return (
     <AnimatedBackground variant="contact">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-purple-50 to-white py-16 dark:from-purple-950/20 dark:to-background md:py-24">
+      <section className="relative overflow-hidden py-16 md:py-24">
+        <div className="absolute inset-0 bg-gradient-to-b from-purple-50 to-white dark:from-slate-900 dark:to-background -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(120,190,255,0.2),transparent_50%),radial-gradient(circle_at_75%_75%,rgba(255,182,193,0.2),transparent_50%)] blur-xl opacity-70 dark:opacity-30 -z-10"></div>
         <div className="container relative z-10">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-4xl font-bold tracking-tight md:text-5xl">Contact Us</h1>
-            <p className="mt-4 text-xl text-muted-foreground">
+            <h1 className="text-4xl font-bold tracking-tight md:text-5xl dark:text-black">Contact Us</h1>
+            <p className="mt-4 text-xl text-slate-700 dark:text-white font-medium dark:text-gray-500">
               We'd love to hear from you! Reach out to the NIBOG team with any questions or inquiries.
             </p>
           </div>
@@ -41,47 +43,49 @@ export default function ContactPage() {
       </section>
 
       {/* Contact Information */}
-      <section className="py-16 md:py-24">
+      <section className="relative py-16 md:py-24 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-bl from-green-50/50 via-white to-blue-50/50 dark:from-green-950/10 dark:via-background dark:to-blue-950/10 -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_75%,rgba(134,239,172,0.15),transparent_50%),radial-gradient(circle_at_75%_25%,rgba(147,197,253,0.15),transparent_50%)] blur-xl opacity-70 dark:opacity-20 -z-10"></div>
         <div className="container">
           <div className="grid gap-12 md:grid-cols-2">
             <div className="space-y-8">
               <div>
                 <h2 className="text-3xl font-bold tracking-tight">Get in Touch</h2>
-                <p className="mt-2 text-muted-foreground">
+                <p className="mt-2 text-slate-700 dark:text-white font-medium">
                   Have questions about our events, registration process, or anything else? Our team is here to help!
                 </p>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+              <div className="space-y-5 mt-6">
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-white/70 dark:bg-slate-800/90 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-700 dark:text-purple-100 shadow-sm">
                     <Phone className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Phone</h3>
-                    <p className="text-muted-foreground">+91 98765 43210</p>
-                    <p className="text-muted-foreground">+91 87654 32109</p>
+                    <h3 className="text-lg font-semibold text-purple-800 dark:text-purple-200">Phone</h3>
+                    <p className="text-slate-700 dark:text-white font-medium mt-1">+91 98765 43210</p>
+                    <p className="text-slate-700 dark:text-white font-medium">+91 87654 32109</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-white/70 dark:bg-slate-800/90 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-700 dark:text-blue-100 shadow-sm">
                     <Mail className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Email</h3>
-                    <p className="text-muted-foreground">info@nibog.in</p>
-                    <p className="text-muted-foreground">support@nibog.in</p>
+                    <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">Email</h3>
+                    <p className="text-slate-700 dark:text-white font-medium mt-1">info@nibog.in</p>
+                    <p className="text-slate-700 dark:text-white font-medium">support@nibog.in</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300">
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-white/70 dark:bg-slate-800/90 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100 shadow-sm">
                     <MapPin className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Head Office</h3>
-                    <p className="text-muted-foreground">
+                    <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">Head Office</h3>
+                    <p className="text-slate-700 dark:text-white font-medium mt-1">
                       123 Jubilee Hills, Road No. 5<br />
                       Hyderabad, Telangana 500033<br />
                       India
@@ -89,13 +93,13 @@ export default function ContactPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
+                <div className="flex items-start gap-4 p-4 rounded-lg bg-white/70 dark:bg-slate-800/90 shadow-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-700 dark:bg-orange-700 dark:text-orange-100 shadow-sm">
                     <Clock className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-medium">Office Hours</h3>
-                    <p className="text-muted-foreground">
+                    <h3 className="text-lg font-semibold text-orange-800 dark:text-orange-200">Office Hours</h3>
+                    <p className="text-slate-700 dark:text-white font-medium mt-1">
                       Monday - Friday: 9:00 AM - 6:00 PM<br />
                       Saturday: 10:00 AM - 2:00 PM<br />
                       Sunday: Closed
@@ -114,8 +118,9 @@ export default function ContactPage() {
               </div>
             </div>
 
-            <div>
-              <Card>
+            <div className="relative">
+              <div className="absolute -inset-6 bg-[radial-gradient(circle_at_70%_30%,rgba(180,180,255,0.2),transparent_70%),radial-gradient(circle_at_30%_70%,rgba(255,182,193,0.2),transparent_70%)] blur-xl rounded-2xl opacity-70 dark:opacity-30"></div>
+              <Card className="bg-white dark:bg-slate-800/90 shadow-md relative z-10">
                 <CardContent className="pt-6">
                   <form className="space-y-6">
                     <div className="space-y-2">
@@ -156,14 +161,16 @@ export default function ContactPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="bg-slate-50 py-16 dark:bg-slate-900/30 md:py-24">
+      <section className="relative py-16 md:py-24">
+        <div className="absolute inset-0 bg-slate-50 dark:bg-slate-800/50 -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(147,197,253,0.15),transparent_60%),radial-gradient(circle_at_70%_70%,rgba(216,180,254,0.15),transparent_60%)] blur-xl opacity-80 dark:opacity-20 -z-10"></div>
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-block rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+            <div className="inline-block rounded-lg bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
               FAQs
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
-            <p className="mt-4 text-muted-foreground">
+            <p className="mt-4 text-slate-600 dark:text-slate-300">
               Find answers to common questions about NIBOG events and registration
             </p>
           </div>
@@ -195,7 +202,7 @@ export default function ContactPage() {
                 answer: "We understand that young children may sometimes feel uncomfortable in new environments. Our staff will try to make your child comfortable, but we never force participation. Unfortunately, registration fees are non-refundable in such cases.",
               },
             ].map((faq, i) => (
-              <Card key={i}>
+              <Card key={i} className="bg-white dark:bg-slate-800/90">
                 <CardContent className="pt-6">
                   <div className="flex items-start gap-4">
                     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
@@ -203,7 +210,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-medium">{faq.question}</h3>
-                      <p className="mt-2 text-muted-foreground">{faq.answer}</p>
+                      <p className="mt-2 text-slate-600 dark:text-slate-300">{faq.answer}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -212,7 +219,7 @@ export default function ContactPage() {
           </div>
 
           <div className="mt-12 text-center">
-            <p className="text-muted-foreground">
+            <p className="text-slate-600 dark:text-slate-300">
               Don't see your question here? Contact us directly and we'll be happy to help!
             </p>
           </div>
@@ -220,14 +227,16 @@ export default function ContactPage() {
       </section>
 
       {/* City Offices */}
-      <section className="py-16 md:py-24">
+      <section className="relative py-16 md:py-24 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-bl from-green-50/50 via-white to-blue-50/50 dark:from-green-950/10 dark:via-background dark:to-blue-950/10 -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_75%,rgba(134,239,172,0.15),transparent_50%),radial-gradient(circle_at_75%_25%,rgba(147,197,253,0.15),transparent_50%)] blur-xl opacity-70 dark:opacity-20 -z-10"></div>
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="inline-block rounded-lg bg-green-100 px-3 py-1 text-sm font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
+            <div className="inline-block rounded-lg bg-green-100 px-3 py-1 text-sm font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">
               Our Presence
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight">NIBOG City Offices</h2>
-            <p className="mt-4 text-muted-foreground">
+            <p className="mt-4 text-slate-600 dark:text-slate-300">
               Find us in 21 cities across India
             </p>
           </div>
@@ -275,7 +284,7 @@ export default function ContactPage() {
                 image: "/images/contact/ahmedabad.jpg",
               },
             ].map((office, i) => (
-              <Card key={i} className="overflow-hidden">
+              <Card key={i} className="overflow-hidden bg-white dark:bg-slate-800/90">
                 <div className="relative h-40">
                   <Image
                     src={office.image}
@@ -286,7 +295,7 @@ export default function ContactPage() {
                 </div>
                 <CardContent className="pt-4">
                   <h3 className="font-bold">{office.city}</h3>
-                  <p className="text-sm text-muted-foreground">{office.address}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{office.address}</p>
                 </CardContent>
               </Card>
             ))}

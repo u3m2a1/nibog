@@ -998,7 +998,7 @@ export default function RegisterEventClientPage() {
   return (
     <div className="container py-8 px-4 sm:px-6 relative">
       {/* Decorative background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none dark:opacity-20">
         <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-yellow-200 opacity-20 animate-pulse"></div>
         <div className="absolute top-1/4 -right-10 w-32 h-32 rounded-full bg-blue-200 opacity-20 animate-pulse delay-700"></div>
         <div className="absolute bottom-1/4 -left-10 w-36 h-36 rounded-full bg-green-200 opacity-20 animate-pulse delay-1000"></div>
@@ -1006,7 +1006,7 @@ export default function RegisterEventClientPage() {
         <div className="absolute top-1/3 left-1/3 w-24 h-24 rounded-full bg-purple-200 opacity-20 animate-pulse delay-300"></div>
       </div>
 
-      <Card className="mx-auto w-full max-w-4xl relative overflow-hidden shadow-lg border-2 border-primary/10 bg-white/90 backdrop-blur-sm">
+      <Card className="mx-auto w-full max-w-4xl relative overflow-hidden shadow-lg border-2 border-primary/10 bg-white/90 backdrop-blur-sm dark:bg-gray-800 dark:border-gray-700">
         {/* Decorative top pattern */}
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500"></div>
 
@@ -1033,7 +1033,7 @@ export default function RegisterEventClientPage() {
           {step === 1 && (
             <>
               {/* City Selection - Moved to the top */}
-              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
+              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
                 <h3 className="text-sm font-medium text-primary flex items-center gap-2">
                   <div className="bg-primary/10 p-1 rounded-full">
                     <MapPin className="h-4 w-4 text-primary" />
@@ -1178,7 +1178,7 @@ export default function RegisterEventClientPage() {
                 )}
               </div>
 
-              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
+              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
                 <h3 className="text-sm font-medium text-primary flex items-center gap-2">
                   <div className="bg-primary/10 p-1 rounded-full">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
@@ -1200,7 +1200,7 @@ export default function RegisterEventClientPage() {
                       value={parentName}
                       onChange={(e) => setParentName(e.target.value)}
                       required
-                      className="border-primary/20 focus:border-primary/40 bg-white/90"
+                      className="border-primary/20 focus:border-primary/40 bg-white/90 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1215,7 +1215,7 @@ export default function RegisterEventClientPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="border-primary/20 focus:border-primary/40 bg-white/90"
+                      className="border-primary/20 focus:border-primary/40 bg-white/90 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1229,13 +1229,13 @@ export default function RegisterEventClientPage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       required
-                      className="border-primary/20 focus:border-primary/40 bg-white/90"
+                      className="border-primary/20 focus:border-primary/40 bg-white/90 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
+              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
                 <h3 className="text-sm font-medium text-primary flex items-center gap-2">
                   <div className="bg-primary/10 p-1 rounded-full">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
@@ -1259,7 +1259,7 @@ export default function RegisterEventClientPage() {
                       value={childName}
                       onChange={(e) => setChildName(e.target.value)}
                       required
-                      className="border-primary/20 focus:border-primary/40 bg-white/90"
+                      className="border-primary/20 focus:border-primary/40 bg-white/90 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1313,7 +1313,7 @@ export default function RegisterEventClientPage() {
                     value={schoolName}
                     onChange={(e) => setSchoolName(e.target.value)}
                     required={childAgeMonths ? childAgeMonths >= 36 : false}
-                    className="border-primary/20 focus:border-primary/40 bg-white/90"
+                    className="border-primary/20 focus:border-primary/40 bg-white/90 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                   />
                   {childAgeMonths && childAgeMonths < 36 && (
                     <p className="text-xs text-muted-foreground mt-1">For children under 3 years, you can enter "Home", "Daycare", or the name of their playschool</p>
@@ -1329,7 +1329,7 @@ export default function RegisterEventClientPage() {
                 <RadioGroup
                   value={gender}
                   onValueChange={setGender}
-                  className="flex gap-4 p-2 border border-dashed rounded-md border-primary/20 bg-white/80"
+                  className="flex gap-4 p-2 border border-dashed rounded-md border-primary/20 bg-white/80 dark:bg-black dark:border-gray-700 dark:text-gray-50"
                 >
                   <div className="flex items-center space-x-2 flex-1 p-2 rounded-md hover:bg-primary/5 transition-colors duration-200">
                     <RadioGroupItem value="male" id="male" className="text-blue-500" />
@@ -1456,7 +1456,7 @@ export default function RegisterEventClientPage() {
 
               {/* Event selection has been moved to the city selection section */}
 
-              <div className="flex items-start space-x-2 p-3 rounded-lg border border-dashed border-primary/20 bg-white/80">
+              <div className="flex items-start space-x-2 p-3 rounded-lg border border-dashed border-primary/20 bg-white/80 dark:bg-black dark:border-gray-700 dark:text-gray-50">
                 <Checkbox
                   id="terms"
                   checked={termsAccepted}

@@ -12,7 +12,7 @@ interface PageBackgroundConfig {
 
 export const pageBackgrounds = {
   home: {
-    gradient: 'bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100',
+    gradient: 'bg-gradient-to-br from-yellow-100 via-pink-100 to-blue-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       { icon: '⭐', size: 'text-2xl', position: 'top-1/4 left-1/5' },
       { icon: '☁️', size: 'text-4xl', position: 'top-1/3 right-1/4' },
@@ -24,7 +24,7 @@ export const pageBackgrounds = {
     ],
   },
   events: {
-    gradient: 'bg-gradient-to-br from-purple-50 via-green-50 to-pink-50',
+    gradient: 'bg-gradient-to-br from-purple-50 via-green-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       { icon: '🎉', size: 'text-3xl', position: 'top-1/5 right-1/4' },
       { icon: '✨', size: 'text-2xl', position: 'bottom-1/3 left-1/4' },
@@ -36,7 +36,7 @@ export const pageBackgrounds = {
     ],
   },
   games: {
-    gradient: 'bg-gradient-to-br from-pink-100 via-cyan-100 to-purple-100',
+    gradient: 'bg-gradient-to-br from-pink-100 via-cyan-100 to-purple-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       { icon: '🎮', size: 'text-4xl', position: 'top-1/4 left-1/4' },
       { icon: '🧩', size: 'text-3xl', position: 'bottom-1/3 right-1/3' },
@@ -49,7 +49,7 @@ export const pageBackgrounds = {
     ],
   },
   register: {
-    gradient: 'bg-gradient-to-br from-blue-50 to-emerald-50',
+    gradient: 'bg-gradient-to-br from-blue-50 to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       { icon: '✏️', size: 'text-3xl', position: 'top-1/5 right-1/5' },
       { icon: '📝', size: 'text-2xl', position: 'bottom-1/4 left-1/5' },
@@ -61,7 +61,7 @@ export const pageBackgrounds = {
     ],
   },
   about: {
-    gradient: 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50',
+    gradient: 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       { icon: '🌱', size: 'text-3xl', position: 'top-1/3 left-1/4', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
       { icon: '🌿', size: 'text-2xl', position: 'bottom-1/3 right-1/4', className: 'text-emerald-500/30 dark:text-emerald-400/20' },
@@ -73,7 +73,7 @@ export const pageBackgrounds = {
     ],
   },
   contact: {
-    gradient: 'bg-gradient-to-br from-blue-50 to-sky-100',
+    gradient: 'bg-gradient-to-br from-blue-50 to-sky-100 dark:from-gray-900 dark:to-gray-800',
     elements: [
       { icon: '☁️', size: 'text-4xl', position: 'top-1/4 right-1/4' },
       { icon: '💬', size: 'text-3xl', position: 'bottom-1/3 left-1/4' },
@@ -85,7 +85,7 @@ export const pageBackgrounds = {
     ],
   },
   olympics: {
-    gradient: 'bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-50',
+    gradient: 'bg-gradient-to-br from-yellow-100 via-amber-100 to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900',
     elements: [
       // Top corners
       { icon: '🎮', size: 'text-3xl', position: 'top-5 left-5' },

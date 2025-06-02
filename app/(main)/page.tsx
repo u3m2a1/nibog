@@ -98,7 +98,7 @@ export default function Home() {
                 </Link>
               </Button>
             </div>
-            <p className="text-muted-foreground">Join us for these exciting events featuring multiple baby games in cities across India</p>
+            <p className="text-muted-foreground dark:text-gray-700">Join us for these exciting events featuring multiple baby games in cities across India</p>
           </div>
           <FeaturedEvents />
         </div>
