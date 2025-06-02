@@ -1,4 +1,7 @@
+import { useState, useEffect } from "react"
 import Link from "next/link"
+
+const STORAGE_KEY = 'nibog_saved_events'
 import Image from "next/image"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -107,6 +110,42 @@ const featuredEvents = [
 ]
 
 export default function FeaturedEvents() {
+  const [savedEvents, setSavedEvents] = useState<Record<string, boolean>>({})
+  const [isClient, setIsClient] = useState(false)
+
+  // Load saved events from localStorage on component mount
+  useEffect(() => {
+    setIsClient(true)
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        setSavedEvents(JSON.parse(saved))
+      }
+    } catch (error) {
+      console.error('Failed to load saved events:', error)
+    }
+  }, [])
+
+  // Save to localStorage whenever savedEvents changes
+  useEffect(() => {
+    if (isClient) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedEvents))
+      } catch (error) {
+        console.error('Failed to save events:', error)
+      }
+    }
+  }, [savedEvents, isClient])
+
+  const toggleSaveEvent = (eventId: string) => {
+    setSavedEvents(prev => {
+      const newState = {
+        ...prev,
+        [eventId]: !prev[eventId]
+      }
+      return newState
+    })
+  }
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {featuredEvents.map((event) => (
@@ -130,9 +169,16 @@ export default function FeaturedEvents() {
               variant="ghost"
               size="icon"
               className="absolute right-2 top-2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm opacity-0 transition-all duration-300 group-hover:opacity-100 hover:bg-primary/10"
-              aria-label="Save event"
+              aria-label={savedEvents[event.id] ? "Unsave event" : "Save event"}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                toggleSaveEvent(event.id)
+              }}
             >
-              <Heart className="h-4 w-4 transition-colors group-hover:fill-rose-500 group-hover:text-rose-500" />
+              <Heart 
+                className={`h-4 w-4 transition-colors ${savedEvents[event.id] ? 'fill-rose-500 text-rose-500' : 'text-muted-foreground'}`} 
+              />
             </Button>
           </div>
           <CardContent className="p-4">
