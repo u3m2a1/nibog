@@ -210,7 +210,7 @@ export default function LoginPage() {
       <div className="container relative z-10 mx-auto flex flex-col md:flex-row h-[calc(100vh-4rem)] items-center justify-between max-w-6xl">
         {/* Left side with slideshow - visible only on md and up */}
         <div className="hidden md:block md:w-1/2 relative h-full">
-          <div className="absolute inset-0 rounded-2xl overflow-hidden m-4 dark:shadow-[0_0_25px_rgba(250,204,21,0.4)] bg-gradient-to-br from-blue-300 via-purple-300 to-pink-300 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700">
+          <div className="absolute inset-0 rounded-2xl overflow-hidden m-4 bg-gradient-to-br from-blue-300 via-purple-300 to-pink-300 dark:from-blue-700 dark:via-purple-700 dark:to-pink-700">
             <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,190,255,0.6),rgba(255,182,193,0.6))] rounded-2xl"></div>
             <div className="absolute inset-0 z-10">
               <ImageSlideshow />
@@ -220,7 +220,7 @@ export default function LoginPage() {
         
         {/* Right side with login card */}
         <div className="w-full md:w-1/2 flex justify-center items-center py-8 md:py-0 md:px-8 md:h-full">
-          <div className="w-full max-w-md p-2 rounded-2xl dark:shadow-[0_0_25px_rgba(255,182,193,0.5)]" style={{animation: 'pulse-slow 3s ease-in-out infinite'}}>
+          <div className="w-full max-w-md p-2 rounded-2xl" style={{animation: 'pulse-slow 3s ease-in-out infinite'}}>
             <Card className="w-full rounded-xl shadow-xl bg-white/90 dark:bg-gray-900/90 border-2 border-pink-300 dark:border-pink-700 overflow-hidden transition-all hover:shadow-inner transform hover:-translate-y-1">
               <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500"></div>
             

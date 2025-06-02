@@ -168,7 +168,7 @@ export default function RegisterPage() {
               </Label>
             </div>
             <Button className="w-full mt-4" type="submit" disabled={isLoading}>
-              {isLoading ? "Registering..." : "Register"}
+              {isLoading ? "Signing up..." : "Sign up"}
             </Button>
           </form>
           {/* Commented out Google and Phone OTP login options
