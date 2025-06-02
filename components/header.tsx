@@ -123,7 +123,7 @@ export default function Header() {
                   className="rounded-full px-5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 border-0 font-medium shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
                   asChild
                 >
-                  <Link href="/register-event">Register</Link>
+                  <Link href="/register">Sign up</Link>
                 </Button>
               </>
             )}

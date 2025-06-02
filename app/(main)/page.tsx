@@ -1,5 +1,8 @@
+'use client';
+
 import Link from "next/link"
 import Image from "next/image"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -8,7 +11,7 @@ import CitySelector from "@/components/city-selector"
 import AgeSelector from "@/components/age-selector"
 import FeaturedEvents from "@/components/featured-events"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
-import { ArrowRight, MapPin, Star, Shield, Award, Sparkles } from "lucide-react"
+import { ArrowRight, Star, Shield, Award, Sparkles, MapPin, Plus, Minus } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
 
 export default function Home() {
@@ -314,39 +317,108 @@ export default function Home() {
               <h2 className="text-2xl font-bold tracking-tight md:text-3xl">NIBOG Events Across India</h2>
               <p className="mx-auto max-w-[700px] text-muted-foreground">Find NIBOG events in 21 cities across India</p>
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-              {[
-                "Hyderabad",
-                "Bangalore",
-                "Chennai",
-                "Vizag",
-                "Patna",
-                "Ranchi",
-                "Nagpur",
-                "Kochi",
-                "Mumbai",
-                "Indore",
-                "Lucknow",
-                "Chandigarh",
-                "Kolkata",
-                "Gurgaon",
-                "Delhi",
-                "Jaipur",
-                "Ahmedabad",
-                "Bhubaneswar",
-                "Pune",
-                "Raipur",
-                "Gandhi Nagar",
-              ].map((city) => (
-                <Link key={city} href={`/events?city=${city.toLowerCase()}`}>
-                  <Card className="group transition-all hover:border-primary hover:shadow-sm">
-                    <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                      <MapPin className="mb-2 h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                      <span className="font-medium group-hover:text-primary">{city}</span>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+            
+            <div className="w-full">
+              {(() => {
+                const cities = [
+                  "Hyderabad",
+                  "Bangalore",
+                  "Chennai",
+                  "Vizag",
+                  "Patna",
+                  "Ranchi",
+                  "Nagpur",
+                  "Kochi",
+                  "Mumbai",
+                  "Indore",
+                  "Lucknow",
+                  "Chandigarh",
+                  "Kolkata",
+                  "Gurgaon",
+                  "Delhi",
+                  "Jaipur",
+                  "Ahmedabad",
+                  "Bhubaneswar",
+                  "Pune",
+                  "Raipur",
+                  "Gandhi Nagar",
+                ];
+                
+                const [showAllCities, setShowAllCities] = useState(false);
+                const [visibleCount, setVisibleCount] = useState(6); // Start with 6 cities
+                
+                // Calculate number of cities to show based on screen size
+                const calculateVisibleCount = () => {
+                  if (typeof window === 'undefined') return 6;
+                  if (window.innerWidth >= 1024) return 11; // Show 11 + 1 (Show More) = 12 (2 rows of 6)
+                  if (window.innerWidth >= 768) return 7;   // Show 7 + 1 = 8 (2 rows of 4)
+                  if (window.innerWidth >= 640) return 5;   // Show 5 + 1 = 6 (2 rows of 3)
+                  return 3;                                 // Show 3 + 1 = 4 (2 rows of 2)
+                };
+                
+                // Set initial visible count
+                useEffect(() => {
+                  setVisibleCount(calculateVisibleCount());
+                }, []);
+                
+                // Handle window resize
+                useEffect(() => {
+                  const handleResize = () => {
+                    if (!showAllCities) {
+                      setVisibleCount(calculateVisibleCount());
+                    }
+                  };
+                  
+                  window.addEventListener('resize', handleResize);
+                  return () => window.removeEventListener('resize', handleResize);
+                }, [showAllCities]);
+                
+                // Toggle between showing all cities and initial count
+                const toggleShowAll = () => {
+                  setShowAllCities(!showAllCities);
+                };
+                
+                // Determine which cities to show
+                const displayCities = showAllCities ? cities : cities.slice(0, visibleCount);
+                
+                return (
+                  <div className="relative">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                      {displayCities.map((city) => (
+                        <Link key={city} href={`/events?city=${city.toLowerCase()}`}>
+                          <Card className="group h-full flex flex-col justify-center transition-all hover:border-primary hover:shadow-sm dark:bg-slate-800/90 dark:hover:border-primary">
+                            <CardContent className="flex flex-col items-center justify-center p-4 text-center h-full">
+                              <MapPin className="mb-2 h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                              <span className="text-lg font-medium group-hover:text-primary dark:text-white">{city}</span>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))}
+                      
+                      {/* Show More/Less Button - always visible as the last item */}
+                      <div 
+                        onClick={toggleShowAll}
+                        className="flex items-center justify-center cursor-pointer group"
+                      >
+                        <Card className="h-full w-full flex items-center justify-center transition-all hover:border-primary hover:shadow-sm dark:bg-slate-800/90 dark:hover:border-primary group-hover:bg-primary/5">
+                          <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                            <div className="w-8 h-8 mb-2 flex items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30">
+                              {showAllCities ? (
+                                <Minus className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                              ) : (
+                                <Plus className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                              )}
+                            </div>
+                            <span className="font-medium text-primary">
+                              {showAllCities ? 'Show Less' : 'Show More'}
+                            </span>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
