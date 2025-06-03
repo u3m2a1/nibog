@@ -810,6 +810,7 @@ export default function RegisterEventClientPage() {
       }
 
       // Format the booking data for the API
+      // Format the booking data for the API
       const bookingData = formatBookingDataForAPI({
         userId,
         parentName,
@@ -823,14 +824,15 @@ export default function RegisterEventClientPage() {
         gameId: selectedGameObj.id,
         gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
         totalAmount: calculateTotalPrice(),
-        paymentMethod: "PhonePe", // Using PhonePe as the payment method
-        paymentStatus: "Pending", // Set to pending initially
+        paymentMethod: "PhonePe",
+        paymentStatus: "pending", // Ensure lowercase to match the expected type
         termsAccepted
       })
 
       console.log("Formatted booking data:", bookingData)
 
-      // Register the booking
+      // Create the booking with pending status
+      // The bookingData is already formatted by formatBookingDataForAPI
       const response = await registerBooking(bookingData)
       console.log("Booking registration response:", response)
 
@@ -839,13 +841,32 @@ export default function RegisterEventClientPage() {
       }
 
       const bookingId = response[0].booking_id.toString()
+      
+      // Update the booking reference in the UI
       setBookingReference(bookingId)
-
-      // Initiate PhonePe payment
-      console.log("Initiating PhonePe payment for booking ID:", bookingId)
-
-      // Get the total amount in rupees
+      
+      // Redirect to payment page with booking details
+      const searchParams = new URLSearchParams()
+      
+      // Add each parameter individually with null checks
+      if (bookingId) searchParams.append('bookingId', bookingId)
+      
       const totalAmount = calculateTotalPrice()
+      if (!isNaN(totalAmount)) {
+        searchParams.append('amount', totalAmount.toString())
+      }
+      
+      if (phone) searchParams.append('mobileNumber', phone)
+      
+      // Use optional chaining and nullish coalescing with proper type checking
+      const eventTitle = selectedApiEvent?.event_title || 'Event'
+      const eventId = selectedApiEvent?.event_id?.toString() || ''
+      
+      if (eventTitle) searchParams.append('eventName', eventTitle)
+      if (eventId) searchParams.append('eventId', eventId)
+      
+      // Navigate to payment page
+      router.push(`/register-event/payment?${searchParams.toString()}`)
 
       // Initiate the payment
       const paymentUrl = await initiatePhonePePayment(
