@@ -124,6 +124,8 @@ export default function LoginPage() {
         ip_address: "0.0.0.0" // This will be set by the server
       }
 
+      console.log('Sending login request with:', { email, device_info: deviceInfo });
+      
       // Call our API route
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -136,55 +138,69 @@ export default function LoginPage() {
           device_info: deviceInfo
         }),
       })
+      
+      console.log('Login response status:', response.status);
 
       const data = await response.json()
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed')
       }
-
-      // Check if the response is an empty array (login failed)
-      if (Array.isArray(data) && data.length === 0) {
-        throw new Error('Invalid email or password')
-      }
-
-      // Check if we have the expected data structure
-      if (!data || !Array.isArray(data) || !data[0] || !data[0].object) {
-        console.error('Unexpected API response format:', data)
-        throw new Error('Unexpected response from server')
-      }
-
-      // Extract token from response headers or body
-      const authHeader = response.headers.get('authorization');
-      const token = authHeader ? authHeader.replace('Bearer ', '') : null;
       
-      if (!token) {
-        throw new Error('No authentication token received');
+      // The data structure from our login API should be: { success: true, data: userData, token: jwtToken }
+      if (!data || !data.success) {
+        console.error('Login failed:', data?.error || 'Unknown error');
+        throw new Error(data?.error || 'Login failed')
       }
 
-      // Store the token in localStorage for client-side access
-      localStorage.setItem('nibog-session', token);
+      // Get user data and token from response
+      const userData = data.data;
+      const token = data.token;
       
-      // Set the HTTP-only cookie for server-side access
-      await fetch('/api/auth/set-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
+      console.log('Login successful, userData:', userData)
+
+      // Check if user is active
+      if (!userData.is_active) {
+        throw new Error('Account is deactivated');
+      }
+
+      // Check if user is locked
+      if (userData.is_locked) {
+        const lockedUntil = userData.locked_until ? new Date(userData.locked_until) : null;
+        if (lockedUntil && lockedUntil > new Date()) {
+          throw new Error(`Account is locked until ${lockedUntil.toLocaleString()}`);
+        }
+      }
+
+      // Store user data in localStorage
+      const userDataForStorage = {
+        user_id: userData.user_id,
+        full_name: userData.full_name,
+        email: userData.email,
+        email_verified: userData.email_verified,
+        phone: userData.phone,
+        phone_verified: userData.phone_verified,
+        city_id: userData.city_id,
+        accepted_terms: userData.accepted_terms,
+        terms_accepted_at: userData.terms_accepted_at,
+        is_active: userData.is_active,
+        is_locked: userData.is_locked,
+        locked_until: userData.locked_until,
+        deactivated_at: userData.deactivated_at,
+        created_at: userData.created_at,
+        updated_at: userData.updated_at,
+        last_login_at: userData.last_login_at
+      };
+      localStorage.setItem('nibog-user', JSON.stringify(userDataForStorage));
 
       // Login successful
       toast({
         title: "Login successful",
-        description: "You have been logged in successfully.",
+        description: "Welcome back " + userData.full_name,
       });
 
-      // Log the user data for debugging
-      console.log('Login successful, user data:', data[0].object);
-
-      // Store user data and token in auth context
-      login({ ...data[0].object, token }, token);
+      // Store user data in auth context
+      login(userDataForStorage, token);
 
       // Redirect to the callback URL or return URL after successful login
       router.push(callbackUrl || returnUrl);

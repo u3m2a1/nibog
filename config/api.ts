@@ -1,6 +1,20 @@
 // API Base URL
 export const API_BASE_URL = "https://ai.alviongs.com/webhook/v1/nibog";
 
+// Authentication API endpoints
+export const AUTH_API = {
+  SUPERADMIN: {
+    LOGIN: `${API_BASE_URL}/superadmin/login`,
+    VERIFY: `${API_BASE_URL}/superadmin/verify`,
+    LOGOUT: `${API_BASE_URL}/superadmin/logout`,
+  },
+  USER: {
+    LOGIN: `${API_BASE_URL}/user/login`,
+    VERIFY: `${API_BASE_URL}/user/verify`,
+    LOGOUT: `${API_BASE_URL}/user/logout`,
+  },
+};
+
 // City API endpoints - Exactly as specified in the API documentation
 export const CITY_API = {
   CREATE: `${API_BASE_URL}/city/create`,     // POST

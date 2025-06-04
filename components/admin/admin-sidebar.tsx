@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 const adminRoutes = [
   {
@@ -107,6 +108,25 @@ const adminRoutes = [
 export default function AdminSidebar() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      // Call logout API
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      // Clear localStorage
+      localStorage.removeItem('superadmin')
+
+      // Redirect to login page
+      window.location.href = '/superadmin/login'
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   return (
     <>
@@ -150,11 +170,13 @@ export default function AdminSidebar() {
               </ul>
             </nav>
             <div className="border-t p-4">
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <a href="/">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Exit Admin
-                </a>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
               </Button>
             </div>
           </div>
@@ -187,11 +209,13 @@ export default function AdminSidebar() {
             </ul>
           </nav>
           <div className="border-t p-4">
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <a href="/">
-                <LogOut className="mr-2 h-4 w-4" />
-                Exit Admin
-              </a>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
             </Button>
           </div>
         </div>
