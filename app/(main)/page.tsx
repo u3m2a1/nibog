@@ -1,21 +1,52 @@
+'use client';
+
 import Link from "next/link"
 import Image from "next/image"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import CitySelector from "@/components/city-selector"
 import AgeSelector from "@/components/age-selector"
-import FeaturedEvents from "@/components/featured-events"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
-import { ArrowRight, MapPin, Star, Shield, Award, Sparkles } from "lucide-react"
+import { ArrowRight, Star, Shield, Award, Sparkles, MapPin, Plus, Minus } from "lucide-react"
+import { AnimatedBackground } from "@/components/animated-background"
 
 export default function Home() {
   return (
-    <div className="flex flex-col gap-12 pb-8">
+    <AnimatedBackground variant="home">
+      <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-400/10 to-primary/5 dark:from-primary/10 dark:to-background" />
+        <div className="absolute inset-0 overflow-hidden">
+          {/* Continuous scrolling row of images */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <div className="absolute inset-y-0 left-0 flex w-[400%] animate-slide-slow">
+              {[
+                // Duplicate the images to create a seamless loop
+                ...[
+                  // Original images
+                  'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/8033858/pexels-photo-8033858.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/5247758/pexels-photo-5247758.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                  'https://images.pexels.com/photos/18830066/pexels-photo-18830066/free-photo-of-children-playing-outdoors.jpeg?auto=compress&cs=tinysrgb&w=1600',
+                ],
+                // Duplicate the first image at the end for smooth looping
+                'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
+              ].map((src, i) => (
+                <div key={`kid-${i}`} className="flex-none w-[25%] h-full">
+                  <img 
+                    src={src} 
+                    alt="Children playing" 
+                    className="w-full h-full object-cover opacity-30 dark:opacity-20"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         <div className="container relative flex flex-col items-center justify-center gap-6 py-16 text-center md:py-24 lg:py-32">
           <Badge className="px-3.5 py-1.5 text-sm font-medium" variant="secondary">
             New India Baby Olympics Games
@@ -31,18 +62,26 @@ export default function Home() {
           </p>
           <div className="w-full max-w-md space-y-4 rounded-lg bg-background/80 p-4 shadow-lg backdrop-blur">
             <Tabs defaultValue="city" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="city">Find by City</TabsTrigger>
-                <TabsTrigger value="age">Find by Age</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="city" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  Find by City
+                </TabsTrigger>
+                <TabsTrigger value="age" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  Find by Age
+                </TabsTrigger>
               </TabsList>
-              <TabsContent value="city" className="mt-4">
-                <CitySelector />
-              </TabsContent>
-              <TabsContent value="age" className="mt-4">
-                <AgeSelector />
-              </TabsContent>
+              
+              <div className="min-h-[120px] w-full">
+                <TabsContent value="city" className="m-0">
+                  <CitySelector />
+                </TabsContent>
+                <TabsContent value="age" className="m-0">
+                  <AgeSelector />
+                </TabsContent>
+              </div>
             </Tabs>
-            <Button className="w-full" size="lg" asChild>
+            
+            <Button className="w-full mt-4" size="lg" asChild>
               <Link href="/events">Find Events</Link>
             </Button>
           </div>
@@ -61,9 +100,8 @@ export default function Home() {
                 </Link>
               </Button>
             </div>
-            <p className="text-muted-foreground">Join us for these exciting events featuring multiple baby games in cities across India</p>
+            <p className="text-muted-foreground dark:text-gray-700">Join us for these exciting events featuring multiple baby games in cities across India</p>
           </div>
-          <FeaturedEvents />
         </div>
       </section>
 
@@ -131,40 +169,6 @@ export default function Home() {
               </Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* NIBOG Olympic Sports Arena Section */}
-      <section className="container">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl">NIBOG Olympic Sports Arena</h2>
-            <p className="text-muted-foreground">"The ground arena teaches us that sometimes the greatest victories come from overcoming the toughest challenges"</p>
-          </div>
-          <div className="group relative overflow-hidden rounded-lg">
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/80 to-yellow-600/80 transition-opacity group-hover:opacity-90" />
-            <Image
-              src="/images/baby-crawling.jpg"
-              alt="NIBOG Baby Olympics"
-              width={640}
-              height={320}
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-            />
-            <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
-              <div className="space-y-2">
-                <Badge className="bg-white text-yellow-600">Happening Now</Badge>
-                <h3 className="text-2xl font-bold">Game of Baby Thrones</h3>
-                <p className="max-w-md">
-                  Step into the World of Baby Games and watch while they Kick, Crawl, Conquer. Join us for exciting baby Olympic games in 21 cities across India.
-                </p>
-                <Button className="mt-2 bg-white text-yellow-600 hover:bg-white/90" asChild>
-                  <Link href="/register-event">Register Now</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-
         </div>
       </section>
 
@@ -277,39 +281,108 @@ export default function Home() {
               <h2 className="text-2xl font-bold tracking-tight md:text-3xl">NIBOG Events Across India</h2>
               <p className="mx-auto max-w-[700px] text-muted-foreground">Find NIBOG events in 21 cities across India</p>
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-              {[
-                "Hyderabad",
-                "Bangalore",
-                "Chennai",
-                "Vizag",
-                "Patna",
-                "Ranchi",
-                "Nagpur",
-                "Kochi",
-                "Mumbai",
-                "Indore",
-                "Lucknow",
-                "Chandigarh",
-                "Kolkata",
-                "Gurgaon",
-                "Delhi",
-                "Jaipur",
-                "Ahmedabad",
-                "Bhubaneswar",
-                "Pune",
-                "Raipur",
-                "Gandhi Nagar",
-              ].map((city) => (
-                <Link key={city} href={`/events?city=${city.toLowerCase()}`}>
-                  <Card className="group transition-all hover:border-primary hover:shadow-sm">
-                    <CardContent className="flex flex-col items-center justify-center p-4 text-center">
-                      <MapPin className="mb-2 h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                      <span className="font-medium group-hover:text-primary">{city}</span>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+            
+            <div className="w-full">
+              {(() => {
+                const cities = [
+                  "Hyderabad",
+                  "Bangalore",
+                  "Chennai",
+                  "Vizag",
+                  "Patna",
+                  "Ranchi",
+                  "Nagpur",
+                  "Kochi",
+                  "Mumbai",
+                  "Indore",
+                  "Lucknow",
+                  "Chandigarh",
+                  "Kolkata",
+                  "Gurgaon",
+                  "Delhi",
+                  "Jaipur",
+                  "Ahmedabad",
+                  "Bhubaneswar",
+                  "Pune",
+                  "Raipur",
+                  "Gandhi Nagar",
+                ];
+                
+                const [showAllCities, setShowAllCities] = useState(false);
+                const [visibleCount, setVisibleCount] = useState(6); // Start with 6 cities
+                
+                // Calculate number of cities to show based on screen size
+                const calculateVisibleCount = () => {
+                  if (typeof window === 'undefined') return 6;
+                  if (window.innerWidth >= 1024) return 11; // Show 11 + 1 (Show More) = 12 (2 rows of 6)
+                  if (window.innerWidth >= 768) return 7;   // Show 7 + 1 = 8 (2 rows of 4)
+                  if (window.innerWidth >= 640) return 5;   // Show 5 + 1 = 6 (2 rows of 3)
+                  return 3;                                 // Show 3 + 1 = 4 (2 rows of 2)
+                };
+                
+                // Set initial visible count
+                useEffect(() => {
+                  setVisibleCount(calculateVisibleCount());
+                }, []);
+                
+                // Handle window resize
+                useEffect(() => {
+                  const handleResize = () => {
+                    if (!showAllCities) {
+                      setVisibleCount(calculateVisibleCount());
+                    }
+                  };
+                  
+                  window.addEventListener('resize', handleResize);
+                  return () => window.removeEventListener('resize', handleResize);
+                }, [showAllCities]);
+                
+                // Toggle between showing all cities and initial count
+                const toggleShowAll = () => {
+                  setShowAllCities(!showAllCities);
+                };
+                
+                // Determine which cities to show
+                const displayCities = showAllCities ? cities : cities.slice(0, visibleCount);
+                
+                return (
+                  <div className="relative">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                      {displayCities.map((city) => (
+                        <Link key={city} href={`/events?city=${city.toLowerCase()}`}>
+                          <Card className="group h-full flex flex-col justify-center transition-all hover:border-primary hover:shadow-sm dark:bg-slate-800/90 dark:hover:border-primary">
+                            <CardContent className="flex flex-col items-center justify-center p-4 text-center h-full">
+                              <MapPin className="mb-2 h-6 w-6 text-muted-foreground group-hover:text-primary" />
+                              <span className="text-lg font-medium group-hover:text-primary dark:text-white">{city}</span>
+                            </CardContent>
+                          </Card>
+                        </Link>
+                      ))}
+                      
+                      {/* Show More/Less Button - always visible as the last item */}
+                      <div 
+                        onClick={toggleShowAll}
+                        className="flex items-center justify-center cursor-pointer group"
+                      >
+                        <Card className="h-full w-full flex items-center justify-center transition-all hover:border-primary hover:shadow-sm dark:bg-slate-800/90 dark:hover:border-primary group-hover:bg-primary/5">
+                          <CardContent className="flex flex-col items-center justify-center p-4 text-center">
+                            <div className="w-8 h-8 mb-2 flex items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/20 dark:bg-primary/20 dark:group-hover:bg-primary/30">
+                              {showAllCities ? (
+                                <Minus className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                              ) : (
+                                <Plus className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                              )}
+                            </div>
+                            <span className="font-medium text-primary">
+                              {showAllCities ? 'Show Less' : 'Show More'}
+                            </span>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -355,5 +428,6 @@ export default function Home() {
         </div>
       </section>
     </div>
+    </AnimatedBackground>
   )
 }

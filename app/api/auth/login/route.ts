@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { USER_AUTH_API } from '@/config/api';
+import { generateToken } from '@/utils/jwt';
 
 export async function POST(request: Request) {
   try {
@@ -63,18 +64,34 @@ export async function POST(request: Request) {
 
     // Parse the response
     const responseData = await response.json();
-
-    // Check if the response is an empty array (login failed)
-    if (Array.isArray(responseData) && responseData.length === 0) {
-      console.log("Server API route: Login failed - empty array response");
+    
+    // Check if we got the expected response structure
+    if (!responseData || !Array.isArray(responseData) || !responseData[0] || !responseData[0].object) {
+      console.error("Unexpected API response format:", responseData);
       return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
+        { error: "Unexpected response from server" },
+        { status: 500 }
       );
     }
 
-    // Return the successful response
-    return NextResponse.json(responseData);
+    // Get the user data from the response
+    const userData = responseData[0].object;
+    
+    // Generate our own JWT token since the external API doesn't provide one
+    // This fixes the "No token found in response" issue
+    const token = generateToken({
+      userId: userData.user_id,
+      email: userData.email,
+      fullName: userData.full_name
+    });
+    
+    // Add the token to the user data for the client
+    userData.token = token;
+    
+    // Create a new response with the updated user data and token
+    const jsonResponse = NextResponse.json(responseData);
+    jsonResponse.headers.set('authorization', `Bearer ${token}`);
+    return jsonResponse;
 
   } catch (error) {
     console.error("Server API route error:", error);

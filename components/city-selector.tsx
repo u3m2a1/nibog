@@ -30,34 +30,79 @@ export default function CitySelector({ onCityChange }: CitySelectorProps) {
 
   // Fetch cities from API
   useEffect(() => {
+    let isMounted = true;
+
     const fetchCities = async () => {
       try {
-        setLoading(true)
-        setError(null)
+        setLoading(true);
+        setError(null);
+        
+        // Use the direct API endpoint since we're now allowing it in the middleware
+        const apiUrl = 'https://ai.alviongs.com/webhook/v1/nibog/city/get-all';
+        console.log('Fetching cities from direct API endpoint...');
 
-        const response = await fetch('/api/cities/get-all')
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+
+        console.log('API Response Status:', response.status, response.statusText);
+        
+        const responseText = await response.text();
+        console.log('Raw response (first 200 chars):', responseText.substring(0, 200));
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch cities: ${response.status}`)
+          throw new Error(`API request failed with status ${response.status}`);
         }
 
-        const data = await response.json()
+        // Parse the JSON response
+        const data = JSON.parse(responseText);
+        console.log('Parsed response data:', data);
 
-        if (Array.isArray(data)) {
-          setCities(data.filter(city => city.is_active))
-        } else {
-          throw new Error('Invalid response format')
+        if (!isMounted) return;
+
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid response format: expected an array of cities');
         }
-      } catch (err) {
-        console.error('Error fetching cities:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load cities')
+
+        // Process the cities data
+        const activeCities = data.filter((city: City) => city.is_active);
+        console.log(`Found ${activeCities.length} active cities`);
+        
+        if (activeCities.length === 0) {
+          console.warn('No active cities found in the response');
+        }
+
+        setCities(activeCities);
+        
+        // If there's only one city, select it by default
+        if (activeCities.length === 1 && onCityChange) {
+          setValue(activeCities[0].id.toString());
+          onCityChange(activeCities[0].id);
+        }
+      } catch (error) {
+        const err = error as Error;
+        console.error('Error fetching cities:', err);
+        setError(err.message || 'Failed to load cities');
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    }
+    };
 
-    fetchCities()
-  }, [])
+    fetchCities();
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [onCityChange]);
 
   // When value changes, find the city and call onCityChange with its ID
   useEffect(() => {
@@ -70,74 +115,76 @@ export default function CitySelector({ onCityChange }: CitySelectorProps) {
   }, [value, onCityChange, cities])
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
-          disabled={loading}
-        >
-          {loading ? (
-            <div className="flex items-center text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading cities...
-            </div>
-          ) : error ? (
-            <div className="flex items-center text-destructive">
-              <MapPin className="mr-2 h-4 w-4" />
-              Error loading cities
-            </div>
-          ) : value ? (
-            <div className="flex items-center">
-              <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
-              {cities.find((city) => city.id.toString() === value)?.city_name}
-            </div>
-          ) : (
-            <div className="flex items-center text-muted-foreground">
-              <MapPin className="mr-2 h-4 w-4" />
-              Select a city...
-            </div>
-          )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
-          <CommandInput placeholder="Search city..." />
-          <CommandList>
-            <CommandEmpty>No city found.</CommandEmpty>
+    <div className="relative w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+            disabled={loading}
+          >
             {loading ? (
-              <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+              <div className="flex items-center text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Loading cities...
               </div>
             ) : error ? (
-              <div className="p-6 text-center text-sm text-destructive">
-                {error}
+              <div className="flex items-center text-destructive">
+                <MapPin className="mr-2 h-4 w-4" />
+                Error loading cities
+              </div>
+            ) : value ? (
+              <div className="flex items-center">
+                <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                {cities.find((city) => city.id.toString() === value)?.city_name}
               </div>
             ) : (
-              <CommandGroup>
-                {cities.map((city) => (
-                  <CommandItem
-                    key={city.id}
-                    value={city.id.toString()}
-                    onSelect={(currentValue) => {
-                      setValue(currentValue === value ? "" : currentValue)
-                      setOpen(false)
-                    }}
-                  >
-                    <Check className={cn("mr-2 h-4 w-4", value === city.id.toString() ? "opacity-100" : "opacity-0")} />
-                    {city.city_name}
-                    <span className="ml-2 text-xs text-muted-foreground">{city.state}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              <div className="flex items-center text-muted-foreground">
+                <MapPin className="mr-2 h-4 w-4" />
+                Select a city...
+              </div>
             )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0 z-[100]" align="start" sideOffset={4}>
+          <Command>
+            <CommandInput placeholder="Search city..." />
+            <CommandList>
+              <CommandEmpty>No city found.</CommandEmpty>
+              {loading ? (
+                <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading cities...
+                </div>
+              ) : error ? (
+                <div className="p-6 text-center text-sm text-destructive">
+                  {error}
+                </div>
+              ) : (
+                <CommandGroup>
+                  {cities.map((city) => (
+                    <CommandItem
+                      key={city.id}
+                      value={city.id.toString()}
+                      onSelect={(currentValue) => {
+                        setValue(currentValue === value ? "" : currentValue)
+                        setOpen(false)
+                      }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", value === city.id.toString() ? "opacity-100" : "opacity-0")} />
+                      {city.city_name}
+                      <span className="ml-2 text-xs text-muted-foreground">{city.state}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }

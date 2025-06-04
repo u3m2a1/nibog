@@ -5,6 +5,7 @@ import EventList from "@/components/event-list"
 import EventsLoading from "./loading"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarRange, Grid3X3 } from "lucide-react"
+import { AnimatedBackground } from "@/components/animated-background"
 
 export const metadata: Metadata = {
   title: "Baby Games | NIBOG",
@@ -13,8 +14,9 @@ export const metadata: Metadata = {
 
 export default function EventsPage() {
   return (
-    <div className="container py-8">
-      <div className="flex flex-col gap-6">
+    <AnimatedBackground variant="events">
+      <div className="container py-8">
+        <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">NIBOG Baby Games</h1>
           <p className="text-muted-foreground">Browse and register for baby games across 21 cities in India</p>
@@ -55,7 +57,8 @@ export default function EventsPage() {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
-    </div>
+    </AnimatedBackground>
   )
 }

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, MapPin, Medal, Trophy, Award, Star } from "lucide-react"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
+import { AnimatedBackground } from "@/components/animated-background"
 import AgeSelector from "@/components/age-selector"
 import CitySelector from "@/components/city-selector"
 import { formatPrice } from "@/lib/utils"
@@ -112,13 +113,23 @@ const olympicsEvents = [
 
 export default function BabyOlympicsPage() {
   return (
-    <div className="flex flex-col gap-12 pb-8">
+    <AnimatedBackground variant="olympics">
+      <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-yellow-600/5" />
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/images/baby-olympics/hero-bg.jpg"
+            alt="NIBOG background"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-100 via-amber-100 to-yellow-50 opacity-40" />
+        </div>
         <div className="container relative flex flex-col items-center justify-center gap-4 py-16 text-center md:py-24 lg:py-32">
           <Badge className="bg-yellow-500 px-3.5 py-1.5 text-sm font-medium">New India Baby Olympics Games</Badge>
-          <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
+          <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl dark:text-black">
             NIBOG - <span className="text-yellow-500">Game of Baby Thrones</span>
           </h1>
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
@@ -148,7 +159,7 @@ export default function BabyOlympicsPage() {
       <section className="container">
         <div className="grid gap-8 md:grid-cols-2 md:gap-12">
           <div className="flex flex-col justify-center space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl">What is NIBOG?</h2>
+            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">What is NIBOG?</h2>
             <p className="text-muted-foreground">
               NIBOG (New India Baby Olympics Games) is India's biggest baby Olympic games platform, executing in 21 cities across India. Our games are designed to encourage physical development, confidence, and social interaction in a fun, competitive environment for babies and young children.
             </p>
@@ -158,7 +169,7 @@ export default function BabyOlympicsPage() {
                   <Trophy className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium">16 Different Games</h3>
+                  <h3 className="font-medium dark:text-white">16 Different Games</h3>
                   <p className="text-sm text-muted-foreground">From crawling races to running races, we have games for all ages from 5-84 months</p>
                 </div>
               </div>
@@ -167,7 +178,7 @@ export default function BabyOlympicsPage() {
                   <Medal className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium">21 Cities Across India</h3>
+                  <h3 className="font-medium dark:text-white">21 Cities Across India</h3>
                   <p className="text-sm text-muted-foreground">NIBOG events are held in 21 cities across India, making it accessible to families nationwide</p>
                 </div>
               </div>
@@ -176,7 +187,7 @@ export default function BabyOlympicsPage() {
                   <Award className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Medals & Certificates</h3>
+                  <h3 className="font-medium dark:text-white">Medals & Certificates</h3>
                   <p className="text-sm text-muted-foreground">Every participant receives a medal and certificate, recognizing their achievement</p>
                 </div>
               </div>
@@ -185,7 +196,7 @@ export default function BabyOlympicsPage() {
                   <Star className="h-5 w-5 text-yellow-500" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Professional Photography</h3>
+                  <h3 className="font-medium dark:text-white">Professional Photography</h3>
                   <p className="text-sm text-muted-foreground">Capture these precious moments with our professional photographers at every event</p>
                 </div>
               </div>
@@ -193,7 +204,12 @@ export default function BabyOlympicsPage() {
           </div>
           <div className="flex items-center justify-center">
             <div className="relative h-80 w-full overflow-hidden rounded-lg">
-              <Image src="/placeholder.svg?height=320&width=480&text=NIBOG+Baby+Olympics" alt="NIBOG Baby Olympics" fill className="object-cover" />
+            <Image
+              src="/images/baby-olympics/about-image.jpg"
+              alt="NIBOG Baby Olympics"
+              fill
+              className="object-cover object-[10%_30%]"
+            />
             </div>
           </div>
         </div>
@@ -204,8 +220,8 @@ export default function BabyOlympicsPage() {
         <div className="container">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2 text-center">
-              <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Upcoming NIBOG Events</h2>
-              <p className="mx-auto max-w-[700px] text-muted-foreground">
+              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Upcoming NIBOG Events</h2>
+              <p className="mx-auto max-w-[700px] text-muted-foreground dark:text-white">
                 Register for our upcoming baby Olympic games in cities across India
               </p>
             </div>
@@ -264,11 +280,22 @@ export default function BabyOlympicsPage() {
       </section>
 
       {/* Testimonials Section */}
-      <section className="container">
+      <section className="relative py-16 md:py-24 overflow-hidden my-8">
+        {/* Background layers */}
+        <div className="absolute inset-0 bg-gradient-to-br from-yellow-50 via-orange-50 to-amber-50 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-yellow-950/20 -z-10"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(251,191,36,0.1),transparent_60%),radial-gradient(circle_at_70%_70%,rgba(245,158,11,0.1),transparent_60%)] blur-xl opacity-80 dark:opacity-30 -z-10"></div>
+        
+        {/* Decorative elements */}
+        <div className="absolute top-12 left-8 text-4xl opacity-20 animate-pulse-slow">💬</div>
+        <div className="absolute bottom-12 right-8 text-4xl opacity-20 animate-pulse-slow">❤️</div>
+        <div className="absolute top-1/3 right-1/4 text-2xl opacity-20 animate-bounce-slow">⭐</div>
+        <div className="absolute bottom-1/3 left-1/4 text-2xl opacity-20 animate-bounce-slow">✨</div>
+        
+        <div className="container">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2 text-center">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Children's Parents Speak for Us</h2>
-            <p className="mx-auto max-w-[700px] text-muted-foreground">
+            <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Children's Parents Speak for Us</h2>
+            <p className="mx-auto max-w-[700px] text-slate-700 dark:text-slate-500 font-medium">
               Hear what parents have to say about NIBOG events
             </p>
           </div>
@@ -313,6 +340,7 @@ export default function BabyOlympicsPage() {
             className="py-8"
           />
         </div>
+        </div>
       </section>
 
       {/* FAQ Section */}
@@ -320,8 +348,8 @@ export default function BabyOlympicsPage() {
         <div className="mx-auto max-w-3xl">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-2 text-center">
-              <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Frequently Asked Questions</h2>
-              <p className="text-muted-foreground">Everything you need to know about NIBOG events</p>
+              <h2 className="text-2xl font-bold tracking-tight md:text-3xl dark:text-white">Frequently Asked Questions</h2>
+              <p className="text-slate-700 dark:text-slate-500 font-medium">Everything you need to know about NIBOG events</p>
             </div>
             <div className="space-y-4">
               <div className="rounded-lg border p-4">
@@ -348,6 +376,7 @@ export default function BabyOlympicsPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </AnimatedBackground>
   );
 }
