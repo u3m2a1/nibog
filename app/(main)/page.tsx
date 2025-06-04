@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import CitySelector from "@/components/city-selector"
 import AgeSelector from "@/components/age-selector"
-import FeaturedEvents from "@/components/featured-events"
 import { AnimatedTestimonials } from "@/components/animated-testimonials"
 import { ArrowRight, Star, Shield, Award, Sparkles, MapPin, Plus, Minus } from "lucide-react"
 import { AnimatedBackground } from "@/components/animated-background"
@@ -103,7 +102,6 @@ export default function Home() {
             </div>
             <p className="text-muted-foreground dark:text-gray-700">Join us for these exciting events featuring multiple baby games in cities across India</p>
           </div>
-          <FeaturedEvents />
         </div>
       </section>
 
@@ -171,40 +169,6 @@ export default function Home() {
               </Link>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* NIBOG Olympic Sports Arena Section */}
-      <section className="container">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold tracking-tight md:text-3xl">NIBOG Olympic Sports Arena</h2>
-            <p className="text-muted-foreground">"The ground arena teaches us that sometimes the greatest victories come from overcoming the toughest challenges"</p>
-          </div>
-          <div className="group relative overflow-hidden rounded-lg">
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/80 to-yellow-600/80 transition-opacity group-hover:opacity-90" />
-            <Image
-              src="/images/baby-crawling.jpg"
-              alt="NIBOG Baby Olympics"
-              width={640}
-              height={320}
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
-            />
-            <div className="absolute inset-0 flex flex-col justify-center p-6 text-white">
-              <div className="space-y-2">
-                <Badge className="bg-white text-yellow-600">Happening Now</Badge>
-                <h3 className="text-2xl font-bold">Game of Baby Thrones</h3>
-                <p className="max-w-md">
-                  Step into the World of Baby Games and watch while they Kick, Crawl, Conquer. Join us for exciting baby Olympic games in 21 cities across India.
-                </p>
-                <Button className="mt-2 bg-white text-yellow-600 hover:bg-white/90" asChild>
-                  <Link href="/register-event">Register Now</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-
         </div>
       </section>
 

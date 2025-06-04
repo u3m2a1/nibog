@@ -7,6 +7,7 @@ import Header from "@/components/header"
 import Footer from "@/components/footer"
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/contexts/auth-context"
+import StagewiseToolbar from "@/components/stagewise-toolbar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -28,6 +29,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <Toaster />
+            <StagewiseToolbar />
           </AuthProvider>
         </ThemeProvider>
       </body>
