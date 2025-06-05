@@ -4,16 +4,19 @@ import { PHONEPE_API, PHONEPE_CONFIG } from '@/config/phonepe';
 export async function POST(request: Request) {
   try {
     console.log("Server API route: Starting PhonePe payment initiation request");
+    console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+    console.log(`PhonePe Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID}`);
 
     // Parse the request body
     const { request: base64Payload, xVerify, transactionId, bookingId } = await request.json();
     console.log(`Server API route: Received transaction ID: ${transactionId}, booking ID: ${bookingId}`);
 
-    // Determine the API URL based on test mode
+    // Determine the API URL based on environment (production vs sandbox)
     const apiUrl = PHONEPE_CONFIG.IS_TEST_MODE
       ? PHONEPE_API.TEST.INITIATE
       : PHONEPE_API.PROD.INITIATE;
 
+    console.log(`Server API route: Using ${PHONEPE_CONFIG.ENVIRONMENT} environment`);
     console.log("Server API route: Calling PhonePe API URL:", apiUrl);
 
     // Call the PhonePe API

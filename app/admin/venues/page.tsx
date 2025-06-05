@@ -116,7 +116,7 @@ export default function VenuesPage() {
     }
 
     fetchData()
-  }, [toast])
+  }, []) // Removed toast from dependency array to prevent infinite loop
 
   // Handle venue deletion
   const handleDeleteVenue = async (id: number) => {

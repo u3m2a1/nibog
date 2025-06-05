@@ -48,7 +48,7 @@ export default function GameTemplatesPage() {
     }
 
     fetchGames()
-  }, [toast])
+  }, []) // Removed toast from dependency array to prevent infinite loop
 
   const handleDeleteGame = async (id: number) => {
     try {

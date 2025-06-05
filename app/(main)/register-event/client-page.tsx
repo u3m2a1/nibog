@@ -826,13 +826,17 @@ export default function RegisterEventClientPage() {
       const bookingId = response[0].booking_id.toString()
       setBookingReference(bookingId)
 
-      // Initiate PhonePe payment
-      console.log("Initiating PhonePe payment for booking ID:", bookingId)
+      console.log("=== PHONEPE PAYMENT INITIATION ===")
+      console.log("Booking ID:", bookingId)
+      console.log("User ID:", userId)
+      console.log("Phone:", phone)
 
       // Get the total amount in rupees
       const totalAmount = calculateTotalPrice()
+      console.log("Total Amount (₹):", totalAmount)
 
       // Initiate the payment
+      console.log("🚀 Calling initiatePhonePePayment...")
       const paymentUrl = await initiatePhonePePayment(
         bookingId,
         userId,
@@ -840,7 +844,8 @@ export default function RegisterEventClientPage() {
         phone
       )
 
-      console.log("PhonePe payment URL:", paymentUrl)
+      console.log("✅ PhonePe payment URL received:", paymentUrl)
+      console.log("🔄 Redirecting to PhonePe payment page...")
 
       // Clear saved registration data since we're proceeding to payment
       sessionStorage.removeItem('registrationData')

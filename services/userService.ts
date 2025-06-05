@@ -27,12 +27,12 @@ export interface User {
 // Get all users
 export async function getAllUsers(): Promise<User[]> {
   try {
-    const response = await fetch(USER_API.GET_ALL, {
+    // Use our internal API route to avoid CORS issues and enable caching
+    const response = await fetch('/api/users/get-all', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      cache: 'no-store',
     });
 
     if (!response.ok) {

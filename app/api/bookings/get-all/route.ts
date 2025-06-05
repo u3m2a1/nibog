@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 
+// Simple in-memory cache to prevent excessive API calls
+let cachedData: any = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 30000; // 30 seconds cache
+
 export async function GET() {
   try {
     console.log("Server API route: Fetching all bookings...");
+
+    // Check if we have cached data that's still valid
+    const now = Date.now();
+    if (cachedData && (now - cacheTimestamp) < CACHE_DURATION) {
+      console.log("Server API route: Returning cached bookings data");
+      return NextResponse.json(cachedData, { status: 200 });
+    }
 
     // Forward the request to the external API with the correct URL
     const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all";
@@ -52,7 +64,12 @@ export async function GET() {
         
         // Limit the number of bookings returned to prevent memory issues
         const limitedData = Array.isArray(responseData) ? responseData.slice(0, 100) : responseData;
-        
+
+        // Cache the successful response
+        cachedData = limitedData;
+        cacheTimestamp = Date.now();
+        console.log("Server API route: Cached bookings data");
+
         return NextResponse.json(limitedData, { status: 200 });
       } catch (parseError) {
         console.error("Server API route: Error parsing response:", parseError);

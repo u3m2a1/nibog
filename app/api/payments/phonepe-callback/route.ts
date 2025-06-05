@@ -5,6 +5,7 @@ import { PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonepe';
 export async function POST(request: Request) {
   try {
     console.log("Server API route: Received PhonePe callback");
+    console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
 
     // Parse the request body
     const callbackData = await request.json();
