@@ -28,7 +28,7 @@ import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 import { initiatePhonePePayment } from "@/services/paymentService"
 
-// Helper function to format price
+// Helper function to format price.
 const formatPrice = (price: number) => {
   return `₹${price.toLocaleString('en-IN')}`
 }
