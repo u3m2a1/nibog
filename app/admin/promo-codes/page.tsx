@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Filter, Eye, Edit, Trash, Copy, AlertTriangle, BarChart } from "lucide-react"
+import { Plus, Search, Filter, Eye, Edit, Trash, Copy, AlertTriangle, BarChart, Loader2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,79 +21,88 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-// Mock data - in a real app, this would come from an API
-const promoCodes = [
-  {
-    id: "1",
-    code: "NIBOG25",
-    discount: 25,
-    discountType: "percentage",
-    maxDiscount: 500,
-    minPurchase: 1000,
-    validFrom: "2025-01-01",
-    validTo: "2025-12-31",
-    usageLimit: 1000,
-    usageCount: 250,
-    status: "active",
-    applicableEvents: ["All"],
-  },
-  {
-    id: "2",
-    code: "WELCOME500",
-    discount: 500,
-    discountType: "fixed",
-    maxDiscount: null,
-    minPurchase: 1800,
-    validFrom: "2025-01-01",
-    validTo: "2025-03-31",
-    usageLimit: 500,
-    usageCount: 320,
-    status: "active",
-    applicableEvents: ["Baby Crawling", "Baby Walker"],
-  },
-  {
-    id: "3",
-    code: "SUMMER20",
-    discount: 20,
-    discountType: "percentage",
-    maxDiscount: 400,
-    minPurchase: 1800,
-    validFrom: "2025-04-01",
-    validTo: "2025-06-30",
-    usageLimit: 800,
-    usageCount: 150,
-    status: "active",
-    applicableEvents: ["All"],
-  },
-  {
-    id: "4",
-    code: "HYDERABAD10",
-    discount: 10,
-    discountType: "percentage",
-    maxDiscount: 200,
-    minPurchase: 1800,
-    validFrom: "2025-01-01",
-    validTo: "2025-12-31",
-    usageLimit: 500,
-    usageCount: 120,
-    status: "active",
-    applicableEvents: ["All"],
-  },
-  {
-    id: "5",
-    code: "FIRSTTIME",
-    discount: 15,
-    discountType: "percentage",
-    maxDiscount: 300,
-    minPurchase: 1800,
-    validFrom: "2025-01-01",
-    validTo: "2025-12-31",
-    usageLimit: 1000,
-    usageCount: 450,
-    status: "active",
-    applicableEvents: ["All"],
-  },
-]
+// Types for API response
+interface PromoCodeAPI {
+  id: number
+  promo_code: string
+  type: "percentage" | "fixed"
+  value: string
+  valid_from: string
+  valid_to: string
+  usage_limit: number
+  usage_count: number
+  minimum_purchase_amount: string
+  maximum_discount_amount: string
+  description: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Internal type for component
+interface PromoCode {
+  id: string
+  code: string
+  discount: number
+  discountType: "percentage" | "fixed"
+  maxDiscount: number | null
+  minPurchase: number
+  validFrom: string
+  validTo: string
+  usageLimit: number
+  usageCount: number
+  status: "active" | "inactive" | "expired"
+  description: string
+}
+
+// API function to fetch promo codes
+const fetchPromoCodes = async (): Promise<PromoCode[]> => {
+  try {
+    const timestamp = new Date().getTime()
+    const response = await fetch(`/api/promo-codes/get-all?t=${timestamp}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+      }
+    })
+    if (!response.ok) {
+      throw new Error('Failed to fetch promo codes')
+    }
+    const data: PromoCodeAPI[] = await response.json()
+
+    // Transform API data to component format
+    return data.map((item) => {
+      const validFrom = new Date(item.valid_from).toISOString().split('T')[0]
+      const validTo = new Date(item.valid_to).toISOString().split('T')[0]
+      const currentDate = new Date()
+      const validToDate = new Date(item.valid_to)
+
+      // Determine status
+      let status: "active" | "inactive" | "expired" = "inactive"
+      if (item.is_active) {
+        status = validToDate < currentDate ? "expired" : "active"
+      }
+
+      return {
+        id: item.id.toString(),
+        code: item.promo_code,
+        discount: parseFloat(item.value),
+        discountType: item.type,
+        maxDiscount: item.maximum_discount_amount ? parseFloat(item.maximum_discount_amount) : null,
+        minPurchase: parseFloat(item.minimum_purchase_amount),
+        validFrom,
+        validTo,
+        usageLimit: item.usage_limit,
+        usageCount: item.usage_count,
+        status,
+        description: item.description
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching promo codes:', error)
+    throw error
+  }
+}
 
 // Discount types
 const discountTypes = [
@@ -125,8 +134,29 @@ export default function PromoCodesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedType, setSelectedType] = useState("all")
-  const [promoCodesList, setPromoCodesList] = useState(promoCodes)
+  const [promoCodesList, setPromoCodesList] = useState<PromoCode[]>([])
   const [isProcessing, setIsProcessing] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch promo codes on component mount
+  useEffect(() => {
+    const loadPromoCodes = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        const codes = await fetchPromoCodes()
+        setPromoCodesList(codes)
+      } catch (err) {
+        setError('Failed to load promo codes. Please try again.')
+        console.error('Error loading promo codes:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadPromoCodes()
+  }, [])
 
   // Handle copy promo code
   const handleCopyPromoCode = (code: string) => {
@@ -146,13 +176,13 @@ export default function PromoCodesPage() {
     // Simulate API call to delete the promo code
     setTimeout(() => {
       // In a real app, this would be an API call to delete the promo code
-      setPromoCodesList(promoCodesList.filter(code => code.id !== id))
+      setPromoCodesList(promoCodesList.filter((code: PromoCode) => code.id !== id))
       setIsProcessing(null)
     }, 1000)
   }
 
   // Filter promo codes based on search and filters
-  const filteredPromoCodes = promoCodesList.filter((promoCode) => {
+  const filteredPromoCodes = promoCodesList.filter((promoCode: PromoCode) => {
     // Search query filter
     if (
       searchQuery &&
@@ -251,20 +281,34 @@ export default function PromoCodesPage() {
               <TableHead>Min Purchase</TableHead>
               <TableHead>Valid Period</TableHead>
               <TableHead>Usage</TableHead>
-              <TableHead>Applicable Events</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPromoCodes.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading promo codes...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  <div className="text-red-500">{error}</div>
+                </TableCell>
+              </TableRow>
+            ) : filteredPromoCodes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
                   No promo codes found.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredPromoCodes.map((promoCode) => (
+              filteredPromoCodes.map((promoCode: PromoCode) => (
                 <TableRow key={promoCode.id}>
                   <TableCell className="font-medium">{promoCode.code}</TableCell>
                   <TableCell>
@@ -291,11 +335,6 @@ export default function PromoCodesPage() {
                         }}
                       />
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {promoCode.applicableEvents.length === 1 && promoCode.applicableEvents[0] === "All"
-                      ? "All Events"
-                      : promoCode.applicableEvents.join(", ")}
                   </TableCell>
                   <TableCell>{getStatusBadge(promoCode.status)}</TableCell>
                   <TableCell className="text-right">

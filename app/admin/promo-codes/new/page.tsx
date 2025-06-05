@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,8 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, Loader2, AlertTriangle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
+import { getEventsForSelector, getAllGamesFromEvents } from "@/services/eventGameService"
+import { createPromoCode, transformFormDataToAPI, validatePromoCodeForm } from "@/services/promoCodeService"
 
 // Discount types
 const discountTypes = [
@@ -19,18 +23,9 @@ const discountTypes = [
   { id: "2", name: "fixed", label: "Fixed Amount" },
 ]
 
-// Events
-const events = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
-]
-
 export default function NewPromoCodePage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [code, setCode] = useState("")
   const [discount, setDiscount] = useState("")
   const [discountType, setDiscountType] = useState("percentage")
@@ -42,43 +37,136 @@ export default function NewPromoCodePage() {
   const [description, setDescription] = useState("")
   const [applyToAll, setApplyToAll] = useState(true)
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
+  const [selectedGames, setSelectedGames] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true)
+  const [eventsError, setEventsError] = useState<string | null>(null)
+  const [events, setEvents] = useState<Array<{id: string, name: string, games: Array<{id: string, name: string}>}>>([])
+  const [allGames, setAllGames] = useState<Array<{id: string, name: string, eventName: string}>>([])
+  const [formErrors, setFormErrors] = useState<string[]>([])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch events and games data on component mount
+  useEffect(() => {
+    const fetchEventsAndGames = async () => {
+      try {
+        setIsLoadingEvents(true)
+        setEventsError(null)
+
+        // Fetch events with games
+        const eventsData = await getEventsForSelector()
+        setEvents(eventsData)
+
+        // Fetch all games
+        const gamesData = await getAllGamesFromEvents()
+        setAllGames(gamesData)
+
+        console.log("Loaded events:", eventsData)
+        console.log("Loaded games:", gamesData)
+      } catch (error: any) {
+        console.error("Error fetching events and games:", error)
+        setEventsError(error.message || "Failed to load events and games")
+      } finally {
+        setIsLoadingEvents(false)
+      }
+    }
+
+    fetchEventsAndGames()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call to create the promo code
-    setTimeout(() => {
-      // In a real app, this would be an API call to create the promo code
-      console.log({
+    try {
+      // Prepare form data for validation
+      const formData = {
         code,
-        discount: parseFloat(discount),
+        discount,
         discountType,
-        maxDiscount: maxDiscount ? parseFloat(maxDiscount) : null,
-        minPurchase: parseFloat(minPurchase),
+        minPurchase,
         validFrom,
         validTo,
-        usageLimit: parseInt(usageLimit),
-        status: "active",
-        applicableEvents: applyToAll ? ["All"] : selectedEvents,
-        description
-      })
-      
-      setIsLoading(false)
-      
-      // Redirect to the promo codes list
-      router.push("/admin/promo-codes")
-    }, 1000)
-  }
+        usageLimit,
+      };
 
-  const handleEventChange = (event: string, checked: boolean) => {
-    if (checked) {
-      setSelectedEvents([...selectedEvents, event])
-    } else {
-      setSelectedEvents(selectedEvents.filter(e => e !== event))
+      // Validate form data
+      const validation = validatePromoCodeForm(formData);
+      if (!validation.isValid) {
+        setFormErrors(validation.errors);
+        toast({
+          title: "Validation Error",
+          description: validation.errors.join(", "),
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Clear form errors if validation passes
+      setFormErrors([]);
+
+      // Check if events are selected when not applying to all
+      if (!applyToAll && selectedEvents.length === 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please select at least one event or apply to all events.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Transform form data to API format
+      const apiData = transformFormDataToAPI(
+        {
+          code,
+          discount,
+          discountType,
+          maxDiscount,
+          minPurchase,
+          validFrom,
+          validTo,
+          usageLimit,
+          description
+        },
+        selectedEvents,
+        selectedGames,
+        applyToAll,
+        events
+      );
+
+      console.log("Creating promo code with data:", apiData);
+
+      // Call the API to create the promo code
+      const response = await createPromoCode(apiData);
+
+      console.log("Promo code creation response:", response);
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Promo code created successfully!",
+        });
+
+        // Redirect to the promo codes list
+        router.push("/admin/promo-codes");
+      } else {
+        throw new Error(response.error || "Failed to create promo code");
+      }
+
+    } catch (error: any) {
+      console.error("Error creating promo code:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create promo code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   }
+
+
 
   // Generate a random promo code
   const generateRandomCode = () => {
@@ -114,6 +202,20 @@ export default function NewPromoCodePage() {
             <CardDescription>Enter the details for the new promo code</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Form Errors Display */}
+            {formErrors.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <ul className="list-disc list-inside space-y-1">
+                    {formErrors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="code">Promo Code</Label>
@@ -244,47 +346,109 @@ export default function NewPromoCodePage() {
             
             <div className="space-y-4">
               <Label>Applicable Events</Label>
-              
+
               <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="applyToAll" 
-                  checked={applyToAll} 
+                <Checkbox
+                  id="applyToAll"
+                  checked={applyToAll}
                   onCheckedChange={(checked) => {
                     if (checked) {
                       setSelectedEvents([])
+                      setSelectedGames([])
                     }
                     setApplyToAll(!!checked)
-                  }} 
+                  }}
                 />
                 <label
                   htmlFor="applyToAll"
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
-                  Apply to all events
+                  Apply to all events and games
                 </label>
               </div>
-              
+
               {!applyToAll && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {events.map((event) => (
-                    <div key={event.id} className="flex items-center space-x-2">
-                      <Checkbox 
-                        id={`event-${event.id}`} 
-                        checked={selectedEvents.includes(event.name)} 
-                        onCheckedChange={(checked) => handleEventChange(event.name, !!checked)} 
-                      />
-                      <label
-                        htmlFor={`event-${event.id}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {event.name}
-                      </label>
+                <div className="space-y-4">
+                  {isLoadingEvents ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-sm text-muted-foreground">Loading events...</span>
                     </div>
-                  ))}
+                  ) : eventsError ? (
+                    <div className="text-sm text-red-500 p-3 bg-red-50 rounded-md">
+                      Error loading events: {eventsError}
+                    </div>
+                  ) : events.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-3 bg-gray-50 rounded-md">
+                      No events available
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Select Events:</h4>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {events.map((event) => (
+                            <div key={event.id} className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`event-${event.id}`}
+                                  checked={selectedEvents.includes(event.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedEvents([...selectedEvents, event.id])
+                                    } else {
+                                      setSelectedEvents(selectedEvents.filter(e => e !== event.id))
+                                      // Remove games from this event
+                                      const eventGameIds = event.games.map(g => `${event.id}-${g.id}`)
+                                      setSelectedGames(selectedGames.filter(g => !eventGameIds.includes(g)))
+                                    }
+                                  }}
+                                />
+                                <label
+                                  htmlFor={`event-${event.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {event.name}
+                                </label>
+                              </div>
+
+                              {selectedEvents.includes(event.id) && event.games.length > 0 && (
+                                <div className="ml-6 space-y-1">
+                                  <p className="text-xs text-muted-foreground">Games in this event:</p>
+                                  {event.games.map((game) => (
+                                    <div key={game.id} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`game-${event.id}-${game.id}`}
+                                        checked={selectedGames.includes(`${event.id}-${game.id}`)}
+                                        onCheckedChange={(checked) => {
+                                          const gameId = `${event.id}-${game.id}`
+                                          if (checked) {
+                                            setSelectedGames([...selectedGames, gameId])
+                                          } else {
+                                            setSelectedGames(selectedGames.filter(g => g !== gameId))
+                                          }
+                                        }}
+                                      />
+                                      <label
+                                        htmlFor={`game-${event.id}-${game.id}`}
+                                        className="text-xs leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                      >
+                                        {game.name}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-              
-              {!applyToAll && selectedEvents.length === 0 && (
+
+              {!applyToAll && selectedEvents.length === 0 && !isLoadingEvents && (
                 <p className="text-sm text-red-500">
                   Please select at least one event or apply to all events.
                 </p>
@@ -311,12 +475,15 @@ export default function NewPromoCodePage() {
                 Cancel
               </Link>
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isLoading || (applyToAll === false && selectedEvents.length === 0)}
+            <Button
+              type="submit"
+              disabled={isLoading || isLoadingEvents || (applyToAll === false && selectedEvents.length === 0)}
             >
               {isLoading ? (
-                "Creating..."
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Promo Code...
+                </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />

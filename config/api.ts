@@ -103,4 +103,11 @@ export const BOOKING_API = {
   UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update", // POST
 };
 
+// Promo Code API endpoints
+export const PROMO_CODE_API = {
+  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/promocode/create", // POST
+  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/promocode/get-all", // GET
+  GET_BY_ID: "https://ai.alviongs.com/webhook/v1/nibog/promocode/get", // POST
+};
+
 // PhonePe API endpoints are now in config/phonepe.ts
