@@ -46,42 +46,36 @@ export interface BookingRegistrationResponse {
  * @returns Promise with the booking registration response
  */
 export async function registerBooking(bookingData: BookingRegistrationData): Promise<BookingRegistrationResponse[]> {
-  console.log("Registering booking:", bookingData);
+  console.log("=== BOOKING REGISTRATION (TEST MODE) ===");
+  console.log("Booking data to be registered:", JSON.stringify(bookingData, null, 2));
+  console.log("=== SKIPPING API CALL FOR PHONEPE TESTING ===");
 
-  try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/bookings/register', {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(bookingData),
-    });
+  // Generate a mock booking ID for testing
+  const mockBookingId = Math.floor(Math.random() * 10000) + 1000;
 
-    console.log(`Register booking response status: ${response.status}`);
+  console.log(`Generated mock booking ID: ${mockBookingId}`);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
-
-      try {
-        // Try to parse the error response as JSON
-        const errorData = JSON.parse(errorText);
-        throw new Error(errorData.error || `API returned error status: ${response.status}`);
-      } catch (parseError) {
-        // If parsing fails, throw a generic error
-        throw new Error(`Failed to register booking. API returned status: ${response.status}`);
-      }
+  // Return mock response data to simulate successful booking creation
+  const mockResponse: BookingRegistrationResponse[] = [
+    {
+      booking_game_id: Math.floor(Math.random() * 10000) + 1000,
+      booking_id: mockBookingId,
+      child_id: Math.floor(Math.random() * 10000) + 1000,
+      game_id: bookingData.booking_games.game_id,
+      game_price: bookingData.booking_games.game_price.toString(),
+      attendance_status: "registered",
+      is_active: true,
+      created_at: new Date().toISOString()
     }
+  ];
 
-    const data = await response.json();
-    console.log("Booking registration response:", data);
+  console.log("Mock booking registration response:", JSON.stringify(mockResponse, null, 2));
+  console.log("=== PROCEEDING TO PHONEPE PAYMENT INITIATION ===");
 
-    return data;
-  } catch (error) {
-    console.error("Error registering booking:", error);
-    throw error;
-  }
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  return mockResponse;
 }
 
 /**

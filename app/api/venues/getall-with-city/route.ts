@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 
+// Simple in-memory cache to prevent excessive API calls
+let cachedData: any = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION = 30000; // 30 seconds cache
+
 export async function GET() {
   try {
     console.log("Server API route: Fetching all venues with city details...");
+
+    // Check if we have cached data that's still valid
+    const now = Date.now();
+    if (cachedData && (now - cacheTimestamp) < CACHE_DURATION) {
+      console.log("Server API route: Returning cached venues data");
+      return NextResponse.json(cachedData, { status: 200 });
+    }
 
     // Forward the request to the external API with the correct URL
     const apiUrl = "https://ai.alviongs.com/webhook/V1/nibog/venues/getall-with-city";
@@ -116,6 +128,11 @@ export async function GET() {
         { status: 500 }
       );
     }
+
+    // Cache the successful response
+    cachedData = data;
+    cacheTimestamp = Date.now();
+    console.log("Server API route: Cached venues data");
 
     // Return the response with the appropriate status
     return NextResponse.json(data, { status: 200 });

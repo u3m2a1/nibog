@@ -42,12 +42,26 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   return defaultValue;
 };
 
+// Determine if we're in production mode
+const isProduction = getEnvVar('PHONEPE_ENVIRONMENT', 'production') === 'production';
+
 // PhonePe merchant configuration from environment variables
 export const PHONEPE_CONFIG = {
-  MERCHANT_ID: getEnvVar('PHONEPE_MERCHANT_ID', ''),
-  SALT_KEY: getEnvVar('PHONEPE_SALT_KEY', ''),
-  SALT_INDEX: getEnvVar('PHONEPE_SALT_INDEX', '1'),
-  IS_TEST_MODE: getEnvVar('PHONEPE_IS_TEST_MODE', 'true') === 'true',
+  MERCHANT_ID: isProduction
+    ? getEnvVar('PHONEPE_PROD_MERCHANT_ID', 'M11BWXEAW0AJ')
+    : getEnvVar('PHONEPE_TEST_MERCHANT_ID', 'PGTESTPAYUAT86'),
+
+  SALT_KEY: isProduction
+    ? getEnvVar('PHONEPE_PROD_SALT_KEY', '63542457-2eb4-4ed4-83f2-da9eaed9fcca')
+    : getEnvVar('PHONEPE_TEST_SALT_KEY', '96434309-7796-489d-8924-ab56988a6076'),
+
+  SALT_INDEX: isProduction
+    ? getEnvVar('PHONEPE_PROD_SALT_INDEX', '2')
+    : getEnvVar('PHONEPE_TEST_SALT_INDEX', '1'),
+
+  IS_TEST_MODE: !isProduction,
+  ENVIRONMENT: isProduction ? 'production' : 'sandbox',
+  APP_URL: getEnvVar('NEXT_PUBLIC_APP_URL', 'https://nibog.in'),
 };
 
 // Generate a SHA256 hash
@@ -110,4 +124,50 @@ export interface PhonePePaymentResponse {
       };
     };
   };
+}
+
+// Validate PhonePe configuration
+export function validatePhonePeConfig(): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!PHONEPE_CONFIG.MERCHANT_ID) {
+    errors.push('MERCHANT_ID is missing');
+  }
+
+  if (!PHONEPE_CONFIG.SALT_KEY) {
+    errors.push('SALT_KEY is missing');
+  }
+
+  if (!PHONEPE_CONFIG.SALT_INDEX) {
+    errors.push('SALT_INDEX is missing');
+  }
+
+  if (!PHONEPE_CONFIG.APP_URL) {
+    errors.push('APP_URL is missing');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
+// Log PhonePe configuration status
+export function logPhonePeConfig(): void {
+  const validation = validatePhonePeConfig();
+
+  console.log('=== PhonePe Configuration ===');
+  console.log(`Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+  console.log(`Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID ? '✓ Set' : '✗ Missing'}`);
+  console.log(`Salt Key: ${PHONEPE_CONFIG.SALT_KEY ? '✓ Set' : '✗ Missing'}`);
+  console.log(`Salt Index: ${PHONEPE_CONFIG.SALT_INDEX ? '✓ Set' : '✗ Missing'}`);
+  console.log(`App URL: ${PHONEPE_CONFIG.APP_URL ? '✓ Set' : '✗ Missing'}`);
+  console.log(`Test Mode: ${PHONEPE_CONFIG.IS_TEST_MODE ? 'Enabled' : 'Disabled'}`);
+
+  if (!validation.isValid) {
+    console.error('PhonePe Configuration Errors:', validation.errors);
+  } else {
+    console.log('✓ PhonePe configuration is valid');
+  }
+  console.log('=============================');
 }

@@ -499,3 +499,34 @@ CREATE TABLE booking_games (
 
 
 
+
+## promo code
+CREATE TABLE promo_codes (
+    id SERIAL PRIMARY KEY,
+    promo_code VARCHAR(50) NOT NULL UNIQUE,
+    type VARCHAR(50) NOT NULL, -- e.g., 'percentage', 'flat'
+    value NUMERIC(10, 2) NOT NULL,
+    valid_from TIMESTAMP NOT NULL,
+    valid_to TIMESTAMP NOT NULL,
+    usage_limit INTEGER DEFAULT 1,
+    usage_count INTEGER DEFAULT 0, -- New column to track current usage
+    minimum_purchase_amount NUMERIC(10, 2) DEFAULT 0,
+    maximum_discount_amount NUMERIC(10, 2), -- as amount, not percent
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+
+CREATE TABLE promo_code_mappings (
+    id SERIAL PRIMARY KEY,
+    promocodetable_id INTEGER REFERENCES promo_codes(id) ON DELETE CASCADE,
+    event_id INTEGER,  -- Reference to your events table if it exists
+    game_id INTEGER,   -- Reference to your games table if it exists
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+

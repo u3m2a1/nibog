@@ -4,16 +4,18 @@ import { PHONEPE_API, PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonep
 export async function POST(request: Request) {
   try {
     console.log("Server API route: Starting PhonePe payment status check request");
+    console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
 
     // Parse the request body
     const { transactionId } = await request.json();
     console.log(`Server API route: Checking status for transaction ID: ${transactionId}`);
 
-    // Determine the API URL based on test mode
+    // Determine the API URL based on environment (production vs sandbox)
     const apiUrl = PHONEPE_CONFIG.IS_TEST_MODE
       ? `${PHONEPE_API.TEST.STATUS}/${PHONEPE_CONFIG.MERCHANT_ID}/${transactionId}`
       : `${PHONEPE_API.PROD.STATUS}/${PHONEPE_CONFIG.MERCHANT_ID}/${transactionId}`;
 
+    console.log(`Server API route: Using ${PHONEPE_CONFIG.ENVIRONMENT} environment`);
     console.log("Server API route: Calling PhonePe API URL:", apiUrl);
 
     // Generate the X-VERIFY header

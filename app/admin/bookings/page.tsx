@@ -109,7 +109,7 @@ export default function BookingsPage() {
     }
 
     fetchBookings()
-  }, [toast])
+  }, []) // Removed toast from dependency array to prevent infinite loop
 
   // Handle confirm booking
   const handleConfirmBooking = async (id: number) => {

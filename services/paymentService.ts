@@ -9,7 +9,9 @@ import {
   PaymentStatus,
   generateTransactionId,
   generateSHA256Hash,
-  base64Encode
+  base64Encode,
+  validatePhonePeConfig,
+  logPhonePeConfig
 } from '@/config/phonepe';
 
 /**
@@ -27,6 +29,14 @@ export async function initiatePhonePePayment(
   mobileNumber: string
 ): Promise<string> {
   try {
+    // Log and validate PhonePe configuration
+    logPhonePeConfig();
+
+    const validation = validatePhonePeConfig();
+    if (!validation.isValid) {
+      throw new Error(`PhonePe configuration is invalid: ${validation.errors.join(', ')}`);
+    }
+
     console.log(`Initiating PhonePe payment for booking ID: ${bookingId}, amount: ${amount}`);
 
     // Generate a unique transaction ID
@@ -38,10 +48,13 @@ export async function initiatePhonePePayment(
       merchantTransactionId: merchantTransactionId,
       merchantUserId: userId.toString(),
       amount: amount * 100, // Convert to paise
-      redirectUrl: `${window.location.origin}/payment-callback?bookingId=${bookingId}&transactionId=${merchantTransactionId}`,
+      redirectUrl: `${PHONEPE_CONFIG.APP_URL}/payment-callback?bookingId=${bookingId}&transactionId=${merchantTransactionId}`,
       redirectMode: 'REDIRECT',
-      callbackUrl: `${window.location.origin}/api/payments/phonepe-callback`,
+      callbackUrl: `${PHONEPE_CONFIG.APP_URL}/api/payments/phonepe-callback`,
       mobileNumber: mobileNumber.replace(/\D/g, ''), // Remove non-numeric characters
+      paymentInstrument: {
+        type: 'PAY_PAGE'
+      }
     };
 
     // Convert the payment request to a base64 encoded string

@@ -71,7 +71,7 @@ export default function UsersPage() {
     }
 
     fetchUsers()
-  }, [toast])
+  }, []) // Removed toast from dependency array to prevent infinite loop
 
   // Handle delete user
   const handleDeleteUser = async (userId: number) => {

@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, addMonths, differenceInMonths, differenceInDays } from "date-fns"
 import { cn } from "@/lib/utils"
-import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2 } from "lucide-react"
+import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2, CheckCircle } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -28,7 +28,7 @@ import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 import { initiatePhonePePayment } from "@/services/paymentService"
 
-// Helper function to format price
+// Helper function to format price.
 const formatPrice = (price: number) => {
   return `₹${price.toLocaleString('en-IN')}`
 }
@@ -548,13 +548,13 @@ export default function RegisterEventClientPage() {
     setSelectedEvent("") // Reset selected event
 
     // Find the city ID from the selected city name
-    const selectedCity = cities.find(c => c.name === city);
-    if (!selectedCity || !selectedCity.id) {
+    const selectedCityObj = cities.find(c => c.name === city);
+    if (!selectedCityObj || !selectedCityObj.id) {
       console.error("Could not find city ID for selected city:", city);
       return;
     }
 
-    const cityId = Number(selectedCity.id);
+    const cityId = Number(selectedCityObj.id);
     setSelectedCityId(cityId);
 
     // Fetch events for the selected city
@@ -673,98 +673,85 @@ export default function RegisterEventClientPage() {
     return Array.from(new Set(eventTitles));
   }
 
-  // Get selected event details
-  const selectedEventDetails = events.find(event => event.id === selectedEvent)
+  // Get selected event details - check both static events and eligible events
+  const selectedEventDetails = events.find(event => event.id === selectedEvent) ||
+                               eligibleEvents.find(event => event.id === selectedEvent);
 
-  // Handle registration
+  // Handle registration - now focuses on authentication check and navigation
   const handleRegistration = async () => {
     if (!isAuthenticated) {
-      // Save registration data to sessionStorage
+      // Save complete registration data to sessionStorage including add-ons
       const registrationData = {
         parentName,
         email,
         phone,
         childName,
         schoolName,
-        dob,
+        dob: dob?.toISOString(),
         gender,
-        eventDate,
+        eventDate: eventDate.toISOString(),
         selectedCity,
+        selectedEventType,
         selectedEvent,
         selectedGame,
         childAgeMonths,
-        availableDates: availableDates.map(date => date.toISOString())
+        availableDates: availableDates.map(date => date.toISOString()),
+        step: 1, // Current step
+        termsAccepted
       }
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
-      // Redirect to login with return URL
-      router.push(`/login?returnUrl=${encodeURIComponent('/register-event')}`)
+      // Save add-ons to session storage
+      saveAddOnsToSession()
+
+      // Show user-friendly message about login requirement
+      alert("Please log in to continue with your registration. Your progress will be saved.")
+
+      // Redirect to login with return URL that includes step information
+      router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
     } else {
-      try {
-        setIsProcessingPayment(true)
-        setPaymentError(null)
+      // User is authenticated, proceed to add-ons step
+      saveAddOnsToSession()
+      setStep(2)
+    }
+  }
 
-        // Get the selected game details
-        const selectedGameObj = eligibleGames.find(game => game.id.toString() === selectedGame)
-        if (!selectedGameObj) {
-          throw new Error("Selected game not found")
-        }
-
-        // Get the selected event details
-        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
-        if (!selectedApiEvent) {
-          throw new Error("Selected event not found")
-        }
-
-        // Get the user ID from the auth context
-        const userId = user?.user_id
-        if (!userId) {
-          throw new Error("User ID not found. Please log in again.")
-        }
-
-        // Format the booking data for the API
-        const bookingData = formatBookingDataForAPI({
-          userId,
-          parentName,
-          email,
-          phone,
-          childName,
-          childDob: dob!,
-          schoolName,
-          gender,
-          eventId: selectedApiEvent.event_id,
-          gameId: selectedGameObj.id,
-          gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
-          totalAmount: calculateTotalPrice(),
-          paymentMethod: "Credit Card", // This should be dynamic based on the selected payment method
-          paymentStatus: "Paid", // This should be dynamic based on the payment result
-          termsAccepted
-        })
-
-        console.log("Formatted booking data:", bookingData)
-
-        // Register the booking
-        const response = await registerBooking(bookingData)
-        console.log("Booking registration response:", response)
-
-        // Set booking success and reference
-        setBookingSuccess(true)
-        if (response && response.length > 0) {
-          setBookingReference(response[0].booking_id.toString())
-        }
-
-        // Show success message
-        alert("Registration successful! Your booking reference is: " + (response && response.length > 0 ? response[0].booking_id : "N/A"))
-
-        // Redirect to the booking confirmation page
-        router.push(`/booking-confirmation?ref=${response && response.length > 0 ? response[0].booking_id : ""}`)
-      } catch (error: any) {
-        console.error("Error processing registration:", error)
-        setPaymentError(error.message || "Failed to process registration. Please try again.")
-        alert("Error: " + (error.message || "Failed to process registration. Please try again."))
-      } finally {
-        setIsProcessingPayment(false)
+  // Handle authentication check and proceed to payment
+  const handleProceedToPayment = async () => {
+    if (!isAuthenticated) {
+      // Save complete registration data including current step
+      const registrationData = {
+        parentName,
+        email,
+        phone,
+        childName,
+        schoolName,
+        dob: dob?.toISOString(),
+        gender,
+        eventDate: eventDate.toISOString(),
+        selectedCity,
+        selectedEventType,
+        selectedEvent,
+        selectedGame,
+        childAgeMonths,
+        availableDates: availableDates.map(date => date.toISOString()),
+        step: 3, // Payment step
+        termsAccepted
       }
+      sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
+
+      // Save add-ons to session storage
+      saveAddOnsToSession()
+
+      // Show user-friendly message about login requirement
+      alert("Please log in to proceed with payment. Your registration details will be saved.")
+
+      // Redirect to login with return URL that includes payment step
+      router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
+    } else {
+      // User is authenticated, proceed to payment step
+      saveAddOnsToSession()
+      setStep(3)
     }
   }
 
@@ -778,11 +765,9 @@ export default function RegisterEventClientPage() {
     sessionStorage.setItem('selectedAddOns', JSON.stringify(addOnsData))
   }
 
-  // Handle continue to payment
+  // Handle continue to payment - now includes authentication check
   const handleContinueToPayment = () => {
-    // Save add-ons to session storage
-    saveAddOnsToSession()
-    setStep(3)
+    handleProceedToPayment()
   }
 
   // Handle payment and booking registration
@@ -841,13 +826,17 @@ export default function RegisterEventClientPage() {
       const bookingId = response[0].booking_id.toString()
       setBookingReference(bookingId)
 
-      // Initiate PhonePe payment
-      console.log("Initiating PhonePe payment for booking ID:", bookingId)
+      console.log("=== PHONEPE PAYMENT INITIATION ===")
+      console.log("Booking ID:", bookingId)
+      console.log("User ID:", userId)
+      console.log("Phone:", phone)
 
       // Get the total amount in rupees
       const totalAmount = calculateTotalPrice()
+      console.log("Total Amount (₹):", totalAmount)
 
       // Initiate the payment
+      console.log("🚀 Calling initiatePhonePePayment...")
       const paymentUrl = await initiatePhonePePayment(
         bookingId,
         userId,
@@ -855,14 +844,36 @@ export default function RegisterEventClientPage() {
         phone
       )
 
-      console.log("PhonePe payment URL:", paymentUrl)
+      console.log("✅ PhonePe payment URL received:", paymentUrl)
+      console.log("🔄 Redirecting to PhonePe payment page...")
+
+      // Clear saved registration data since we're proceeding to payment
+      sessionStorage.removeItem('registrationData')
+      sessionStorage.removeItem('selectedAddOns')
 
       // Redirect to the PhonePe payment page
       window.location.href = paymentUrl
     } catch (error: any) {
       console.error("Error processing payment and booking:", error)
-      setPaymentError(error.message || "Failed to process payment and booking. Please try again.")
-      alert("Error: " + (error.message || "Failed to process payment and booking. Please try again."))
+
+      // Provide more specific error messages
+      let errorMessage = "Failed to process payment and booking. Please try again."
+
+      if (error.message?.includes("User ID not found")) {
+        errorMessage = "Authentication expired. Please log in again to continue."
+        // Redirect to login if authentication failed
+        setTimeout(() => {
+          router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
+        }, 2000)
+      } else if (error.message?.includes("booking")) {
+        errorMessage = "Failed to create booking. Please check your details and try again."
+      } else if (error.message?.includes("payment")) {
+        errorMessage = "Failed to initiate payment. Please try again or contact support."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
+      setPaymentError(errorMessage)
     } finally {
       setIsProcessingPayment(false)
     }
@@ -915,85 +926,79 @@ export default function RegisterEventClientPage() {
       setSelectedCity(cityParam)
     }
 
-    if (stepParam === 'addons' || stepParam === 'payment') {
-      // Try to load saved registration data
-      const savedData = sessionStorage.getItem('registrationData')
-      if (savedData) {
-        try {
-          const data = JSON.parse(savedData)
-          setParentName(data.parentName || '')
-          setEmail(data.email || '')
-          setPhone(data.phone || '')
-          setChildName(data.childName || '')
-          setSchoolName(data.schoolName || '')
-          setDob(data.dob ? new Date(data.dob) : undefined)
-          setGender(data.gender || 'female')
-          setSelectedCity(data.selectedCity || '')
-          setSelectedEvent(data.selectedEvent || '')
-          setSelectedGame(data.selectedGame || '')
-          setChildAgeMonths(data.childAgeMonths || null)
+    // Try to load saved registration data
+    const savedData = sessionStorage.getItem('registrationData')
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData)
 
-          // If we have all required data, go to appropriate step
-          if (data.selectedCity && data.dob && data.selectedEvent && data.childAgeMonths !== null) {
-            // Recalculate eligible events
-            const ageInMonths = data.childAgeMonths
-            const eligible = events.filter(
-              event =>
-                event.minAgeMonths <= ageInMonths &&
-                event.maxAgeMonths >= ageInMonths &&
-                event.city === data.selectedCity
-            )
-            setEligibleEvents(eligible)
+        // Restore all form data
+        setParentName(data.parentName || '')
+        setEmail(data.email || '')
+        setPhone(data.phone || '')
+        setChildName(data.childName || '')
+        setSchoolName(data.schoolName || '')
+        setDob(data.dob ? new Date(data.dob) : undefined)
+        setGender(data.gender || 'female')
+        setSelectedCity(data.selectedCity || cityParam || '')
+        setSelectedEventType(data.selectedEventType || '')
+        setSelectedEvent(data.selectedEvent || '')
+        setSelectedGame(data.selectedGame || '')
+        setChildAgeMonths(data.childAgeMonths || null)
+        setTermsAccepted(data.termsAccepted || false)
 
-            // Get unique dates for this city
-            const dates = eligible.map(event => new Date(event.date))
-            const uniqueDates = Array.from(new Set(dates.map(date => date.toISOString())))
-              .map(dateStr => new Date(dateStr))
-
-            // Load available dates from saved data or calculate them
-            if (data.availableDates && Array.isArray(data.availableDates)) {
-              setAvailableDates(data.availableDates.map((dateStr: string) => new Date(dateStr)))
-            } else {
-              setAvailableDates(uniqueDates)
-            }
-
-            // Set event date from saved data or first available date
-            if (data.eventDate) {
-              setEventDate(new Date(data.eventDate))
-            } else if (uniqueDates.length > 0) {
-              setEventDate(uniqueDates[0])
-            }
-
-            // Load saved add-ons if available
-            const savedAddOns = sessionStorage.getItem('selectedAddOns')
-            if (savedAddOns) {
-              try {
-                const addOnsData = JSON.parse(savedAddOns)
-                const loadedAddOns = addOnsData.map((item: { addOnId: string; quantity: number; variantId?: string }) => ({
-                  addOn: addOns.find(addon => addon.id === item.addOnId) as AddOn,
-                  quantity: item.quantity,
-                  variantId: item.variantId
-                })).filter((item: { addOn: AddOn | undefined }) => item.addOn !== undefined)
-
-                setSelectedAddOns(loadedAddOns)
-              } catch (error) {
-                console.error('Error parsing saved add-ons data:', error)
-              }
-            }
-
-            // Set the appropriate step based on the URL parameter
-            if (stepParam === 'addons') {
-              setStep(2) // Add-ons step
-            } else if (stepParam === 'payment') {
-              setStep(3) // Payment step
-            }
-          }
-        } catch (error) {
-          console.error('Error parsing saved registration data:', error)
+        // Restore event date
+        if (data.eventDate) {
+          setEventDate(new Date(data.eventDate))
         }
+
+        // Load available dates from saved data
+        if (data.availableDates && Array.isArray(data.availableDates)) {
+          setAvailableDates(data.availableDates.map((dateStr: string) => new Date(dateStr)))
+        }
+
+        // Load saved add-ons if available
+        const savedAddOns = sessionStorage.getItem('selectedAddOns')
+        if (savedAddOns) {
+          try {
+            const addOnsData = JSON.parse(savedAddOns)
+            const loadedAddOns = addOnsData.map((item: { addOnId: string; quantity: number; variantId?: string }) => ({
+              addOn: addOns.find(addon => addon.id === item.addOnId) as AddOn,
+              quantity: item.quantity,
+              variantId: item.variantId
+            })).filter((item: { addOn: AddOn | undefined }) => item.addOn !== undefined)
+
+            setSelectedAddOns(loadedAddOns)
+          } catch (error) {
+            console.error('Error parsing saved add-ons data:', error)
+          }
+        }
+
+        // Determine the appropriate step
+        if (stepParam === 'payment' && isAuthenticated) {
+          // User is authenticated and wants to go to payment
+          setStep(3)
+        } else if (stepParam === 'addons' || (data.step && data.step >= 2)) {
+          // Go to add-ons step
+          setStep(2)
+        } else {
+          // Stay on registration step
+          setStep(1)
+        }
+
+        // Clear the URL parameters to clean up the URL
+        if (stepParam) {
+          const newUrl = window.location.pathname + (cityParam ? `?city=${cityParam}` : '')
+          window.history.replaceState({}, '', newUrl)
+        }
+      } catch (error) {
+        console.error('Error parsing saved registration data:', error)
       }
+    } else if (stepParam === 'payment' || stepParam === 'addons') {
+      // If no saved data but step parameter exists, redirect to start
+      router.push('/register-event' + (cityParam ? `?city=${cityParam}` : ''))
     }
-  }, []) // Empty dependency array means this effect runs once on mount
+  }, [isAuthenticated, router]) // Include isAuthenticated and router in dependencies
 
   return (
     <div className="container py-8 px-4 sm:px-6 relative">
@@ -1029,6 +1034,92 @@ export default function RegisterEventClientPage() {
             </div>
           </div>
         </CardHeader>
+
+        {/* Authentication Status Indicator */}
+        {!isAuthenticated ? (
+          <div className="mx-6 mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-100 dark:bg-blue-900 p-1 rounded-full">
+                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="text-sm">
+                <span className="font-medium text-blue-800 dark:text-blue-200">Login Required</span>
+                <p className="text-blue-600 dark:text-blue-300 mt-1">
+                  You'll need to log in to complete your registration and payment. Your progress will be saved.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : user && (
+          <div className="mx-6 mb-4 p-3 rounded-lg bg-green-50 border border-green-200 dark:bg-green-950 dark:border-green-800">
+            <div className="flex items-center gap-2">
+              <div className="bg-green-100 dark:bg-green-900 p-1 rounded-full">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="text-sm">
+                <span className="font-medium text-green-800 dark:text-green-200">Welcome back, {user.full_name}!</span>
+                <p className="text-green-600 dark:text-green-300 mt-1">
+                  You're logged in and ready to complete your registration.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step Indicator */}
+        <div className="mx-6 mb-4">
+          <div className="flex items-center justify-center space-x-4">
+            <div className={cn(
+              "flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium transition-all",
+              step === 1 ? "bg-primary text-white" : step > 1 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+            )}>
+              <span className={cn(
+                "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                step === 1 ? "bg-white text-primary" : step > 1 ? "bg-green-500 text-white" : "bg-gray-300 text-gray-600"
+              )}>
+                {step > 1 ? "✓" : "1"}
+              </span>
+              <span>Registration</span>
+            </div>
+
+            <div className={cn(
+              "w-8 h-0.5 transition-all",
+              step > 1 ? "bg-green-500" : "bg-gray-300"
+            )}></div>
+
+            <div className={cn(
+              "flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium transition-all",
+              step === 2 ? "bg-primary text-white" : step > 2 ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+            )}>
+              <span className={cn(
+                "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                step === 2 ? "bg-white text-primary" : step > 2 ? "bg-green-500 text-white" : "bg-gray-300 text-gray-600"
+              )}>
+                {step > 2 ? "✓" : "2"}
+              </span>
+              <span>Add-ons</span>
+            </div>
+
+            <div className={cn(
+              "w-8 h-0.5 transition-all",
+              step > 2 ? "bg-green-500" : "bg-gray-300"
+            )}></div>
+
+            <div className={cn(
+              "flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium transition-all",
+              step === 3 ? "bg-primary text-white" : "bg-gray-100 text-gray-500"
+            )}>
+              <span className={cn(
+                "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold",
+                step === 3 ? "bg-white text-primary" : "bg-gray-300 text-gray-600"
+              )}>
+                3
+              </span>
+              <span>Payment</span>
+            </div>
+          </div>
+        </div>
+
         <CardContent className="space-y-4 sm:px-6">
           {step === 1 && (
             <>
@@ -1497,7 +1588,10 @@ export default function RegisterEventClientPage() {
                       Processing...
                     </>
                   ) : (
-                    <>Register <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" /></>
+                    <>
+                      {isAuthenticated ? "Continue to Add-ons" : "Continue (Login Required)"}
+                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                    </>
                   )}
                 </span>
                 <span className="absolute inset-0 bg-white/10 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500"></span>
@@ -1533,18 +1627,47 @@ export default function RegisterEventClientPage() {
                 </div>
               </div>
 
-              <AddOnSelector
-                addOns={addOns}
-                onAddOnsChange={setSelectedAddOns}
-                initialSelectedAddOns={selectedAddOns}
-              />
+              {/* Add-ons Section with Optional Indicator */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Add-ons</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    Optional
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Enhance your experience with optional add-ons. You can skip this step and proceed directly to payment if you prefer.
+                </p>
+
+                <AddOnSelector
+                  addOns={addOns}
+                  onAddOnsChange={setSelectedAddOns}
+                  initialSelectedAddOns={selectedAddOns}
+                />
+              </div>
+
+              {/* Show different messaging based on add-ons selection */}
+              {selectedAddOns.length === 0 && (
+                <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm text-blue-800 dark:text-blue-200">
+                      No add-ons selected. You can proceed to payment or add some optional extras above.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-4 mt-6">
                 <Button variant="outline" className="w-full" onClick={() => setStep(1)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button className="w-full" onClick={handleContinueToPayment}>
-                  Register <ArrowRight className="ml-2 h-4 w-4" />
+                  {selectedAddOns.length === 0
+                    ? (isAuthenticated ? "Skip Add-ons & Proceed to Payment" : "Skip Add-ons & Continue (Login Required)")
+                    : (isAuthenticated ? "Proceed to Payment" : "Continue to Payment (Login Required)")
+                  }
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </>
@@ -1552,35 +1675,35 @@ export default function RegisterEventClientPage() {
 
           {step === 3 && selectedEventDetails && (
             <>
-              <div className="rounded-md bg-muted p-4">
-                <h3 className="font-semibold">Registration Summary</h3>
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Event:</span>
-                    <span className="font-medium">{selectedEventDetails.title}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Date:</span>
-                    <span>{format(eventDate, "PPP")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Venue:</span>
-                    <span>{selectedEventDetails.venue}, {selectedEventDetails.city}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Child's Age on Event Date:</span>
-                    <span>{childAgeMonths} months</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">School:</span>
-                    <span>{schoolName || (childAgeMonths && childAgeMonths < 36 ? "Home" : "Not specified")}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-medium">
-                    <span>Registration Fee:</span>
-                    <span>₹{selectedEventDetails.price}</span>
-                  </div>
-                  {selectedAddOns.length > 0 && (
+                <div className="rounded-md bg-muted p-4">
+                  <h3 className="font-semibold">Registration Summary</h3>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Event:</span>
+                      <span className="font-medium">{selectedEventDetails.title}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Date:</span>
+                      <span>{format(eventDate, "PPP")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Venue:</span>
+                      <span>{selectedEventDetails.venue}, {selectedEventDetails.city}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Child's Age on Event Date:</span>
+                      <span>{childAgeMonths} months</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">School:</span>
+                      <span>{schoolName || (childAgeMonths && childAgeMonths < 36 ? "Home" : "Not specified")}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-medium">
+                      <span>Registration Fee:</span>
+                      <span>₹{selectedEventDetails.price}</span>
+                    </div>
+                    {selectedAddOns.length > 0 ? (
                     <>
                       {selectedAddOns.map((item) => {
                         let price = item.addOn.price
@@ -1635,6 +1758,11 @@ export default function RegisterEventClientPage() {
                         <span>₹{calculateAddOnsTotal()}</span>
                       </div>
                     </>
+                  ) : (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Add-ons:</span>
+                      <span>None selected</span>
+                    </div>
                   )}
                   <div className="flex justify-between font-medium">
                     <span>GST (18%):</span>
@@ -1645,100 +1773,100 @@ export default function RegisterEventClientPage() {
                     <span>Total Amount:</span>
                     <span>₹{calculateTotalPrice()}</span>
                   </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2 mt-6">
-                <Label htmlFor="promo">Promo Code</Label>
-                <div className="flex space-x-2">
-                  <Input id="promo" placeholder="Enter promo code" />
-                  <Button variant="outline">Apply</Button>
+                <div className="space-y-2 mt-6">
+                  <Label htmlFor="promo">Promo Code</Label>
+                  <div className="flex space-x-2">
+                    <Input id="promo" placeholder="Enter promo code" />
+                    <Button variant="outline">Apply</Button>
+                  </div>
                 </div>
-              </div>
 
-              {paymentError && (
-                <div className="rounded-lg bg-red-50 p-4 border border-red-100 shadow-inner mb-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0 bg-red-100 rounded-full p-1">
-                      <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
+                {paymentError && (
+                  <div className="rounded-lg bg-red-50 p-4 border border-red-100 shadow-inner mb-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 bg-red-100 rounded-full p-1">
+                        <AlertTriangle className="h-5 w-5 text-red-500" aria-hidden="true" />
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">Payment Error</h3>
+                        <div className="mt-2 text-sm text-red-700">
+                          <p>{paymentError}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">Payment Error</h3>
-                      <div className="mt-2 text-sm text-red-700">
-                        <p>{paymentError}</p>
+                  </div>
+                )}
+
+                <div className="space-y-2 mt-6">
+                  <Label>Payment Method</Label>
+                  <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
+                    <div className="flex items-center justify-center">
+                      <div className="bg-[#5f259f] p-4 rounded-lg text-white font-bold text-xl flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h16a2 2 0 0 1 2 2v13c0 1.1-.9 2-2 2h-3.5"></path>
+                          <path d="M2 10h20"></path>
+                          <path d="M7 15h.01"></path>
+                          <path d="M11 15h2"></path>
+                          <path d="M10.5 20a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0z"></path>
+                        </svg>
+                        PhonePe
+                      </div>
+                    </div>
+                    <p className="text-center text-sm text-muted-foreground">
+                      You will be redirected to PhonePe to complete your payment securely.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2 mt-4">
+                      <div className="bg-gray-100 p-2 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                          <line x1="2" x2="22" y1="10" y2="10"></line>
+                        </svg>
+                      </div>
+                      <div className="bg-gray-100 p-2 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16.7 8A3 3 0 0 0 14 6h-4a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-4a3 3 0 0 1-2.7-2"></path>
+                          <path d="M12 18V6"></path>
+                        </svg>
+                      </div>
+                      <div className="bg-gray-100 p-2 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 2v20"></path>
+                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                      </div>
+                      <div className="bg-gray-100 p-2 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"></path>
+                          <path d="M2 9v1c0 1.1.9 2 2 2h1"></path>
+                          <path d="M16 11h0"></path>
+                        </svg>
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
 
-              <div className="space-y-2 mt-6">
-                <Label>Payment Method</Label>
-                <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
-                  <div className="flex items-center justify-center">
-                    <div className="bg-[#5f259f] p-4 rounded-lg text-white font-bold text-xl flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10.5 20H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h16a2 2 0 0 1 2 2v13c0 1.1-.9 2-2 2h-3.5"></path>
-                        <path d="M2 10h20"></path>
-                        <path d="M7 15h.01"></path>
-                        <path d="M11 15h2"></path>
-                        <path d="M10.5 20a2.5 2.5 0 1 1 5 0 2.5 2.5 0 1 1-5 0z"></path>
-                      </svg>
-                      PhonePe
-                    </div>
-                  </div>
-                  <p className="text-center text-sm text-muted-foreground">
-                    You will be redirected to PhonePe to complete your payment securely.
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    <div className="bg-gray-100 p-2 rounded-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect width="20" height="14" x="2" y="5" rx="2"></rect>
-                        <line x1="2" x2="22" y1="10" y2="10"></line>
-                      </svg>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M16.7 8A3 3 0 0 0 14 6h-4a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-4a3 3 0 0 1-2.7-2"></path>
-                        <path d="M12 18V6"></path>
-                      </svg>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 2v20"></path>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                      </svg>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded-md">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"></path>
-                        <path d="M2 9v1c0 1.1.9 2 2 2h1"></path>
-                        <path d="M16 11h0"></path>
-                      </svg>
-                    </div>
-                  </div>
+                <div className="flex gap-4 mt-6">
+                  <Button variant="outline" className="w-full" onClick={() => setStep(2)}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                  </Button>
+                  <Button
+                    className="w-full"
+                    onClick={handlePayment}
+                    disabled={isProcessingPayment}
+                  >
+                    {isProcessingPayment ? (
+                      <>
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>Pay with PhonePe ₹{calculateTotalPrice()}</>
+                    )}
+                  </Button>
                 </div>
-              </div>
-
-              <div className="flex gap-4 mt-6">
-                <Button variant="outline" className="w-full" onClick={() => setStep(2)}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                </Button>
-                <Button
-                  className="w-full"
-                  onClick={handlePayment}
-                  disabled={isProcessingPayment}
-                >
-                  {isProcessingPayment ? (
-                    <>
-                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>Pay with PhonePe ₹{calculateTotalPrice()}</>
-                  )}
-                </Button>
-              </div>
             </>
           )}
         </CardContent>
