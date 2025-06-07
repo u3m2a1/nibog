@@ -5,7 +5,7 @@ POST https://ai.alviongs.com/webhook/v1/nibog/promocode/create
 payload
 
 {
-  "id": 42,  // ← promo_code ID from DB
+
   "promo_code": "NIBOG25",
   "type": "percentage",
   "value": 25,
@@ -243,43 +243,55 @@ response
 
 ## update promocode
 
-PUT https://ai.alviongs.com/webhook/v1/nibog/promocode/update
+POST https://ai.alviongs.com/webhook/v1/nibog/promocode/update
 
 payload
 
 {
-  "id": 1,
+  "id": 42,  // ← promo_code ID from DB
   "promo_code": "NIBOG25",
   "type": "percentage",
   "value": 25,
-  "valid_from": "2025-01-01",
-  "valid_to": "2025-12-31",
+  "valid_from": "2025-01-01T00:00:00Z",
+  "valid_to": "2025-12-31T23:59:59Z",
   "usage_limit": 1000,
-  "usage_count": 0,
   "minimum_purchase_amount": 1000,
   "maximum_discount_amount": 500,
-  "description": "25% off on all NIBOG events. Maximum discount of ₹500."
-  "applicable_events": [1, 2, 3],
-  "applicable_games": [4, 5, 6]
+  "description": "25% off on all NIBOG events. Maximum discount of ₹500.",
+  "events": [
+    {
+      "id": 1,
+      "games_id": [4, 5]
+    },
+    {
+      "id": 2,
+      "games_id": []
+    },
+    {
+      "id": 3,
+      "games_id": [6]
+    }
+  ]
 }
 
 response
 
 [
   {
-    "id": 1,
+    "id": 11,
     "promo_code": "NIBOG25",
     "type": "percentage",
-    "value": 25,
-    "valid_from": "2025-01-01",
-    "valid_to": "2025-12-31",
+    "value": "25.00",
+    "valid_from": "2025-01-01T00:00:00.000Z",
+    "valid_to": "2025-12-31T00:00:00.000Z",
     "usage_limit": 1000,
     "usage_count": 0,
-    "minimum_purchase_amount": 1000,
-    "maximum_discount_amount": 500,
+    "minimum_purchase_amount": "1000.00",
+    "maximum_discount_amount": "500.00",
     "description": "25% off on all NIBOG events. Maximum discount of ₹500.",
-    "created_at": "2025-05-07T18:41:35.185Z",
-    "updated_at": "2025-05-07T18:41:35.185Z"
+    "created_at": "2025-06-06T07:27:09.932Z",
+    "updated_at": "2025-06-06T07:27:09.932Z",
+    "is_active": false
   }
 ]
 
@@ -287,7 +299,7 @@ response
 
 ## delete promocode
 
-DELETE https://ai.alviongs.com/webhook/v1/nibog/promocode/delete
+POST https://ai.alviongs.com/webhook/v1/nibog/promocode/delete
 {
     "id": 1
 }
@@ -296,10 +308,9 @@ response
 
 [
   {
-    "success": true
-  }
+    "success": true
+  }
 ]
-
 
 
 ## get promocode by code

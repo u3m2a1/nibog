@@ -32,29 +32,6 @@ CREATE TABLE events (
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE baby_games (
   id SERIAL PRIMARY KEY,
   game_name VARCHAR(255) NOT NULL,
@@ -408,28 +385,6 @@ FOR EACH ROW
 EXECUTE FUNCTION check_auth_method();
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE parents (
     parent_id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -528,5 +483,27 @@ CREATE TABLE promo_code_mappings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE
 );
+
+
+-- Statuses table
+CREATE TABLE testimonial_statuses (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Testimonials table
+CREATE TABLE testimonials (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  city_id INTEGER REFERENCES cities(id) ON DELETE SET NULL,
+  event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+  testimonial TEXT NOT NULL,
+  status_id INTEGER REFERENCES testimonial_statuses(id),
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 
 
