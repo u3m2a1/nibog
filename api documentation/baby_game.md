@@ -3,7 +3,7 @@ POST https://ai.alviongs.com/webhook/v1/nibog/babygame/create
 
 {
   "game_name": "Baby Crawling",
-  "game_description": "Let your little crawler compete in a fun and safe environment.",
+  "description": "Let your little crawler compete in a fun and safe environment.",
   "min_age_months": 5,
   "max_age_months": 13,
   "duration_minutes": 60,

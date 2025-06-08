@@ -284,7 +284,7 @@ export default function NewGameTemplate() {
                 </Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {categories.map((category) => (
+                {categories.map((category: string) => (
                   <Badge key={category} variant="secondary">
                     {category}
                     <button

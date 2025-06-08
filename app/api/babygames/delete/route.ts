@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { BABY_GAME_API } from '@/config/api';
 
-export async function DELETE(request: Request) {
+export async function POST(request: Request) {
   try {
     // Parse the request body
     const data = await request.json();
@@ -25,7 +25,7 @@ export async function DELETE(request: Request) {
     console.log("Server API route: Delete request data:", apiData);
 
     const response = await fetch(apiUrl, {
-      method: "DELETE",
+      method: "POST", // Changed from DELETE to POST as per API documentation
       headers: {
         "Content-Type": "application/json",
       },
@@ -44,7 +44,7 @@ export async function DELETE(request: Request) {
       console.log("Server API route: Trying alternative URL:", alternativeUrl);
 
       const alternativeResponse = await fetch(alternativeUrl, {
-        method: "DELETE",
+        method: "POST", // Changed from DELETE to POST as per API documentation
         headers: {
           "Content-Type": "application/json",
         },

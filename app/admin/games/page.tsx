@@ -30,19 +30,26 @@ export default function GameTemplatesPage() {
   useEffect(() => {
     const fetchGames = async () => {
       try {
+        console.log("🔄 [Games Page] Starting to fetch all games")
         setIsLoading(true)
         setError(null)
+
         const data = await getAllBabyGames()
+        console.log("✅ [Games Page] Received games data:", data)
+
         setGames(data)
+        console.log("🎯 [Games Page] Set games state with", data.length, "games")
       } catch (err: any) {
-        console.error("Error fetching games:", err)
-        setError(err.message || "Failed to fetch games")
+        console.error("💥 [Games Page] Error fetching games:", err)
+        const errorMsg = err.message || "Failed to fetch games"
+        setError(errorMsg)
         toast({
           title: "Error",
-          description: err.message || "Failed to fetch games",
+          description: errorMsg,
           variant: "destructive",
         })
       } finally {
+        console.log("🏁 [Games Page] Finished fetching games, setting loading to false")
         setIsLoading(false)
       }
     }
@@ -76,10 +83,10 @@ export default function GameTemplatesPage() {
           <p className="text-muted-foreground">Manage baby games for NIBOG Olympic events</p>
         </div>
         <Button asChild>
-          <a href="/admin/games/new">
+          <Link href="/admin/games/new">
             <Plus className="mr-2 h-4 w-4" />
             Add New Baby Game
-          </a>
+          </Link>
         </Button>
       </div>
 
@@ -103,10 +110,10 @@ export default function GameTemplatesPage() {
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">No games found</p>
           <Button asChild>
-            <a href="/admin/games/new">
+            <Link href="/admin/games/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Your First Game
-            </a>
+            </Link>
           </Button>
         </div>
       ) : (
@@ -147,16 +154,16 @@ export default function GameTemplatesPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
-                        <a href={`/admin/games/${game.id}`}>
+                        <Link href={`/admin/games/${game.id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View</span>
-                        </a>
+                        </Link>
                       </Button>
                       <Button variant="ghost" size="icon" asChild>
-                        <a href={`/admin/games/${game.id}/edit`}>
+                        <Link href={`/admin/games/${game.id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
-                        </a>
+                        </Link>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

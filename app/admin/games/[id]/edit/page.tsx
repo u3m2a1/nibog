@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -18,14 +18,16 @@ import { getBabyGameById, updateBabyGame } from "@/services/babyGameService"
 import { useToast } from "@/components/ui/use-toast"
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function EditGameTemplate({ params }: Props) {
   const router = useRouter()
   const { toast } = useToast()
 
-  const gameId = parseInt(params.id, 10)
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params)
+  const gameId = parseInt(resolvedParams.id, 10)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,19 +49,22 @@ export default function EditGameTemplate({ params }: Props) {
   useEffect(() => {
     const fetchGameData = async () => {
       try {
+        console.log(`🔄 [Edit Page] Starting to fetch game data for ID: ${gameId}`)
         setIsLoading(true)
         setError(null)
 
         // Validate gameId
         if (isNaN(gameId) || gameId <= 0) {
-          setError(`Invalid game ID: ${params.id}. ID must be a positive number.`)
+          const errorMsg = `Invalid game ID: ${resolvedParams.id}. ID must be a positive number.`
+          console.error(`❌ [Edit Page] ${errorMsg}`)
+          setError(errorMsg)
           setIsLoading(false)
           return
         }
 
-        console.log(`Fetching game data for ID: ${gameId}`)
+        console.log(`📡 [Edit Page] Calling getBabyGameById(${gameId})`)
         const gameData = await getBabyGameById(gameId)
-        console.log("Game data received:", gameData)
+        console.log("✅ [Edit Page] Game data received:", gameData)
 
         if (!gameData) {
           throw new Error("No game data returned from API")
@@ -68,6 +73,7 @@ export default function EditGameTemplate({ params }: Props) {
         setGame(gameData)
 
         // Set form values
+        console.log("🎯 [Edit Page] Setting form values from game data")
         setName(gameData.game_name || "")
         setDescription(gameData.description || "")
         setMinAge(gameData.min_age || 0)
@@ -77,21 +83,23 @@ export default function EditGameTemplate({ params }: Props) {
         setCategories(gameData.categories || [])
 
       } catch (error: any) {
-        console.error("Failed to fetch game data:", error)
-        setError(error.message || "Failed to load game data. Please try again.")
+        console.error("💥 [Edit Page] Failed to fetch game data:", error)
+        const errorMsg = error.message || "Failed to load game data. Please try again."
+        setError(errorMsg)
 
         toast({
           title: "Error",
-          description: error.message || "Failed to load game data",
+          description: errorMsg,
           variant: "destructive",
         })
       } finally {
+        console.log("🏁 [Edit Page] Finished fetching game data, setting loading to false")
         setIsLoading(false)
       }
     }
 
     fetchGameData()
-  }, [gameId, params.id, toast])
+  }, [gameId, resolvedParams.id]) // Removed toast from dependency array to prevent infinite loop
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -320,7 +328,7 @@ export default function EditGameTemplate({ params }: Props) {
                 </Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {categories.map((category) => (
+                {categories.map((category: string) => (
                   <Badge key={category} variant="secondary">
                     {category}
                     <button

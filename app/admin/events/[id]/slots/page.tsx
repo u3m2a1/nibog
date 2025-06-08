@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -55,12 +55,15 @@ const events = [
 ]
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function EventSlotsPage({ params }: Props) {
   const router = useRouter()
-  const event = events.find((e) => e.id === params.id)
+
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params)
+  const event = events.find((e) => e.id === resolvedParams.id)
 
   if (!event) {
     return (
@@ -80,7 +83,7 @@ export default function EventSlotsPage({ params }: Props) {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" asChild>
-          <Link href={`/admin/events/${params.id}`}>
+          <Link href={`/admin/events/${resolvedParams.id}`}>
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Link>
@@ -100,7 +103,7 @@ export default function EventSlotsPage({ params }: Props) {
             <CardDescription>Manage time slots for this event</CardDescription>
           </div>
           <Button asChild>
-            <Link href={`/admin/events/${params.id}/slots/new`}>
+            <Link href={`/admin/events/${resolvedParams.id}/slots/new`}>
               <Plus className="mr-2 h-4 w-4" />
               Add New Slot
             </Link>
@@ -165,13 +168,13 @@ export default function EventSlotsPage({ params }: Props) {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/events/${params.id}/slots/${slot.id}/edit`}>
+                            <Link href={`/admin/events/${resolvedParams.id}/slots/${slot.id}/edit`}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </Link>
                           </Button>
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/events/${params.id}/slots/${slot.id}/participants`}>
+                            <Link href={`/admin/events/${resolvedParams.id}/slots/${slot.id}/participants`}>
                               <Users className="mr-2 h-4 w-4" />
                               Participants
                             </Link>

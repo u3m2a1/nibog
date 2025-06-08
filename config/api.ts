@@ -36,13 +36,12 @@ export const VENUE_API = {
 };
 
 // Baby Game API endpoints
-const BABY_GAME_BASE_URL = "https://ai.alviongs.com/webhook/V1/nibog";
 export const BABY_GAME_API = {
-  CREATE: `${BABY_GAME_BASE_URL}/babygame/create`,
-  UPDATE: `${BABY_GAME_BASE_URL}/babygame/update`,
-  GET: `${BABY_GAME_BASE_URL}/babygame/get`,
-  GET_ALL: `${BABY_GAME_BASE_URL}/babygame/get-all`,
-  DELETE: `${BABY_GAME_BASE_URL}/babygame/delete`,
+  CREATE: `${API_BASE_URL}/babygame/create`,
+  UPDATE: `${API_BASE_URL}/babygame/update`,
+  GET: `${API_BASE_URL}/babygame/get`,
+  GET_ALL: `${API_BASE_URL}/babygame/get-all`,
+  DELETE: `${API_BASE_URL}/babygame/delete`,
 };
 
 // Event API endpoints

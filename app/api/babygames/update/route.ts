@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { BABY_GAME_API } from '@/config/api';
 
-export async function PUT(request: Request) {
+export async function POST(request: Request) {
   try {
     // Parse the request body
     const data = await request.json();
-    
+
     // Validate required fields
     if (!data.id) {
       return NextResponse.json(
@@ -13,14 +13,14 @@ export async function PUT(request: Request) {
         { status: 400 }
       );
     }
-    
+
     if (!data.game_name) {
       return NextResponse.json(
         { error: "Game name is required" },
         { status: 400 }
       );
     }
-    
+
     console.log(`Server API route: Updating baby game with ID: ${data.id}`);
 
     // Forward the request to the external API with the correct URL
@@ -28,7 +28,7 @@ export async function PUT(request: Request) {
     console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {
-      method: "PUT",
+      method: "POST", // Changed from PUT to POST as per API documentation
       headers: {
         "Content-Type": "application/json",
       },
@@ -41,12 +41,12 @@ export async function PUT(request: Request) {
     if (!response.ok) {
       // If the first attempt fails, try with the webhook-test URL
       console.log("Server API route: First attempt failed, trying with webhook-test URL");
-      
+
       const alternativeUrl = apiUrl.replace("webhook/v1", "webhook-test/v1");
       console.log("Server API route: Trying alternative URL:", alternativeUrl);
-      
+
       const alternativeResponse = await fetch(alternativeUrl, {
-        method: "PUT",
+        method: "POST", // Changed from PUT to POST as per API documentation
         headers: {
           "Content-Type": "application/json",
         },

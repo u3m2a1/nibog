@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -23,14 +23,16 @@ import { getBabyGameById, deleteBabyGame } from "@/services/babyGameService"
 import { useToast } from "@/components/ui/use-toast"
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function GameDetailPage({ params }: Props) {
   const router = useRouter()
   const { toast } = useToast()
 
-  const gameId = parseInt(params.id, 10)
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params)
+  const gameId = parseInt(resolvedParams.id, 10)
 
   const [game, setGame] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -42,19 +44,22 @@ export default function GameDetailPage({ params }: Props) {
   useEffect(() => {
     const fetchGameData = async () => {
       try {
+        console.log(`🔄 [Page] Starting to fetch game data for ID: ${gameId}`)
         setIsLoading(true)
         setError(null)
 
         // Validate gameId
         if (isNaN(gameId) || gameId <= 0) {
-          setError(`Invalid game ID: ${params.id}. ID must be a positive number.`)
+          const errorMsg = `Invalid game ID: ${resolvedParams.id}. ID must be a positive number.`
+          console.error(`❌ [Page] ${errorMsg}`)
+          setError(errorMsg)
           setIsLoading(false)
           return
         }
 
-        console.log(`Fetching game data for ID: ${gameId}`)
+        console.log(`📡 [Page] Calling getBabyGameById(${gameId})`)
         const gameData = await getBabyGameById(gameId)
-        console.log("Game data received:", gameData)
+        console.log("✅ [Page] Game data received:", gameData)
 
         if (!gameData) {
           throw new Error("No game data returned from API")
@@ -70,23 +75,26 @@ export default function GameDetailPage({ params }: Props) {
           lastUpdatedAt: gameData.updated_at ? new Date(gameData.updated_at).toLocaleDateString() : "N/A",
         }
 
+        console.log("🎯 [Page] Setting enhanced game data:", enhancedGameData)
         setGame(enhancedGameData)
       } catch (error: any) {
-        console.error("Failed to fetch game data:", error)
-        setError(error.message || "Failed to load game data. Please try again.")
+        console.error("💥 [Page] Failed to fetch game data:", error)
+        const errorMsg = error.message || "Failed to load game data. Please try again."
+        setError(errorMsg)
 
         toast({
           title: "Error",
-          description: error.message || "Failed to load game data",
+          description: errorMsg,
           variant: "destructive",
         })
       } finally {
+        console.log("🏁 [Page] Finished fetching game data, setting loading to false")
         setIsLoading(false)
       }
     }
 
     fetchGameData()
-  }, [gameId, params.id, toast])
+  }, [gameId, resolvedParams.id]) // Removed toast from dependency array to prevent infinite loop
 
   const handleDelete = async () => {
     try {
@@ -251,7 +259,7 @@ export default function GameDetailPage({ params }: Props) {
             <div>
               <h3 className="mb-2 font-medium">Categories</h3>
               <div className="flex flex-wrap gap-2">
-                {game.categories && game.categories.map((category) => (
+                {game.categories && game.categories.map((category: string) => (
                   <Badge key={category} variant="secondary">
                     {category}
                   </Badge>
