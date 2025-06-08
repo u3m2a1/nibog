@@ -99,8 +99,14 @@ interface Employee {
   "shift": "Day",
   "location": "Head Office",
   "password": "securepassword123",
+  "resume" : "resume",
+  "joining_letter" : "joiningletter",
+  "resignation_letter" : "resignation_letter",
+  "other_document_name" : "otherdocument",
+  "other_document_file" : "otherfile",
   "is_superadmin": false
 }
+
 ```
 
 **Note:** File uploads (image, resume, joining_letter, etc.) should be handled via multipart/form-data.
@@ -122,23 +128,159 @@ interface Employee {
 **Responses:**
 - `200 OK`: Returns paginated list of employees
 ```json
-{
-  "data": [Employee],
-  "pagination": {
-    "total": 100,
-    "page": 1,
-    "limit": 10,
-    "totalPages": 10
+[
+  {
+    "id": 1,
+    "employee_id": "1",
+    "department": "test",
+    "designation": "test",
+    "qualification": "test",
+    "work_exp": "10 years",
+    "name": "superadmin",
+    "surname": "super",
+    "father_name": "father",
+    "mother_name": "mother",
+    "contact_no": "9876543210",
+    "emeregency_contact_no": "9876543211",
+    "email": "admin@gmail.com",
+    "dob": "2000-10-11T00:00:00.000Z",
+    "marital_status": "married",
+    "date_of_joining": "2025-05-05T00:00:00.000Z",
+    "date_of_leaving": null,
+    "local_address": "test",
+    "permanent_address": "test",
+    "note": null,
+    "image": null,
+    "password": "12345678",
+    "gender": "male",
+    "acount_title": "test",
+    "bank_account_no": "876543",
+    "bank_name": "test",
+    "ifsc_code": "test",
+    "bank_branch": "test",
+    "payscale": "test",
+    "basic_salary": "20000",
+    "epf_no": "23",
+    "contract_type": "test",
+    "shift": "test",
+    "location": "test",
+    "resume": "test",
+    "joining_letter": "test",
+    "resignation_letter": "test",
+    "other_document_name": "test",
+    "other_document_file": "test",
+    "is_active": true,
+    "is_superadmin": true,
+    "verification_code": "true",
+    "created_at": "2025-06-04T07:14:03.490Z",
+    "updated_at": "2025-06-04T07:14:03.490Z"
+  },
+  {
+    "id": 3,
+    "employee_id": "EMP001",
+    "department": "IT",
+    "designation": "Developer",
+    "qualification": "B.Tech",
+    "work_exp": "5 years",
+    "name": "John",
+    "surname": "Doe",
+    "father_name": "Mike Doe",
+    "mother_name": "Sarah Doe",
+    "contact_no": "1234567890",
+    "emeregency_contact_no": "0987654321",
+    "email": "john.doe@example.com",
+    "dob": "1990-01-01T00:00:00.000Z",
+    "marital_status": "Single",
+    "date_of_joining": "2023-01-01T00:00:00.000Z",
+    "date_of_leaving": null,
+    "local_address": "123 Main St, City",
+    "permanent_address": "456 Oak St, Hometown",
+    "note": null,
+    "image": null,
+    "password": "securepassword123",
+    "gender": "Male",
+    "acount_title": "John Doe",
+    "bank_account_no": "1234567890",
+    "bank_name": "Example Bank",
+    "ifsc_code": "EXMP1234567",
+    "bank_branch": "Main Branch",
+    "payscale": "E1",
+    "basic_salary": "50000",
+    "epf_no": "EPF12345",
+    "contract_type": "Permanent",
+    "shift": "Day",
+    "location": "Head Office",
+    "resume": "resume",
+    "joining_letter": "joiningletter",
+    "resignation_letter": "resignation_letter",
+    "other_document_name": "otherdocument",
+    "other_document_file": "otherfile",
+    "is_active": true,
+    "is_superadmin": false,
+    "verification_code": null,
+    "created_at": "2025-06-08T10:31:04.139Z",
+    "updated_at": "2025-06-08T10:31:04.139Z"
   }
-}
+]
 ```
 
 ### 3. Get Single Employee
 **GET** `/:id`
 
+
+
 **Responses:**
 - `200 OK`: Returns employee details
 - `404 Not Found`: Employee not found
+
+[
+  {
+    "id": 1,
+    "employee_id": "1",
+    "department": "test",
+    "designation": "test",
+    "qualification": "test",
+    "work_exp": "10 years",
+    "name": "superadmin",
+    "surname": "super",
+    "father_name": "father",
+    "mother_name": "mother",
+    "contact_no": "9876543210",
+    "emeregency_contact_no": "9876543211",
+    "email": "admin@gmail.com",
+    "dob": "2000-10-11T00:00:00.000Z",
+    "marital_status": "married",
+    "date_of_joining": "2025-05-05T00:00:00.000Z",
+    "date_of_leaving": null,
+    "local_address": "test",
+    "permanent_address": "test",
+    "note": null,
+    "image": null,
+    "password": "12345678",
+    "gender": "male",
+    "acount_title": "test",
+    "bank_account_no": "876543",
+    "bank_name": "test",
+    "ifsc_code": "test",
+    "bank_branch": "test",
+    "payscale": "test",
+    "basic_salary": "20000",
+    "epf_no": "23",
+    "contract_type": "test",
+    "shift": "test",
+    "location": "test",
+    "resume": "test",
+    "joining_letter": "test",
+    "resignation_letter": "test",
+    "other_document_name": "test",
+    "other_document_file": "test",
+    "is_active": true,
+    "is_superadmin": true,
+    "verification_code": "true",
+    "created_at": "2025-06-04T07:14:03.490Z",
+    "updated_at": "2025-06-04T07:14:03.490Z"
+  }
+]
 
 ### 4. Update Employee
 **PUT** `/:id`

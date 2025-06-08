@@ -28,12 +28,6 @@ Response (201 Created)
   }
 ]
 
-
-
-
-
-
-
 ## Get baby game list
 
 GET https://ai.alviongs.com/webhook/v1/nibog/babygame/get-all
@@ -56,12 +50,6 @@ Response (200 OK)
     "updated_at": "2025-04-27T00:57:08.538Z"
   }
 ]
-
-
-
-
-
-
 
 ## Get baby game by id
 
@@ -89,15 +77,9 @@ Response (200 OK)
   }
 ]
 
-
-
-
-
-
-
 ## Update baby game
 
-PUT https://ai.alviongs.com/webhook/v1/nibog/babygame/update
+POST https://ai.alviongs.com/webhook/v1/nibog/babygame/update
 {
   "id": 1,
   "game_name": "Obstacle Course",
@@ -132,15 +114,9 @@ Response (200 OK)
   }
 ]
 
-
-
-
-
-
-
 ## Delete baby game
 
-DELETE https://ai.alviongs.com/webhook/v1/nibog/babygame/delete
+POST https://ai.alviongs.com/webhook/v1/nibog/babygame/delete
 {
   "id": 1
 }

@@ -1,3 +1,5 @@
+## create email setting
+
 POST https://ai.alviongs.com/webhook/v1/nibog/emailsetting/create
 
 
@@ -28,8 +30,7 @@ Response
   }
 ]
 
-
-
+## get email setting
 
 GET https://ai.alviongs.com/webhook/v1/nibog/emailsetting/get
 

@@ -198,16 +198,6 @@ CREATE TABLE email_settings (
     CONSTRAINT valid_smtp_host CHECK (smtp_host ~* '^[a-zA-Z0-9.-]+$')
 );
 
-
-
-
-
-
-
-
-
-
-
 ## authentication
 
 
@@ -450,11 +440,6 @@ CREATE TABLE booking_games (
 );
 
 
-
-
-
-
-
 ## promo code
 CREATE TABLE promo_codes (
     id SERIAL PRIMARY KEY,
@@ -484,26 +469,18 @@ CREATE TABLE promo_code_mappings (
     is_active BOOLEAN DEFAULT TRUE
 );
 
-
--- Statuses table
-CREATE TABLE testimonial_statuses (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(50) UNIQUE NOT NULL
-);
-
 -- Testimonials table
 CREATE TABLE testimonials (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  city_id INTEGER REFERENCES cities(id) ON DELETE SET NULL,
-  event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
-  rating INTEGER CHECK (rating BETWEEN 1 AND 5),
-  testimonial TEXT NOT NULL,
-  status_id INTEGER REFERENCES testimonial_statuses(id),
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    city VARCHAR(100),
+    event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    testimonial TEXT,
+    submitted_at DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(20) CHECK (status IN ('Published', 'Pending', 'Rejected')) DEFAULT 'Pending'
 );
+
 
 
 

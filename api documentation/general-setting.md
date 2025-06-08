@@ -1,3 +1,5 @@
+## create general setting
+
 POST https://ai.alviongs.com/webhook/v1/nibog/generalsetting/create
 
 payload
@@ -27,10 +29,7 @@ response
   }
 ]
 
-
-
-
-
+## get general setting
 
 GET https://ai.alviongs.com/webhook/v1/nibog/generalsetting/get
 

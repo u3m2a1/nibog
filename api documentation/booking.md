@@ -1,4 +1,4 @@
-Create booking 
+## create booking 
 
 POST https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create
 
@@ -50,30 +50,12 @@ response
     }
 ]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## get all bookings
 
 GET https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all
 
 
 response
-
-
 
 [
     {
