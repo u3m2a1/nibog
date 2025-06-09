@@ -3,11 +3,8 @@ import { EVENT_API } from '@/config/api';
 
 export async function GET() {
   try {
-    console.log("Server API route: Fetching all events...");
-
     // Forward the request to the external API with the correct URL
     const apiUrl = EVENT_API.GET_ALL;
-    console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: "GET",
@@ -17,15 +14,10 @@ export async function GET() {
       cache: "no-store",
     });
 
-    console.log(`Server API route: Get all events response status: ${response.status}`);
-
     if (!response.ok) {
       // If the first attempt fails, try with a different URL format
-      console.log("Server API route: First attempt failed, trying with alternative URL format");
-
       // Try with webhook-test instead of webhook
       const alternativeUrl = "https://ai.alviongs.com/webhook-test/v1/nibog/event-game-slot/get-all";
-      console.log("Server API route: Trying alternative URL:", alternativeUrl);
 
       const alternativeResponse = await fetch(alternativeUrl, {
         method: "GET",
@@ -35,11 +27,7 @@ export async function GET() {
         cache: "no-store",
       });
 
-      console.log(`Server API route: Alternative get all events response status: ${alternativeResponse.status}`);
-
       if (!alternativeResponse.ok) {
-        const errorText = await alternativeResponse.text();
-        console.error("Server API route: Error response from alternative URL:", errorText);
         return NextResponse.json(
           { error: `Failed to fetch events. API returned status: ${alternativeResponse.status}` },
           { status: alternativeResponse.status }
@@ -48,16 +36,13 @@ export async function GET() {
 
       // Get the response data from the alternative URL
       const responseText = await alternativeResponse.text();
-      console.log(`Server API route: Raw response from alternative URL: ${responseText}`);
 
       try {
         // Try to parse the response as JSON
         const responseData = JSON.parse(responseText);
-        console.log(`Server API route: Retrieved ${responseData.length} events`);
 
         return NextResponse.json(responseData, { status: 200 });
       } catch (parseError) {
-        console.error("Server API route: Error parsing response:", parseError);
         // If parsing fails, return the error
         return NextResponse.json(
           {
@@ -71,16 +56,13 @@ export async function GET() {
 
     // Get the response data
     const responseText = await response.text();
-    console.log(`Server API route: Raw response: ${responseText}`);
 
     try {
       // Try to parse the response as JSON
       const responseData = JSON.parse(responseText);
-      console.log(`Server API route: Retrieved ${responseData.length} events`);
 
       return NextResponse.json(responseData, { status: 200 });
     } catch (parseError) {
-      console.error("Server API route: Error parsing response:", parseError);
       // If parsing fails, return the error
       return NextResponse.json(
         {
@@ -91,7 +73,6 @@ export async function GET() {
       );
     }
   } catch (error: any) {
-    console.error("Server API route: Error fetching events:", error);
     return NextResponse.json(
       { error: error.message || "Failed to fetch events" },
       { status: 500 }

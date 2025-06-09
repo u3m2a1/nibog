@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+// Event service for managing events
 
 // Define the event interface for creating events
 export interface Event {
@@ -180,8 +180,6 @@ export function formatEventDataForAPI(formData: {
  * @returns A list of all events
  */
 export async function getAllEvents(): Promise<EventListItem[]> {
-  console.log("Fetching all events");
-
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/events/get-all', {
@@ -191,20 +189,14 @@ export async function getAllEvents(): Promise<EventListItem[]> {
       },
     });
 
-    console.log(`Get all events response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} events`);
 
     return data;
   } catch (error) {
-    console.error("Error fetching events:", error);
     throw error;
   }
 }
@@ -387,8 +379,6 @@ export function formatEventDataForUpdate(
  * @returns Promise with array of events for the specified city
  */
 export async function getEventsByCityId(cityId: number): Promise<EventListItem[]> {
-  console.log(`Fetching events for city ID: ${cityId}`);
-
   if (!cityId || isNaN(Number(cityId)) || Number(cityId) <= 0) {
     throw new Error("Invalid city ID. ID must be a positive number.");
   }
@@ -403,20 +393,14 @@ export async function getEventsByCityId(cityId: number): Promise<EventListItem[]
       body: JSON.stringify({ city_id: Number(cityId) }),
     });
 
-    console.log(`Get events by city response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} events for city ID ${cityId}`);
 
     return data;
   } catch (error) {
-    console.error(`Error fetching events for city ID ${cityId}:`, error);
     throw error;
   }
 }

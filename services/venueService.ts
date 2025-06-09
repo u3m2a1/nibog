@@ -17,32 +17,38 @@ export interface Venue {
  */
 export const getAllVenues = async (): Promise<Venue[]> => {
   try {
-    console.log("Fetching all venues...");
-
-    const response = await fetch(VENUE_API.GET_ALL, {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/venues/get-all', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
     });
 
-    console.log(`Get all venues response status: ${response.status}`);
-
     if (!response.ok) {
-      throw new Error(`Error fetching venues: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `Error fetching venues: ${response.status}`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} venues from API`);
 
     if (!Array.isArray(data)) {
-      console.warn("API did not return an array for venues:", data);
       return [];
     }
 
     return data;
   } catch (error) {
-    console.error("Error fetching venues:", error);
     throw error;
   }
 };
@@ -267,8 +273,6 @@ export const getVenuesByCity = async (cityId: number): Promise<Venue[]> => {
       throw new Error(`Invalid city ID: ${cityId}. ID must be a positive number.`);
     }
 
-    console.log(`Fetching venues for city ID: ${cityId}`);
-
     // Use our internal API route to avoid CORS issues
     // Use POST method with request body as specified in the API documentation
     const response = await fetch('/api/venues/get-by-city', {
@@ -278,8 +282,6 @@ export const getVenuesByCity = async (cityId: number): Promise<Venue[]> => {
       },
       body: JSON.stringify({ city_id: cityId }),
     });
-
-    console.log(`Get venues by city response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -298,16 +300,13 @@ export const getVenuesByCity = async (cityId: number): Promise<Venue[]> => {
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} venues for city ID ${cityId}`);
 
     if (!Array.isArray(data)) {
-      console.warn("API did not return an array for venues by city:", data);
       return [];
     }
 
     return data;
   } catch (error) {
-    console.error(`Error fetching venues for city ID ${cityId}:`, error);
     throw error;
   }
 };

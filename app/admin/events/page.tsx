@@ -179,6 +179,7 @@ export default function EventsPage() {
       title: apiEvent.event_title || "Untitled Event",
       gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
       venue: apiEvent.venue?.venue_name || "Unknown Venue",
+      venueId: apiEvent.venue?.venue_id?.toString() || "unknown", // Add venue ID for proper linking
       city: apiEvent.city?.city_name || "Unknown City",
       date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : "Unknown Date", // Format date to YYYY-MM-DD
       slots: games.map((game: any, index: number) => ({
@@ -675,7 +676,7 @@ export default function EventsPage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/admin/events/venues/${encodeURIComponent(event.venue)}`}
+                          href={`/admin/events/venues/${event.venueId}`}
                           className="flex items-center hover:underline"
                         >
                           <Building className="mr-1 h-3 w-3 text-muted-foreground" />

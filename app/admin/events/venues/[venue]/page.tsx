@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Search, Building, Calendar, Plus, ChevronRight, Clock, Users, DollarSign } from "lucide-react"
+import { ArrowLeft, Search, Building, Calendar, Plus, ChevronRight, Clock, Users, DollarSign, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,142 +16,156 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-// We'll implement animations without framer-motion
+import { useToast } from "@/hooks/use-toast"
+import { getAllVenues, type Venue } from "@/services/venueService"
+import { getAllEvents, type EventListItem } from "@/services/eventService"
+import { getAllCities, type City } from "@/services/cityService"
 
-// Mock events data
-const eventsByVenue = {
-  "Gachibowli Indoor Stadium": [
-    {
-      id: "E001",
-      title: "Baby Crawling Championship",
-      date: "2025-10-15",
-      status: "scheduled",
-      registrations: 25,
-      capacity: 40,
-      gameTemplate: "Baby Crawling",
-      slots: [
-        { id: "S001", startTime: "09:00 AM", endTime: "10:30 AM", capacity: 15, bookedCount: 12, price: 799 },
-        { id: "S002", startTime: "11:00 AM", endTime: "12:30 PM", capacity: 15, bookedCount: 8, price: 799 },
-        { id: "S003", startTime: "02:00 PM", endTime: "03:30 PM", capacity: 10, bookedCount: 5, price: 699 },
-      ]
-    },
-    {
-      id: "E002",
-      title: "Toddler Dance Party",
-      date: "2025-11-05",
-      status: "scheduled",
-      registrations: 18,
-      capacity: 30,
-      gameTemplate: "Dance & Music",
-      slots: [
-        { id: "S004", startTime: "10:00 AM", endTime: "11:30 AM", capacity: 15, bookedCount: 10, price: 899 },
-        { id: "S005", startTime: "01:00 PM", endTime: "02:30 PM", capacity: 15, bookedCount: 8, price: 899 },
-      ]
-    },
-  ],
-  "Hitex Exhibition Center": [
-    {
-      id: "E003",
-      title: "Baby Walker Race",
-      date: "2025-10-20",
-      status: "scheduled",
-      registrations: 22,
-      capacity: 35,
-      gameTemplate: "Baby Walker",
-      slots: [
-        { id: "S006", startTime: "09:30 AM", endTime: "11:00 AM", capacity: 20, bookedCount: 15, price: 849 },
-        { id: "S007", startTime: "12:00 PM", endTime: "01:30 PM", capacity: 15, bookedCount: 7, price: 849 },
-      ]
-    },
-  ],
-  "Kids Paradise": [
-    {
-      id: "E004",
-      title: "Baby Sensory Play",
-      date: "2025-09-25",
-      status: "active",
-      registrations: 30,
-      capacity: 30,
-      gameTemplate: "Sensory Play",
-      slots: [
-        { id: "S008", startTime: "10:00 AM", endTime: "11:30 AM", capacity: 15, bookedCount: 15, price: 999 },
-        { id: "S009", startTime: "01:00 PM", endTime: "02:30 PM", capacity: 15, bookedCount: 15, price: 999 },
-      ]
-    },
-  ],
-}
-
-// Mock venue data
-const venueData = {
-  "Gachibowli Indoor Stadium": {
-    id: "V001",
-    name: "Gachibowli Indoor Stadium",
-    address: "Gachibowli, Hyderabad",
-    city: "Hyderabad",
-    capacity: 500,
-    facilities: ["Parking", "Restrooms", "Changing Rooms", "Cafeteria"],
-    contactPerson: "Rajesh Kumar",
-    contactPhone: "+91 98765 43210",
-    contactEmail: "rajesh@gachibowlistadium.com",
-  },
-  "Hitex Exhibition Center": {
-    id: "V002",
-    name: "Hitex Exhibition Center",
-    address: "Madhapur, Hyderabad",
-    city: "Hyderabad",
-    capacity: 800,
-    facilities: ["Parking", "Restrooms", "Changing Rooms", "Food Court", "First Aid"],
-    contactPerson: "Priya Sharma",
-    contactPhone: "+91 87654 32109",
-    contactEmail: "priya@hitex.com",
-  },
-  "Kids Paradise": {
-    id: "V003",
-    name: "Kids Paradise",
-    address: "Banjara Hills, Hyderabad",
-    city: "Hyderabad",
-    capacity: 200,
-    facilities: ["Parking", "Restrooms", "Changing Rooms", "Play Area"],
-    contactPerson: "Amit Patel",
-    contactPhone: "+91 76543 21098",
-    contactEmail: "amit@kidsparadise.com",
-  },
+// Types for venue data
+interface VenueWithEvents extends Venue {
+  city_name?: string
+  events: EventListItem[]
+  totalGames: number
 }
 
 export default function EventsVenuePage() {
   const router = useRouter()
   const params = useParams()
-  const venueName = decodeURIComponent(params.venue as string)
-  const [searchQuery, setSearchQuery] = useState("")
+  const { toast } = useToast()
+  const venueId = params.venue as string
 
-  // Get venue data
-  const venue = venueData[venueName]
-  const events = eventsByVenue[venueName] || []
+  const [venue, setVenue] = useState<VenueWithEvents | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch venue and events data
+  useEffect(() => {
+    const fetchVenueData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        // Fetch all data in parallel
+        const [allVenues, allEvents, allCities] = await Promise.all([
+          getAllVenues(),
+          getAllEvents(),
+          getAllCities()
+        ])
+
+        // Find the venue by ID
+        const foundVenue = allVenues.find((v: Venue) => v.id?.toString() === venueId)
+
+        if (!foundVenue) {
+          throw new Error(`Venue with ID "${venueId}" not found`)
+        }
+
+        // Find the city for this venue
+        const venueCity = allCities.find((c: City) => c.id === foundVenue.city_id)
+
+        // Filter events for this venue
+        const venueEvents = allEvents.filter((event: EventListItem) =>
+          event.venue_id?.toString() === venueId
+        )
+
+        // Calculate total games for this venue
+        let totalGames = 0
+        venueEvents.forEach((event: EventListItem) => {
+          if (event.games && Array.isArray(event.games)) {
+            const validGames = event.games.filter((game: any) =>
+              game &&
+              game.game_id !== null &&
+              game.game_title !== null &&
+              game.game_title !== undefined &&
+              game.game_title.trim() !== ''
+            )
+            totalGames += validGames.length
+          }
+        })
+
+        // Create venue with events data
+        const venueWithEvents: VenueWithEvents = {
+          ...foundVenue,
+          city_name: venueCity?.city_name || 'Unknown City',
+          events: venueEvents,
+          totalGames
+        }
+
+        setVenue(venueWithEvents)
+
+      } catch (err: any) {
+        setError(err.message || "Failed to load venue data")
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load venue data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVenueData()
+  }, [venueId, toast])
 
   // Filter events based on search query
-  const filteredEvents = events.filter(event => {
+  const filteredEvents = venue?.events.filter((event: EventListItem) => {
     if (!searchQuery) return true
 
     return (
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.gameTemplate.toLowerCase().includes(searchQuery.toLowerCase())
+      event.event_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.event_description?.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  })
+  }) || []
 
   // Calculate venue totals
   const venueTotals = {
-    totalEvents: events.length,
-    totalSlots: events.reduce((sum, event) => sum + event.slots.length, 0),
-    totalRegistrations: events.reduce((sum, event) => sum + event.registrations, 0),
-    totalCapacity: events.reduce((sum, event) => sum + event.capacity, 0),
+    totalEvents: venue?.events.length || 0,
+    totalGames: venue?.totalGames || 0,
+    activeEvents: 0,
+    upcomingEvents: 0,
   }
 
-  if (!venue) {
+  // Calculate active and upcoming events
+  if (venue?.events) {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    venue.events.forEach((event: EventListItem) => {
+      const eventDate = new Date(event.event_date)
+      const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate())
+
+      if (event.event_status === 'Published' || event.event_status === 'Active') {
+        if (eventDateOnly >= today) {
+          venueTotals.upcomingEvents++
+        } else {
+          venueTotals.activeEvents++
+        }
+      }
+    })
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <p className="text-muted-foreground">Loading venue data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !venue) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Venue Not Found</h2>
-          <p className="text-muted-foreground">The venue you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">
+            {error || "The venue you're looking for doesn't exist or has been removed."}
+          </p>
           <Button className="mt-4" asChild>
             <Link href="/admin/events/cities">Back to Cities</Link>
           </Button>
@@ -165,14 +179,14 @@ export default function EventsVenuePage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href={`/admin/events/cities/${encodeURIComponent(venue.city)}`}>
+            <Link href={`/admin/events/cities/${encodeURIComponent(venue.city_name || 'Unknown')}`}>
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{venue.name}</h1>
-            <p className="text-muted-foreground">{venue.address}, {venue.city}</p>
+            <h1 className="text-3xl font-bold tracking-tight">{venue.venue_name}</h1>
+            <p className="text-muted-foreground">{venue.address}, {venue.city_name}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -182,7 +196,7 @@ export default function EventsVenuePage() {
             </Link>
           </Button>
           <Button asChild>
-            <Link href={`/admin/events/new?venue=${encodeURIComponent(venue.name)}`}>
+            <Link href={`/admin/events/new?venue=${encodeURIComponent(venue.venue_name || '')}`}>
               <Plus className="mr-2 h-4 w-4" />
               Create Event
             </Link>
@@ -198,21 +212,23 @@ export default function EventsVenuePage() {
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="mb-2 font-medium">Contact Person</h3>
-                <p>{venue.contactPerson}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{venue.contactPhone}</p>
-                <p className="text-sm text-muted-foreground">{venue.contactEmail}</p>
+                <h3 className="mb-2 font-medium">Venue Details</h3>
+                <p><strong>Address:</strong> {venue.address || 'Not specified'}</p>
+                <p className="mt-1 text-sm text-muted-foreground"><strong>City:</strong> {venue.city_name}</p>
+                <p className="text-sm text-muted-foreground"><strong>Venue ID:</strong> {venue.id}</p>
               </div>
               <div>
-                <h3 className="mb-2 font-medium">Capacity</h3>
-                <p>{venue.capacity} people</p>
+                <h3 className="mb-2 font-medium">Statistics</h3>
+                <p><strong>Total Events:</strong> {venueTotals.totalEvents}</p>
+                <p className="mt-1 text-sm text-muted-foreground"><strong>Total Games:</strong> {venueTotals.totalGames}</p>
+                <p className="text-sm text-muted-foreground"><strong>Active Events:</strong> {venueTotals.activeEvents}</p>
               </div>
               <div className="sm:col-span-2">
-                <h3 className="mb-2 font-medium">Facilities</h3>
+                <h3 className="mb-2 font-medium">Event Status</h3>
                 <div className="flex flex-wrap gap-2">
-                  {venue.facilities.map((facility, index) => (
-                    <Badge key={index} variant="outline">{facility}</Badge>
-                  ))}
+                  <Badge variant="default">Active: {venueTotals.activeEvents}</Badge>
+                  <Badge variant="outline">Upcoming: {venueTotals.upcomingEvents}</Badge>
+                  <Badge variant="secondary">Total Games: {venueTotals.totalGames}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -220,7 +236,7 @@ export default function EventsVenuePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Events at {venue.name}</CardTitle>
+              <CardTitle>Events at {venue.venue_name}</CardTitle>
               <CardDescription>Manage games and events at this venue</CardDescription>
             </CardHeader>
             <CardContent>
@@ -242,34 +258,31 @@ export default function EventsVenuePage() {
                   ) : (
                     <div className="space-y-6">
                       {filteredEvents.map((event) => (
-                        <div key={event.id} className="rounded-md border overflow-hidden">
+                        <div key={event.event_id} className="rounded-md border overflow-hidden">
                           <div
                             className="flex cursor-pointer items-center justify-between border-b p-4 hover:bg-muted/50"
-                            onClick={() => router.push(`/admin/events/${event.id}`)}
+                            onClick={() => router.push(`/admin/events/${event.event_id}`)}
                           >
                             <div className="flex items-center gap-2">
                               <Calendar className="h-5 w-5 text-muted-foreground" />
                               <div>
-                                <h3 className="font-semibold">{event.title}</h3>
+                                <h3 className="font-semibold">{event.event_title}</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  {event.gameTemplate} • {new Date(event.date).toLocaleDateString()}
+                                  {event.games?.length || 0} games • {new Date(event.event_date).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-6">
                               <div className="text-right">
-                                <div className="text-sm font-medium">Registrations</div>
+                                <div className="text-sm font-medium">Games</div>
                                 <div className="flex items-center justify-end">
-                                  <span className="mr-2">{event.registrations}/{event.capacity}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    ({Math.round((event.registrations / event.capacity) * 100)}%)
-                                  </span>
+                                  <span className="mr-2">{event.games?.filter((g: any) => g && g.game_title).length || 0}</span>
                                 </div>
                               </div>
                               <div className="text-right">
                                 <div className="text-sm font-medium">Status</div>
-                                <Badge variant={event.status === "active" ? "default" : "outline"}>
-                                  {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+                                <Badge variant={event.event_status === "Published" ? "default" : "outline"}>
+                                  {event.event_status || 'Draft'}
                                 </Badge>
                               </div>
                               <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -277,59 +290,31 @@ export default function EventsVenuePage() {
                           </div>
 
                           <div className="p-4">
-                            <h4 className="mb-2 text-sm font-medium">Time Slots</h4>
+                            <h4 className="mb-2 text-sm font-medium">Games in this Event</h4>
                             <div className="rounded-md border">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Time</TableHead>
-                                    <TableHead>Capacity</TableHead>
-                                    <TableHead>Bookings</TableHead>
-                                    <TableHead>Price</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {event.slots.map((slot) => (
-                                    <TableRow key={slot.id}>
-                                      <TableCell>
-                                        {slot.startTime} - {slot.endTime}
-                                      </TableCell>
-                                      <TableCell>{slot.capacity}</TableCell>
-                                      <TableCell>
-                                        <div className="flex items-center">
-                                          <span className="mr-2">{slot.bookedCount}/{slot.capacity}</span>
-                                          <span className="text-xs text-muted-foreground">
-                                            ({Math.round((slot.bookedCount / slot.capacity) * 100)}%)
-                                          </span>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>₹{slot.price}</TableCell>
-                                      <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                          <Button variant="outline" size="sm" asChild>
-                                            <Link href={`/admin/events/${event.id}/slots/${slot.id}/edit`}>
-                                              Edit
-                                            </Link>
-                                          </Button>
-                                          <Button variant="outline" size="sm" asChild>
-                                            <Link href={`/admin/events/${event.id}/slots/${slot.id}/participants`}>
-                                              Participants
-                                            </Link>
-                                          </Button>
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                              {event.games && event.games.length > 0 ? (
+                                <div className="p-4">
+                                  <div className="grid gap-2">
+                                    {event.games.filter((game: any) => game && game.game_title).map((game: any, index: number) => (
+                                      <div key={index} className="flex items-center justify-between p-2 bg-muted/20 rounded">
+                                        <span className="font-medium">{game.game_title}</span>
+                                        <Badge variant="outline">Game ID: {game.game_id}</Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-4 text-center text-muted-foreground">
+                                  No games configured for this event
+                                </div>
+                              )}
                             </div>
 
                             <div className="mt-4 flex justify-end">
                               <Button size="sm" asChild>
-                                <Link href={`/admin/events/${event.id}/slots/new`}>
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Add Time Slot
+                                <Link href={`/admin/events/${event.event_id}`}>
+                                  <Calendar className="mr-2 h-4 w-4" />
+                                  View Event Details
                                 </Link>
                               </Button>
                             </div>
@@ -358,33 +343,24 @@ export default function EventsVenuePage() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Total Time Slots</span>
-                </div>
-                <span className="font-medium">{venueTotals.totalSlots}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Total Registrations</span>
-                </div>
-                <span className="font-medium">{venueTotals.totalRegistrations}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Total Capacity</span>
-                </div>
-                <span className="font-medium">{venueTotals.totalCapacity}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Fill Rate</span>
+                  <span className="text-sm">Total Games</span>
                 </div>
-                <span className="font-medium">
-                  {Math.round((venueTotals.totalRegistrations / venueTotals.totalCapacity) * 100)}%
-                </span>
+                <span className="font-medium">{venueTotals.totalGames}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Active Events</span>
+                </div>
+                <span className="font-medium">{venueTotals.activeEvents}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Upcoming Events</span>
+                </div>
+                <span className="font-medium">{venueTotals.upcomingEvents}</span>
               </div>
             </CardContent>
           </Card>
@@ -395,7 +371,7 @@ export default function EventsVenuePage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button className="w-full justify-start" asChild>
-                <Link href={`/admin/events/new?venue=${encodeURIComponent(venue.name)}`}>
+                <Link href={`/admin/events/new?venue=${encodeURIComponent(venue.venue_name || '')}`}>
                   <Plus className="mr-2 h-4 w-4" />
                   Create New Event
                 </Link>

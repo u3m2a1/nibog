@@ -26,7 +26,7 @@ export const CITY_API = {
 
 // Venue API endpoints - Exactly as specified in the API documentation with correct case
 export const VENUE_API = {
-  CREATE: `${API_BASE_URL}/venues/create}`,
+  CREATE: `${API_BASE_URL}/venues/create`,
   UPDATE: `${API_BASE_URL}/venues/update`,
   GET: `${API_BASE_URL}/venues/get`,
   GET_ALL: `${API_BASE_URL}/venues/get-all`,
