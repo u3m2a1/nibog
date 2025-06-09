@@ -10,10 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building, Trash2 } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building, Trash2, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, getDay, startOfWeek, endOfWeek } from "date-fns"
 import { cn } from "@/lib/utils"
 import { deleteEvent, updateEvent } from "@/services/eventService"
 import { getAllCities, City } from "@/services/cityService"
@@ -31,6 +31,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 
 
@@ -49,6 +56,11 @@ export default function EventsPage() {
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [eventToUpdate, setEventToUpdate] = useState<string | null>(null)
+
+  // Calendar view state
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedDayEvents, setSelectedDayEvents] = useState<any[]>([])
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false)
 
   // State for filter data from APIs
   const [cities, setCities] = useState<City[]>([])
@@ -397,6 +409,39 @@ export default function EventsPage() {
   const filteredVenues = selectedCity
     ? venues.filter((venue) => venue.city_name === selectedCity)
     : venues
+
+  // Calendar helper functions
+  const generateCalendarDays = (month: Date) => {
+    const start = startOfWeek(startOfMonth(month))
+    const end = endOfWeek(endOfMonth(month))
+    return eachDayOfInterval({ start, end })
+  }
+
+  const getEventsForDay = (day: Date) => {
+    const dayString = format(day, "yyyy-MM-dd")
+    return filteredEvents.filter(event => event.date === dayString)
+  }
+
+  const handleDayClick = (day: Date) => {
+    const dayEvents = getEventsForDay(day)
+    setSelectedDayEvents(dayEvents)
+    setIsEventModalOpen(true)
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1))
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'published': return 'bg-green-500'
+      case 'paused': return 'bg-amber-500'
+      case 'cancelled': return 'bg-red-500'
+      case 'draft': return 'bg-gray-500'
+      case 'completed': return 'bg-blue-500'
+      default: return 'bg-gray-400'
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -823,19 +868,340 @@ export default function EventsPage() {
         <TabsContent value="calendar" className="space-y-4">
           <Card>
             <CardContent className="p-6">
-              <div className="flex h-[400px] items-center justify-center rounded-lg border border-dashed p-8 text-center">
-                <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                  <CalendarIcon className="h-10 w-10 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">Calendar View</h3>
-                  <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                    View events organized by date in a calendar format. Coming soon!
-                  </p>
+              {isLoading ? (
+                <div className="flex h-[400px] items-center justify-center">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <span className="ml-2">Loading events...</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Calendar Header */}
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold">
+                      {format(currentMonth, "MMMM yyyy")}
+                    </h2>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigateMonth('prev')}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigateMonth('next')}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Day headers */}
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
+                        {day}
+                      </div>
+                    ))}
+
+                    {/* Calendar days */}
+                    {generateCalendarDays(currentMonth).map((day, index) => {
+                      const dayEvents = getEventsForDay(day)
+                      const isCurrentMonth = format(day, 'M') === format(currentMonth, 'M')
+                      const isCurrentDay = isToday(day)
+
+                      return (
+                        <div
+                          key={index}
+                          className={cn(
+                            "min-h-[100px] p-1 border border-border cursor-pointer hover:bg-muted/50 transition-colors",
+                            !isCurrentMonth && "bg-muted/20 text-muted-foreground",
+                            isCurrentDay && "bg-primary/10 border-primary"
+                          )}
+                          onClick={() => handleDayClick(day)}
+                        >
+                          <div className="flex flex-col h-full">
+                            <div className={cn(
+                              "text-sm font-medium mb-1",
+                              isCurrentDay && "text-primary font-bold"
+                            )}>
+                              {format(day, 'd')}
+                            </div>
+
+                            <div className="flex-1 space-y-1">
+                              {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                                <div
+                                  key={eventIndex}
+                                  className={cn(
+                                    "text-xs p-1 rounded text-white truncate",
+                                    getStatusColor(event.status)
+                                  )}
+                                  title={`${event.title} - ${event.status}`}
+                                >
+                                  {event.title}
+                                </div>
+                              ))}
+
+                              {dayEvents.length > 3 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{dayEvents.length - 3} more
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-4 pt-4 border-t">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-green-500"></div>
+                      <span className="text-sm">Published</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-amber-500"></div>
+                      <span className="text-sm">Paused</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-red-500"></div>
+                      <span className="text-sm">Cancelled</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-gray-500"></div>
+                      <span className="text-sm">Draft</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-blue-500"></div>
+                      <span className="text-sm">Completed</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Event Details Modal */}
+      <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Events for {selectedDayEvents.length > 0 && format(new Date(selectedDayEvents[0].date), "MMMM d, yyyy")}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''} scheduled for this day
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedDayEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No events scheduled for this day</p>
+              </div>
+            ) : (
+              selectedDayEvents.map((event) => (
+                <Card key={event.id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-semibold">{event.title}</h3>
+                        {event.status === "published" && (
+                          <Badge className="bg-green-500 hover:bg-green-600">Published</Badge>
+                        )}
+                        {event.status === "draft" && (
+                          <Badge variant="outline">Draft</Badge>
+                        )}
+                        {event.status === "paused" && (
+                          <Badge className="bg-amber-500 hover:bg-amber-600">Paused</Badge>
+                        )}
+                        {event.status === "cancelled" && (
+                          <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
+                        )}
+                        {event.status === "completed" && (
+                          <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span>{event.city}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          <span>{event.venue}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="text-sm font-medium mb-2">Games:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {event.gameTemplate && typeof event.gameTemplate === 'string' ?
+                            event.gameTemplate.split(", ").map((game: string, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {game}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline" className="text-xs">Unknown</Badge>
+                            )
+                          }
+                        </div>
+                      </div>
+
+                      {event.slots && event.slots.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-sm font-medium mb-2">Time Slots:</div>
+                          <div className="space-y-1">
+                            {event.slots.map((slot: any) => (
+                              <div key={slot.id} className="flex items-center gap-2 text-sm">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span>{slot.time}</span>
+                                <Users className="h-3 w-3 text-muted-foreground ml-2" />
+                                <span>{slot.booked}/{slot.capacity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 ml-4">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/${event.id}`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View details</span>
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/${event.id}/edit`}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit event</span>
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/clone/${event.id}`}>
+                          <Copy className="h-4 w-4" />
+                          <span className="sr-only">Clone event</span>
+                        </Link>
+                      </Button>
+
+                      {/* Action buttons with same functionality as table view */}
+                      {event.status === "published" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleEventStatus(event.id, event.status)}
+                          disabled={isUpdatingStatus && eventToUpdate === event.id}
+                        >
+                          {isUpdatingStatus && eventToUpdate === event.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                          ) : (
+                            <Pause className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Pause event</span>
+                        </Button>
+                      )}
+                      {event.status === "paused" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleEventStatus(event.id, event.status)}
+                          disabled={isUpdatingStatus && eventToUpdate === event.id}
+                        >
+                          {isUpdatingStatus && eventToUpdate === event.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Resume event</span>
+                        </Button>
+                      )}
+                      {(event.status === "published" || event.status === "paused" || event.status === "draft") && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <X className="h-4 w-4" />
+                              <span className="sr-only">Cancel event</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel Event</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to cancel this event? This will prevent any new bookings, but existing bookings will be maintained. This action can be reversed by editing the event status.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleCancelEvent(event.id)}
+                                disabled={isUpdatingStatus && eventToUpdate === event.id}
+                                className="bg-orange-500 hover:bg-orange-600"
+                              >
+                                {isUpdatingStatus && eventToUpdate === event.id ? (
+                                  <>
+                                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                    Cancelling...
+                                  </>
+                                ) : (
+                                  "Cancel Event"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <span className="sr-only">Delete event</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this event? This action cannot be undone.
+                              All registrations and data associated with this event will be permanently removed.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteEvent(event.id)}
+                              disabled={isDeletingEvent && eventToDelete === event.id}
+                              className="bg-red-500 hover:bg-red-600"
+                            >
+                              {isDeletingEvent && eventToDelete === event.id ? (
+                                <>
+                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                  Deleting...
+                                </>
+                              ) : (
+                                "Delete Event"
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
