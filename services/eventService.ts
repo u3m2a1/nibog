@@ -249,6 +249,269 @@ export async function getEventById(id: number): Promise<EventListItem> {
 }
 
 /**
+ * Get a single event with complete games/slots information by ID
+ * @param id The event ID
+ * @returns The event data with games and slots
+ */
+export async function getEventWithGames(id: string | number): Promise<any> {
+  console.log(`Getting event with games for ID: ${id}`);
+
+  if (!id || (typeof id === 'string' && id.trim() === '')) {
+    throw new Error("Event ID is required");
+  }
+
+  try {
+    // Use our internal API route to get event with complete games information
+    // Add cache busting to ensure fresh data
+    const response = await fetch('/api/events/get-with-games', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id: Number(id) }),
+      cache: "no-store", // Disable caching to get fresh data
+    });
+
+    console.log(`Get event with games response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Retrieved event with games:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Error getting event with games:", error);
+    throw error;
+  }
+}
+
+/**
+ * Create a new event game slot
+ * @param slotData The slot data to create
+ * @returns Promise with the created slot data
+ */
+export async function createEventGameSlot(slotData: {
+  event_id: number;
+  game_id: number;
+  custom_title?: string;
+  custom_description?: string;
+  custom_price?: number;
+  start_time: string;
+  end_time: string;
+  slot_price?: number;
+  max_participants: number;
+}): Promise<any> {
+  console.log(`Creating event game slot:`, slotData);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/event-game-slots/create', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(slotData),
+    });
+
+    console.log(`Create event game slot response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Created event game slot:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Error creating event game slot:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing event game slot
+ * @param slotData The slot data to update
+ * @returns Promise with the updated slot data
+ */
+export async function updateEventGameSlot(slotData: {
+  id: number;
+  event_id: number;
+  game_id: number;
+  custom_title?: string;
+  custom_description?: string;
+  custom_price?: number;
+  start_time: string;
+  end_time: string;
+  slot_price?: number;
+  max_participants: number;
+  status?: string;
+}): Promise<any> {
+  console.log(`Updating event game slot:`, slotData);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/event-game-slots/update', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(slotData),
+    });
+
+    console.log(`Update event game slot response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Updated event game slot:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Error updating event game slot:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete an event game slot
+ * @param id The slot ID to delete
+ * @returns Promise with the deletion result
+ */
+export async function deleteEventGameSlot(id: number): Promise<any> {
+  console.log(`Deleting event game slot with ID: ${id}`);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/event-game-slots/delete', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    console.log(`Delete event game slot response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Deleted event game slot:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Error deleting event game slot:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get slot status
+ * @param slotId The slot ID to get status for
+ * @returns Promise with the slot status
+ */
+export async function getSlotStatus(slotId: string): Promise<string> {
+  console.log(`Getting status for slot: ${slotId}`);
+
+  try {
+    const response = await fetch(`/api/event-game-slots/status?slotId=${slotId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`Failed to get slot status, defaulting to active`);
+      return 'active';
+    }
+
+    const data = await response.json();
+    return data.status || 'active';
+  } catch (error) {
+    console.error("Error getting slot status:", error);
+    return 'active'; // Default to active on error
+  }
+}
+
+/**
+ * Update slot status
+ * @param slotId The slot ID to update
+ * @param status The new status
+ * @returns Promise with the update result
+ */
+export async function updateSlotStatus(slotId: string, status: string): Promise<any> {
+  console.log(`Updating slot ${slotId} status to: ${status}`);
+
+  try {
+    const response = await fetch('/api/event-game-slots/status', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ slotId, status }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Slot status updated:", data);
+
+    return data;
+  } catch (error) {
+    console.error("Error updating slot status:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get all slot statuses for an event
+ * @returns Promise with all slot statuses
+ */
+export async function getAllSlotStatuses(): Promise<Record<string, string>> {
+  console.log("Getting all slot statuses");
+
+  try {
+    const response = await fetch('/api/event-game-slots/status', {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn("Failed to get slot statuses, returning empty object");
+      return {};
+    }
+
+    const data = await response.json();
+    return data || {};
+  } catch (error) {
+    console.error("Error getting slot statuses:", error);
+    return {}; // Return empty object on error
+  }
+}
+
+/**
  * Update an existing event
  * @param eventData The event data to update
  * @returns Promise with the updated event or success status

@@ -20,6 +20,7 @@ import { getAllCities, City } from "@/services/cityService"
 import { getVenuesByCity } from "@/services/venueService"
 import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
 import { useToast } from "@/components/ui/use-toast"
+import { TruncatedText } from "@/components/ui/truncated-text"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -660,7 +661,13 @@ export default function EventsPage() {
                 ) : (
                   filteredEvents.map((event) => (
                     <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.title}</TableCell>
+                      <TableCell className="font-medium">
+                        <TruncatedText
+                          text={event.title}
+                          maxLength={50}
+                          showTooltip={true}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="max-w-[200px]">
                           {event.gameTemplate && typeof event.gameTemplate === 'string' ?
@@ -1014,7 +1021,13 @@ export default function EventsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold">{event.title}</h3>
+                        <h3 className="text-lg font-semibold">
+                          <TruncatedText
+                            text={event.title}
+                            maxLength={60}
+                            showTooltip={true}
+                          />
+                        </h3>
                         {event.status === "published" && (
                           <Badge className="bg-green-500 hover:bg-green-600">Published</Badge>
                         )}
