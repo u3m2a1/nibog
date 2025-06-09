@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { deleteEvent } from "@/services/eventService"
+import { deleteEvent, updateEvent } from "@/services/eventService"
 import { getAllCities, City } from "@/services/cityService"
 import { getVenuesByCity } from "@/services/venueService"
 import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
@@ -47,6 +47,8 @@ export default function EventsPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [eventToUpdate, setEventToUpdate] = useState<string | null>(null)
 
   // State for filter data from APIs
   const [cities, setCities] = useState<City[]>([])
@@ -223,14 +225,15 @@ export default function EventsPage() {
   })
 
   // Handle event deletion
-  const handleDeleteEvent = async () => {
-    if (!eventToDelete) return;
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!eventId) return;
 
     try {
       setIsDeletingEvent(true);
+      setEventToDelete(eventId);
 
       // Call the API to delete the event
-      const result = await deleteEvent(Number(eventToDelete));
+      const result = await deleteEvent(Number(eventId));
 
       // Check if the result indicates success (either directly or as an array with success property)
       const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
@@ -244,7 +247,7 @@ export default function EventsPage() {
 
         // Remove the deleted event from the state
         setApiEvents(prevEvents => {
-          const filteredEvents = (prevEvents || []).filter(event => event.event_id.toString() !== eventToDelete);
+          const filteredEvents = (prevEvents || []).filter(event => event.event_id.toString() !== eventId);
           return filteredEvents;
         });
 
@@ -261,6 +264,132 @@ export default function EventsPage() {
       });
     } finally {
       setIsDeletingEvent(false);
+      setEventToDelete(null);
+    }
+  };
+
+  // Handle pause/resume event
+  const handleToggleEventStatus = async (eventId: string, currentStatus: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setEventToUpdate(eventId);
+
+      // Find the event in the current data
+      const eventToUpdate = apiEvents.find(event => event.event_id.toString() === eventId);
+      if (!eventToUpdate) {
+        throw new Error("Event not found");
+      }
+
+      // Determine the new status
+      const newStatus = currentStatus.toLowerCase() === "published" ? "Paused" : "Published";
+
+      // Prepare the update data with all required fields
+      const updateData = {
+        id: Number(eventId),
+        title: eventToUpdate.event_title,
+        description: eventToUpdate.event_description,
+        city_id: eventToUpdate.city?.city_id || eventToUpdate.city_id,
+        venue_id: eventToUpdate.venue?.venue_id || eventToUpdate.venue_id,
+        event_date: eventToUpdate.event_date.split('T')[0], // Format as YYYY-MM-DD
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+        games: eventToUpdate.games || []
+      };
+
+      // Call the API to update the event status
+      const result = await updateEvent(updateData);
+
+      // Check if the result indicates success
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
+
+      if (isSuccess) {
+        toast({
+          title: "Success",
+          description: `Event ${newStatus.toLowerCase()} successfully`,
+        });
+
+        // Update the event status in the state
+        setApiEvents(prevEvents => {
+          return prevEvents.map(event =>
+            event.event_id.toString() === eventId
+              ? { ...event, event_status: newStatus }
+              : event
+          );
+        });
+      } else {
+        throw new Error(`Failed to ${newStatus.toLowerCase()} event. Please try again.`);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to update event status. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setEventToUpdate(null);
+    }
+  };
+
+  // Handle cancel event
+  const handleCancelEvent = async (eventId: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setEventToUpdate(eventId);
+
+      // Find the event in the current data
+      const eventToCancel = apiEvents.find(event => event.event_id.toString() === eventId);
+      if (!eventToCancel) {
+        throw new Error("Event not found");
+      }
+
+      // Prepare the update data with all required fields
+      const updateData = {
+        id: Number(eventId),
+        title: eventToCancel.event_title,
+        description: eventToCancel.event_description,
+        city_id: eventToCancel.city?.city_id || eventToCancel.city_id,
+        venue_id: eventToCancel.venue?.venue_id || eventToCancel.venue_id,
+        event_date: eventToCancel.event_date.split('T')[0], // Format as YYYY-MM-DD
+        status: "Cancelled",
+        updated_at: new Date().toISOString(),
+        games: eventToCancel.games || []
+      };
+
+      // Call the API to cancel the event
+      const result = await updateEvent(updateData);
+
+      // Check if the result indicates success
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
+
+      if (isSuccess) {
+        toast({
+          title: "Success",
+          description: "Event cancelled successfully",
+        });
+
+        // Update the event status in the state
+        setApiEvents(prevEvents => {
+          return prevEvents.map(event =>
+            event.event_id.toString() === eventId
+              ? { ...event, event_status: "Cancelled" }
+              : event
+          );
+        });
+      } else {
+        throw new Error("Failed to cancel event. Please try again.");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel event. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setEventToUpdate(null);
     }
   };
 
@@ -583,22 +712,69 @@ export default function EventsPage() {
                             </Link>
                           </Button>
                           {event.status === "published" && (
-                            <Button variant="ghost" size="icon">
-                              <Pause className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleEventStatus(event.id, event.status)}
+                              disabled={isUpdatingStatus && eventToUpdate === event.id}
+                            >
+                              {isUpdatingStatus && eventToUpdate === event.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                              ) : (
+                                <Pause className="h-4 w-4" />
+                              )}
                               <span className="sr-only">Pause event</span>
                             </Button>
                           )}
                           {event.status === "paused" && (
-                            <Button variant="ghost" size="icon">
-                              <Play className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleEventStatus(event.id, event.status)}
+                              disabled={isUpdatingStatus && eventToUpdate === event.id}
+                            >
+                              {isUpdatingStatus && eventToUpdate === event.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                              ) : (
+                                <Play className="h-4 w-4" />
+                              )}
                               <span className="sr-only">Resume event</span>
                             </Button>
                           )}
                           {(event.status === "published" || event.status === "paused" || event.status === "draft") && (
-                            <Button variant="ghost" size="icon">
-                              <X className="h-4 w-4" />
-                              <span className="sr-only">Cancel event</span>
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <X className="h-4 w-4" />
+                                  <span className="sr-only">Cancel event</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel Event</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to cancel this event? This will prevent any new bookings, but existing bookings will be maintained. This action can be reversed by editing the event status.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleCancelEvent(event.id)}
+                                    disabled={isUpdatingStatus && eventToUpdate === event.id}
+                                    className="bg-orange-500 hover:bg-orange-600"
+                                  >
+                                    {isUpdatingStatus && eventToUpdate === event.id ? (
+                                      <>
+                                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                        Cancelling...
+                                      </>
+                                    ) : (
+                                      "Cancel Event"
+                                    )}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -618,13 +794,8 @@ export default function EventsPage() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => {
-                                    setEventToDelete(event.id);
-                                    setTimeout(() => {
-                                      handleDeleteEvent();
-                                    }, 100); // Small delay to ensure state is updated
-                                  }}
-                                  disabled={isDeletingEvent}
+                                  onClick={() => handleDeleteEvent(event.id)}
+                                  disabled={isDeletingEvent && eventToDelete === event.id}
                                   className="bg-red-500 hover:bg-red-600"
                                 >
                                   {isDeletingEvent && eventToDelete === event.id ? (
