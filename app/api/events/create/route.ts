@@ -53,54 +53,12 @@ export async function POST(request: Request) {
     console.log(`Server API route: Create event response status: ${response.status}`);
 
     if (!response.ok) {
-      // If the first attempt fails, try with a different URL format
-      console.log("Server API route: First attempt failed, trying with alternative URL format");
-
-      // Try with webhook instead of webhook-test as a fallback
-      const alternativeUrl = "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/create";
-      console.log("Server API route: Trying alternative URL:", alternativeUrl);
-
-      const alternativeResponse = await fetch(alternativeUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventData),
-        cache: "no-store",
-      });
-
-      console.log(`Server API route: Alternative create event response status: ${alternativeResponse.status}`);
-
-      if (!alternativeResponse.ok) {
-        const errorText = await alternativeResponse.text();
-        console.error("Server API route: Error response from alternative URL:", errorText);
-        return NextResponse.json(
-          { error: `Failed to create event. API returned status: ${alternativeResponse.status}` },
-          { status: alternativeResponse.status }
-        );
-      }
-
-      // Get the response data from the alternative URL
-      const responseText = await alternativeResponse.text();
-      console.log(`Server API route: Raw response from alternative URL: ${responseText}`);
-
-      try {
-        // Try to parse the response as JSON
-        const responseData = JSON.parse(responseText);
-        console.log("Server API route: Created event:", responseData);
-
-        return NextResponse.json(responseData, { status: 201 });
-      } catch (parseError) {
-        console.error("Server API route: Error parsing response:", parseError);
-        // If parsing fails, return the error
-        return NextResponse.json(
-          {
-            error: "Failed to parse API response",
-            rawResponse: responseText.substring(0, 500) // Limit the size of the raw response
-          },
-          { status: 500 }
-        );
-      }
+      const errorText = await response.text();
+      console.error("Server API route: Error response:", errorText);
+      return NextResponse.json(
+        { error: `Failed to create event: ${response.status} ${response.statusText}` },
+        { status: response.status }
+      );
     }
 
     // Get the response data

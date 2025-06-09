@@ -53,9 +53,18 @@ export const BASIC_EVENT_API = {
   DELETE:  `${API_BASE_URL}/event/delete`, // POST with id in body
 };
 
-// Event Game Slot API endpoints (for events with games and slots)
+// Event Registration API endpoints (for events with games and slots)
 export const EVENT_API = {
-  CREATE: `${API_BASE_URL}/event-game-slot/create`, // POST - This is the endpoint for creating events with games and slots
+  CREATE: `${API_BASE_URL}/event-registration/create`, // POST - This is the correct endpoint for creating events with games and slots
+  GET: `${API_BASE_URL}/event-registration/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event-registration/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event-registration/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event-registration/delete`, // POST with id in body
+};
+
+// Event Game Slot API endpoints (for individual game slot management)
+export const EVENT_GAME_SLOT_API = {
+  CREATE: `${API_BASE_URL}/event-game-slot/create`, // POST - For creating individual game slots
   GET: `${API_BASE_URL}/event-game-slot/get`,       // POST with id in body
   GET_ALL: `${API_BASE_URL}/event-game-slot/get-all`, // GET
   UPDATE: `${API_BASE_URL}/event-game-slot/update`, // POST with full event data
