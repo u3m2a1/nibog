@@ -49,41 +49,33 @@ export default function EditGameTemplate({ params }: Props) {
   useEffect(() => {
     const fetchGameData = async () => {
       try {
-        console.log(`🔄 [Edit Page] Starting to fetch game data for ID: ${gameId}`)
         setIsLoading(true)
         setError(null)
 
         // Validate gameId
         if (isNaN(gameId) || gameId <= 0) {
           const errorMsg = `Invalid game ID: ${resolvedParams.id}. ID must be a positive number.`
-          console.error(`❌ [Edit Page] ${errorMsg}`)
           setError(errorMsg)
           setIsLoading(false)
           return
         }
 
-        console.log(`📡 [Edit Page] Calling getBabyGameById(${gameId})`)
         const gameData = await getBabyGameById(gameId)
-        console.log("✅ [Edit Page] Game data received:", gameData)
 
         if (!gameData) {
           throw new Error("No game data returned from API")
         }
 
         setGame(gameData)
-
-        // Set form values
-        console.log("🎯 [Edit Page] Setting form values from game data")
         setName(gameData.game_name || "")
         setDescription(gameData.description || "")
         setMinAge(gameData.min_age || 0)
-        setMaxAge(gameData.max_age || 36)
+        setMaxAge(gameData.max_age || 90)
         setDuration(gameData.duration_minutes || 60)
         setIsActive(gameData.is_active || false)
         setCategories(gameData.categories || [])
 
       } catch (error: any) {
-        console.error("💥 [Edit Page] Failed to fetch game data:", error)
         const errorMsg = error.message || "Failed to load game data. Please try again."
         setError(errorMsg)
 
@@ -93,7 +85,6 @@ export default function EditGameTemplate({ params }: Props) {
           variant: "destructive",
         })
       } finally {
-        console.log("🏁 [Edit Page] Finished fetching game data, setting loading to false")
         setIsLoading(false)
       }
     }
@@ -135,19 +126,15 @@ export default function EditGameTemplate({ params }: Props) {
         id: gameId,
         game_name: name,
         description: description,
-        min_age: minAge,
-        max_age: maxAge,
+        min_age_months: minAge,    // API expects min_age_months
+        max_age_months: maxAge,    // API expects max_age_months
         duration_minutes: duration,
         categories: categories,
         is_active: isActive,
       }
 
-      console.log("Submitting game data:", gameData)
-
       // Call the API to update the game
       const result = await updateBabyGame(gameData)
-
-      console.log("Game updated successfully:", result)
 
       // Show success message
       toast({
@@ -165,7 +152,6 @@ export default function EditGameTemplate({ params }: Props) {
       }, 1500)
 
     } catch (error: any) {
-      console.error("Error updating game:", error)
       setError(error.message || "Failed to update game. Please try again.")
 
       toast({
@@ -277,7 +263,7 @@ export default function EditGameTemplate({ params }: Props) {
                     <Slider
                       value={[minAge, maxAge]}
                       min={0}
-                      max={84}
+                      max={90}
                       step={1}
                       onValueChange={(value) => {
                         setMinAge(value[0])

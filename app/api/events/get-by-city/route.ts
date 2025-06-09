@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     console.log(`Server API route: Fetching events for city ID: ${cityId}`);
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/getbycityid";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/event-game-slot/getbycityid";
     console.log("Server API route: Calling API URL:", apiUrl);
 
     // Use POST method with request body as specified in the API documentation

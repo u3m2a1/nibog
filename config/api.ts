@@ -26,13 +26,13 @@ export const CITY_API = {
 
 // Venue API endpoints - Exactly as specified in the API documentation with correct case
 export const VENUE_API = {
-  CREATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/create`,
-  UPDATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/update`,
-  GET: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get`,
-  GET_ALL: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-all`,
-  GET_BY_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-by-city`,
-  GET_ALL_WITH_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/getall-with-city`,
-  DELETE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/delete`,
+  CREATE: `${API_BASE_URL}/venues/create}`,
+  UPDATE: `${API_BASE_URL}/venues/update`,
+  GET: `${API_BASE_URL}/venues/get`,
+  GET_ALL: `${API_BASE_URL}/venues/get-all`,
+  GET_BY_CITY: `${API_BASE_URL}/venues/get-by-city`,
+  GET_ALL_WITH_CITY: `${API_BASE_URL}/venues/getall-with-city`,
+  DELETE: `${API_BASE_URL}/venues/delete`,
 };
 
 // Baby Game API endpoints
@@ -44,13 +44,22 @@ export const BABY_GAME_API = {
   DELETE: `${API_BASE_URL}/babygame/delete`,
 };
 
-// Event API endpoints
+// Basic Event API endpoints (for events without games/slots)
+export const BASIC_EVENT_API = {
+  CREATE: `${API_BASE_URL}/event/create`, // POST
+  GET: `${API_BASE_URL}/event/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event/delete`, // POST with id in body
+};
+
+// Event Game Slot API endpoints (for events with games and slots)
 export const EVENT_API = {
-  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/create", // POST - This is the endpoint for creating events with games and slots
-  GET: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get",       // POST with id in body
-  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get-all", // GET
-  UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/update", // POST with full event data
-  DELETE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/delete", // POST with id in body
+  CREATE: `${API_BASE_URL}/event-game-slot/create`, // POST - This is the endpoint for creating events with games and slots
+  GET: `${API_BASE_URL}/event-game-slot/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event-game-slot/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event-game-slot/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event-game-slot/delete`, // POST with id in body
 };
 
 

@@ -222,28 +222,29 @@ export default function EventsPage() {
   }, [])
 
   // Convert API events to the format expected by the UI
-  const convertedEvents = apiEvents.map(apiEvent => {
-    // Get all games for the event
-    const gameNames = apiEvent.games.map(game => game.game_title);
+  const convertedEvents = apiEvents && Array.isArray(apiEvents) ? apiEvents.map(apiEvent => {
+    // Get all games for the event - add null check
+    const games = apiEvent.games || [];
+    const gameNames = games.map(game => game.game_title || "Unknown Game");
     const uniqueGameNames = [...new Set(gameNames)]; // Remove duplicates
 
     return {
-      id: apiEvent.event_id.toString(),
-      title: apiEvent.event_title,
+      id: apiEvent.event_id?.toString() || "unknown",
+      title: apiEvent.event_title || "Untitled Event",
       gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
-      venue: apiEvent.venue_name,
-      city: apiEvent.city_name,
-      date: apiEvent.event_date.split('T')[0], // Format date to YYYY-MM-DD
-      slots: apiEvent.games.map(game => ({
-        id: `${apiEvent.event_id}-${game.game_id}`,
-        time: `${game.start_time} - ${game.end_time}`,
-        capacity: game.max_participants,
+      venue: apiEvent.venue_name || "Unknown Venue",
+      city: apiEvent.city_name || "Unknown City",
+      date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : "Unknown Date", // Format date to YYYY-MM-DD
+      slots: games.map(game => ({
+        id: `${apiEvent.event_id || 'unknown'}-${game.game_id || 'unknown'}`,
+        time: `${game.start_time || '00:00'} - ${game.end_time || '00:00'}`,
+        capacity: game.max_participants || 0,
         booked: 0, // API doesn't provide this information
         status: "active" // Assuming all slots are active
       })),
-      status: apiEvent.event_status.toLowerCase()
+      status: apiEvent.event_status ? apiEvent.event_status.toLowerCase() : "unknown"
     };
-  });
+  }) : [];
 
   // Always use API data, even if it's empty
   const eventsToUse = convertedEvents;
@@ -304,7 +305,8 @@ export default function EventsPage() {
       console.log("Delete event result:", JSON.stringify(result));
 
       // Check if the result indicates success (either directly or as an array with success property)
-      const isSuccess = result.success || (Array.isArray(result) && result[0]?.success === true);
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
       console.log(`Delete operation success: ${isSuccess}`);
 
       if (isSuccess) {
@@ -315,11 +317,11 @@ export default function EventsPage() {
 
         // Remove the deleted event from the state
         console.log(`Removing event with ID ${eventToDelete} from state`);
-        console.log(`Current events: ${apiEvents.map(e => e.event_id).join(', ')}`);
+        console.log(`Current events: ${apiEvents && Array.isArray(apiEvents) ? apiEvents.map(e => e.event_id).join(', ') : 'No events'}`);
 
         setApiEvents(prevEvents => {
-          const filteredEvents = prevEvents.filter(event => event.event_id.toString() !== eventToDelete);
-          console.log(`Events after filtering: ${filteredEvents.map(e => e.event_id).join(', ')}`);
+          const filteredEvents = (prevEvents || []).filter(event => event.event_id.toString() !== eventToDelete);
+          console.log(`Events after filtering: ${filteredEvents && Array.isArray(filteredEvents) ? filteredEvents.map(e => e.event_id).join(', ') : 'No events'}`);
           return filteredEvents;
         });
 
@@ -565,11 +567,15 @@ export default function EventsPage() {
                       <TableCell className="font-medium">{event.title}</TableCell>
                       <TableCell>
                         <div className="max-w-[200px]">
-                          {event.gameTemplate.split(", ").map((game, index) => (
-                            <Badge key={index} variant="outline" className="mr-1 mb-1">
-                              {game}
-                            </Badge>
-                          ))}
+                          {event.gameTemplate && typeof event.gameTemplate === 'string' ?
+                            event.gameTemplate.split(", ").map((game, index) => (
+                              <Badge key={index} variant="outline" className="mr-1 mb-1">
+                                {game}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline">Unknown</Badge>
+                            )
+                          }
                         </div>
                       </TableCell>
                       <TableCell>
@@ -593,22 +599,26 @@ export default function EventsPage() {
                       <TableCell>{event.date}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          {event.slots.map((slot) => (
-                            <div key={slot.id} className="flex items-center gap-2 text-xs">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "h-1.5 w-1.5 rounded-full p-0",
-                                  slot.status === "active" && "bg-green-500",
-                                  slot.status === "paused" && "bg-amber-500",
-                                  slot.status === "cancelled" && "bg-red-500"
-                                )}
-                              />
-                              <span>
-                                {slot.time} ({slot.booked}/{slot.capacity})
-                              </span>
-                            </div>
-                          ))}
+                          {event.slots && Array.isArray(event.slots) && event.slots.length > 0 ?
+                            event.slots.map((slot) => (
+                              <div key={slot.id} className="flex items-center gap-2 text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full p-0",
+                                    slot.status === "active" && "bg-green-500",
+                                    slot.status === "paused" && "bg-amber-500",
+                                    slot.status === "cancelled" && "bg-red-500"
+                                  )}
+                                />
+                                <span>
+                                  {slot.time} ({slot.booked}/{slot.capacity})
+                                </span>
+                              </div>
+                            )) : (
+                              <span className="text-xs text-muted-foreground">No slots</span>
+                            )
+                          }
                         </div>
                       </TableCell>
                       <TableCell>

@@ -17,7 +17,7 @@ export async function GET() {
     }
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get-all";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/event-game-slot/get-all";
     console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {

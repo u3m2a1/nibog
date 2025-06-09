@@ -24,7 +24,7 @@ export async function GET() {
       console.log("Server API route: First attempt failed, trying with alternative URL format");
 
       // Try with webhook-test instead of webhook
-      const alternativeUrl = "https://ai.alviongs.com/webhook-test/v1/nibog/event-game-slots/get-all";
+      const alternativeUrl = "https://ai.alviongs.com/webhook-test/v1/nibog/event-game-slot/get-all";
       console.log("Server API route: Trying alternative URL:", alternativeUrl);
 
       const alternativeResponse = await fetch(alternativeUrl, {

@@ -44,22 +44,18 @@ export default function GameDetailPage({ params }: Props) {
   useEffect(() => {
     const fetchGameData = async () => {
       try {
-        console.log(`🔄 [Page] Starting to fetch game data for ID: ${gameId}`)
         setIsLoading(true)
         setError(null)
 
         // Validate gameId
         if (isNaN(gameId) || gameId <= 0) {
           const errorMsg = `Invalid game ID: ${resolvedParams.id}. ID must be a positive number.`
-          console.error(`❌ [Page] ${errorMsg}`)
           setError(errorMsg)
           setIsLoading(false)
           return
         }
 
-        console.log(`📡 [Page] Calling getBabyGameById(${gameId})`)
         const gameData = await getBabyGameById(gameId)
-        console.log("✅ [Page] Game data received:", gameData)
 
         if (!gameData) {
           throw new Error("No game data returned from API")
@@ -75,10 +71,8 @@ export default function GameDetailPage({ params }: Props) {
           lastUpdatedAt: gameData.updated_at ? new Date(gameData.updated_at).toLocaleDateString() : "N/A",
         }
 
-        console.log("🎯 [Page] Setting enhanced game data:", enhancedGameData)
         setGame(enhancedGameData)
       } catch (error: any) {
-        console.error("💥 [Page] Failed to fetch game data:", error)
         const errorMsg = error.message || "Failed to load game data. Please try again."
         setError(errorMsg)
 
@@ -88,7 +82,6 @@ export default function GameDetailPage({ params }: Props) {
           variant: "destructive",
         })
       } finally {
-        console.log("🏁 [Page] Finished fetching game data, setting loading to false")
         setIsLoading(false)
       }
     }
@@ -112,7 +105,6 @@ export default function GameDetailPage({ params }: Props) {
       // Redirect to the games list
       router.push("/admin/games")
     } catch (error: any) {
-      console.error("Error deleting game:", error)
 
       toast({
         title: "Error",

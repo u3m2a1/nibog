@@ -21,44 +21,46 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`Server API route: Updating baby game with ID: ${data.id}`);
+    // Ensure we're using the correct field names as specified in the API documentation
+    // Since edit works with min_age_months/max_age_months, use that format
+    const apiData = {
+      id: data.id,
+      game_name: data.game_name,
+      description: data.description || data.game_description,
+      min_age: data.min_age_months || data.min_age, // API expects min_age_months
+      max_age: data.max_age_months || data.max_age, // API expects max_age_months
+      duration_minutes: data.duration_minutes,
+      categories: data.categories,
+      is_active: data.is_active
+    };
 
     // Forward the request to the external API with the correct URL
     const apiUrl = BABY_GAME_API.UPDATE;
-    console.log("Server API route: Calling API URL:", apiUrl);
-
     const response = await fetch(apiUrl, {
       method: "POST", // Changed from PUT to POST as per API documentation
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(apiData),
       cache: "no-store",
     });
 
-    console.log(`Server API route: Update baby game response status: ${response.status}`);
-
     if (!response.ok) {
       // If the first attempt fails, try with the webhook-test URL
-      console.log("Server API route: First attempt failed, trying with webhook-test URL");
 
       const alternativeUrl = apiUrl.replace("webhook/v1", "webhook-test/v1");
-      console.log("Server API route: Trying alternative URL:", alternativeUrl);
 
       const alternativeResponse = await fetch(alternativeUrl, {
         method: "POST", // Changed from PUT to POST as per API documentation
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(apiData),
         cache: "no-store",
       });
       
-      console.log(`Server API route: Alternative response status: ${alternativeResponse.status}`);
-      
       if (!alternativeResponse.ok) {
         const errorText = await alternativeResponse.text();
-        console.error(`Server API route: Error response from alternative attempt: ${errorText}`);
         return NextResponse.json(
           { error: `API returned error status: ${alternativeResponse.status}` },
           { status: alternativeResponse.status }
@@ -67,13 +69,11 @@ export async function POST(request: Request) {
       
       // Get the response data from successful alternative attempt
       const responseText = await alternativeResponse.text();
-      console.log(`Server API route: Raw response from alternative attempt: ${responseText}`);
       
       try {
         const responseData = JSON.parse(responseText);
         return NextResponse.json(responseData, { status: 200 });
       } catch (parseError) {
-        console.error("Server API route: Error parsing alternative response:", parseError);
         return NextResponse.json(
           { 
             error: "Failed to parse API response", 
@@ -86,16 +86,13 @@ export async function POST(request: Request) {
 
     // Get the response data
     const responseText = await response.text();
-    console.log(`Server API route: Raw response: ${responseText}`);
     
     try {
       // Try to parse the response as JSON
       const responseData = JSON.parse(responseText);
-      console.log("Server API route: Updated baby game:", responseData);
       
       return NextResponse.json(responseData, { status: 200 });
     } catch (parseError) {
-      console.error("Server API route: Error parsing response:", parseError);
       // If parsing fails, return the error
       return NextResponse.json(
         { 
@@ -106,7 +103,6 @@ export async function POST(request: Request) {
       );
     }
   } catch (error: any) {
-    console.error("Server API route: Error updating baby game:", error);
     return NextResponse.json(
       { error: error.message || "Failed to update baby game" },
       { status: 500 }

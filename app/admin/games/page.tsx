@@ -30,17 +30,13 @@ export default function GameTemplatesPage() {
   useEffect(() => {
     const fetchGames = async () => {
       try {
-        console.log("🔄 [Games Page] Starting to fetch all games")
         setIsLoading(true)
         setError(null)
 
         const data = await getAllBabyGames()
-        console.log("✅ [Games Page] Received games data:", data)
 
         setGames(data)
-        console.log("🎯 [Games Page] Set games state with", data.length, "games")
       } catch (err: any) {
-        console.error("💥 [Games Page] Error fetching games:", err)
         const errorMsg = err.message || "Failed to fetch games"
         setError(errorMsg)
         toast({
@@ -49,7 +45,6 @@ export default function GameTemplatesPage() {
           variant: "destructive",
         })
       } finally {
-        console.log("🏁 [Games Page] Finished fetching games, setting loading to false")
         setIsLoading(false)
       }
     }
@@ -67,7 +62,6 @@ export default function GameTemplatesPage() {
         variant: "default",
       })
     } catch (err: any) {
-      console.error("Error deleting game:", err)
       toast({
         title: "Error",
         description: err.message || "Failed to delete game",
@@ -122,6 +116,7 @@ export default function GameTemplatesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Age Range</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Categories</TableHead>
@@ -133,6 +128,11 @@ export default function GameTemplatesPage() {
               {games.map((game) => (
                 <TableRow key={game.id}>
                   <TableCell className="font-medium">{game.game_name}</TableCell>
+                  <TableCell className="max-w-xs">
+                    <div className="truncate" title={game.description || "No description"}>
+                      {game.description || "No description"}
+                    </div>
+                  </TableCell>
                   <TableCell>{game.min_age} - {game.max_age} months</TableCell>
                   <TableCell>{game.duration_minutes} minutes</TableCell>
                   <TableCell>

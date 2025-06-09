@@ -128,9 +128,3 @@ Response (200 OK)
     "success": true
   }
 ]
-
-
-
-
-
-
