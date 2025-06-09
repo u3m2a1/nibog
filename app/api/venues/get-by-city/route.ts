@@ -54,7 +54,7 @@ async function getVenuesByCity(cityId: number) {
     console.log(`Server API route: Fetching venues for city ID: ${cityId}`);
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/V1/nibog/venues/get-by-city";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/venues/get-by-city";
     console.log("Server API route: Calling API URL:", apiUrl);
 
     // Use POST method with request body as specified in the API documentation

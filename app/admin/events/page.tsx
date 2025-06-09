@@ -15,7 +15,10 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { getAllEvents, EventListItem, deleteEvent } from "@/services/eventService"
+import { deleteEvent } from "@/services/eventService"
+import { getAllCities, City } from "@/services/cityService"
+import { getVenuesByCity } from "@/services/venueService"
+import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
 import { useToast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -29,143 +32,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-// Mock data - in a real app, this would come from an API
-const events = [
-  {
-    id: "E001",
-    title: "Baby Crawling",
-    gameTemplate: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S001", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 12, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E002",
-    title: "Baby Walker",
-    gameTemplate: "Baby Walker",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S003", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 15, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E003",
-    title: "Running Race",
-    gameTemplate: "Running Race",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S004", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 10, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E004",
-    title: "Hurdle Toddle",
-    gameTemplate: "Hurdle Toddle",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    date: "2025-03-16",
-    slots: [
-      { id: "S006", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 20, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E005",
-    title: "Cycle Race",
-    gameTemplate: "Cycle Race",
-    venue: "Sports Complex",
-    city: "Vizag",
-    date: "2025-08-15",
-    slots: [
-      { id: "S008", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 12, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E006",
-    title: "Ring Holding",
-    gameTemplate: "Ring Holding",
-    venue: "Indoor Stadium",
-    city: "Bangalore",
-    date: "2025-10-12",
-    slots: [
-      { id: "S009", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 15, status: "active" },
-    ],
-    status: "draft",
-  },
-  {
-    id: "E007",
-    title: "Baby Gymnastics",
-    gameTemplate: "Baby Gymnastics",
-    venue: "Little Movers Gym",
-    city: "Hyderabad",
-    date: "2025-04-28",
-    slots: [
-      { id: "S010", time: "09:30 AM - 10:30 AM", capacity: 8, booked: 0, status: "active" },
-      { id: "S011", time: "11:00 AM - 12:00 PM", capacity: 8, booked: 0, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E008",
-    title: "Toddler Dance Party",
-    gameTemplate: "Toddler Dance",
-    venue: "Rhythm Studio",
-    city: "Delhi",
-    date: "2025-04-30",
-    slots: [
-      { id: "S012", time: "04:00 PM - 05:30 PM", capacity: 15, booked: 0, status: "active" },
-    ],
-    status: "scheduled",
-  },
-]
 
-// Mock cities data
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-  { id: "8", name: "Pune" },
-  { id: "9", name: "Patna" },
-  { id: "10", name: "Ranchi" },
-]
-
-// Mock venues data
-const venues = [
-  { id: "1", name: "Gachibowli Indoor Stadium", city: "Hyderabad" },
-  { id: "2", name: "Indoor Stadium", city: "Chennai" },
-  { id: "3", name: "Indoor Stadium", city: "Bangalore" },
-  { id: "4", name: "Sports Complex", city: "Vizag" },
-  { id: "5", name: "Indoor Stadium", city: "Mumbai" },
-  { id: "6", name: "Sports Complex", city: "Delhi" },
-  { id: "7", name: "Indoor Stadium", city: "Kolkata" },
-]
-
-// Mock game templates data
-const gameTemplates = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
-  { id: "7", name: "Ball Throw" },
-  { id: "8", name: "Balancing Beam" },
-]
 
 export default function EventsPage() {
   const { toast } = useToast()
@@ -175,11 +42,26 @@ export default function EventsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date>()
-  const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
+  const [apiEvents, setApiEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+
+  // State for filter data from APIs
+  const [cities, setCities] = useState<City[]>([])
+  const [venues, setVenues] = useState<any[]>([]) // Venues with city details
+  const [gameTemplates, setGameTemplates] = useState<BabyGame[]>([])
+  const [isLoadingFilters, setIsLoadingFilters] = useState(true)
+
+  // Function to fetch events with complete information
+  const fetchEventsWithGames = async () => {
+    const response = await fetch('/api/events/get-all-with-games')
+    if (!response.ok) {
+      throw new Error(`Failed to fetch events: ${response.status}`)
+    }
+    return response.json()
+  }
 
   // Fetch events from API when component mounts
   useEffect(() => {
@@ -188,15 +70,10 @@ export default function EventsPage() {
         setIsLoading(true)
         setError(null)
 
-        console.log("Fetching events from API...")
-
-        // Fetch events from the API
-        const eventsData = await getAllEvents()
-        console.log("Events data from API:", eventsData)
-        console.log(`Received ${eventsData.length} events from API`)
+        // Fetch events from the API with complete information
+        const eventsData = await fetchEventsWithGames()
 
         if (eventsData.length === 0) {
-          console.warn("No events found in the API response")
           toast({
             title: "No Events Found",
             description: "There are no events in the database. You can create a new event using the 'Create New Event' button.",
@@ -206,7 +83,6 @@ export default function EventsPage() {
 
         setApiEvents(eventsData)
       } catch (err: any) {
-        console.error("Failed to fetch events:", err)
         setError(err.message || "Failed to load events")
         toast({
           title: "Error",
@@ -221,22 +97,78 @@ export default function EventsPage() {
     fetchEvents()
   }, [])
 
+  // Fetch filter data (cities, venues, game templates) from APIs
+  useEffect(() => {
+    const fetchFilterData = async () => {
+      try {
+        setIsLoadingFilters(true)
+
+        // Fetch cities and games first
+        const [citiesData, gamesData] = await Promise.all([
+          getAllCities(),
+          getAllBabyGames()
+        ])
+
+        setCities(citiesData)
+        setGameTemplates(gamesData)
+
+        // Fetch venues for each city using get-by-city API
+        try {
+          const allVenues: any[] = []
+
+          // Fetch venues for each city
+          for (const city of citiesData) {
+            if (city.id) {
+              try {
+                const cityVenues = await getVenuesByCity(city.id)
+                // Add city name to each venue
+                const venuesWithCityName = cityVenues.map(venue => ({
+                  ...venue,
+                  city_name: city.city_name
+                }))
+                allVenues.push(...venuesWithCityName)
+              } catch (cityVenueError) {
+                // If fetching venues for a specific city fails, continue with other cities
+                console.warn(`Failed to fetch venues for city ${city.city_name}:`, cityVenueError)
+              }
+            }
+          }
+
+          setVenues(allVenues)
+        } catch (venueError) {
+          // If venue fetching fails completely, set empty array
+          setVenues([])
+        }
+      } catch (err: any) {
+        toast({
+          title: "Warning",
+          description: "Some filter options may not be available due to a loading error.",
+          variant: "default",
+        })
+      } finally {
+        setIsLoadingFilters(false)
+      }
+    }
+
+    fetchFilterData()
+  }, [])
+
   // Convert API events to the format expected by the UI
-  const convertedEvents = apiEvents && Array.isArray(apiEvents) ? apiEvents.map(apiEvent => {
-    // Get all games for the event - add null check
+  const convertedEvents = apiEvents && Array.isArray(apiEvents) ? apiEvents.map((apiEvent: any) => {
+    // Extract games from the nested structure
     const games = apiEvent.games || [];
-    const gameNames = games.map(game => game.game_title || "Unknown Game");
+    const gameNames = games.map((game: any) => game.custom_title || game.game_title || "Unknown Game");
     const uniqueGameNames = [...new Set(gameNames)]; // Remove duplicates
 
     return {
       id: apiEvent.event_id?.toString() || "unknown",
       title: apiEvent.event_title || "Untitled Event",
       gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
-      venue: apiEvent.venue_name || "Unknown Venue",
-      city: apiEvent.city_name || "Unknown City",
+      venue: apiEvent.venue?.venue_name || "Unknown Venue",
+      city: apiEvent.city?.city_name || "Unknown City",
       date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : "Unknown Date", // Format date to YYYY-MM-DD
-      slots: games.map(game => ({
-        id: `${apiEvent.event_id || 'unknown'}-${game.game_id || 'unknown'}`,
+      slots: games.map((game: any, index: number) => ({
+        id: `${apiEvent.event_id || 'unknown'}-${game.game_id || 'unknown'}-${index}`,
         time: `${game.start_time || '00:00'} - ${game.end_time || '00:00'}`,
         capacity: game.max_participants || 0,
         booked: 0, // API doesn't provide this information
@@ -294,20 +226,15 @@ export default function EventsPage() {
   const handleDeleteEvent = async () => {
     if (!eventToDelete) return;
 
-    console.log(`Starting deletion process for event ID: ${eventToDelete}`);
-
     try {
       setIsDeletingEvent(true);
 
       // Call the API to delete the event
-      console.log(`Calling deleteEvent with ID: ${eventToDelete}`);
       const result = await deleteEvent(Number(eventToDelete));
-      console.log("Delete event result:", JSON.stringify(result));
 
       // Check if the result indicates success (either directly or as an array with success property)
       const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
                         (Array.isArray(result) && result[0]?.success === true);
-      console.log(`Delete operation success: ${isSuccess}`);
 
       if (isSuccess) {
         toast({
@@ -316,12 +243,8 @@ export default function EventsPage() {
         });
 
         // Remove the deleted event from the state
-        console.log(`Removing event with ID ${eventToDelete} from state`);
-        console.log(`Current events: ${apiEvents && Array.isArray(apiEvents) ? apiEvents.map(e => e.event_id).join(', ') : 'No events'}`);
-
         setApiEvents(prevEvents => {
           const filteredEvents = (prevEvents || []).filter(event => event.event_id.toString() !== eventToDelete);
-          console.log(`Events after filtering: ${filteredEvents && Array.isArray(filteredEvents) ? filteredEvents.map(e => e.event_id).join(', ') : 'No events'}`);
           return filteredEvents;
         });
 
@@ -331,8 +254,6 @@ export default function EventsPage() {
         throw new Error("Failed to delete event. Please try again.");
       }
     } catch (error: any) {
-      console.error("Error deleting event:", error);
-
       toast({
         title: "Error",
         description: error.message || "Failed to delete event. Please try again.",
@@ -345,7 +266,7 @@ export default function EventsPage() {
 
   // Get filtered venues based on selected city
   const filteredVenues = selectedCity
-    ? venues.filter((venue) => venue.city === selectedCity)
+    ? venues.filter((venue) => venue.city_name === selectedCity)
     : venues
 
   return (
@@ -407,8 +328,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Cities</SelectItem>
                         {cities.map((city) => (
-                          <SelectItem key={city.id} value={city.name}>
-                            {city.name}
+                          <SelectItem key={city.id} value={city.city_name}>
+                            {city.city_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -423,8 +344,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Venues</SelectItem>
                         {filteredVenues.map((venue) => (
-                          <SelectItem key={venue.id} value={venue.name}>
-                            {venue.name}
+                          <SelectItem key={venue.id} value={venue.venue_name}>
+                            {venue.venue_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -439,8 +360,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Templates</SelectItem>
                         {gameTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.name}>
-                            {template.name}
+                          <SelectItem key={template.id} value={template.game_name}>
+                            {template.game_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -698,7 +619,6 @@ export default function EventsPage() {
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => {
-                                    console.log(`Setting event to delete: ${event.id}`);
                                     setEventToDelete(event.id);
                                     setTimeout(() => {
                                       handleDeleteEvent();
