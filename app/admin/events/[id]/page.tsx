@@ -142,7 +142,7 @@ export default function EventDetailPage({ params }: Props) {
     }
 
     fetchEventData()
-  }, [eventId, toast])
+  }, [eventId])
 
   // Handle pause event
   const handlePauseEvent = () => {

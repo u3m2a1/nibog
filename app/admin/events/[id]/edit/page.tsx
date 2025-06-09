@@ -174,7 +174,7 @@ export default function EditEventPage({ params }: Props) {
     }
 
     fetchEventData()
-  }, [eventId, toast])
+  }, [eventId])
 
   // Fetch cities from API
   const fetchCities = async () => {
@@ -502,7 +502,7 @@ export default function EditEventPage({ params }: Props) {
       })
 
       // Redirect to event details page
-      router.push(`/admin/events/${eventId}`)
+      router.push('/admin/events')
     } catch (error: any) {
       console.error("Error updating event:", error)
       toast({

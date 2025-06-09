@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -12,81 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, ArrowLeft, Copy, Check } from "lucide-react"
+import { CalendarIcon, ArrowLeft, Copy, Check, AlertTriangle } from "lucide-react"
 import { format, addDays, addWeeks } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
-
-// Mock data - in a real app, this would come from an API
-const events = [
-  {
-    id: "E001",
-    title: "Baby Sensory Play",
-    description: "Engage your baby's senses with various textures, sounds, and colors. This interactive session is designed to stimulate your baby's development through sensory exploration. Activities include tactile play, visual stimulation, and sound discovery. All materials used are baby-safe and age-appropriate.",
-    gameTemplateId: "1",
-    gameTemplate: {
-      id: "1",
-      name: "Baby Sensory Play",
-      minAgeMonths: 6,
-      maxAgeMonths: 18,
-      durationMinutes: 90,
-      suggestedPrice: 799,
-    },
-    venueId: "1",
-    venue: {
-      id: "1",
-      name: "Little Explorers Center",
-      address: "123 Play Street, Andheri West",
-      city: "Mumbai",
-    },
-    cityId: "1",
-    city: "Mumbai",
-    date: "2025-04-15",
-    slots: [
-      { 
-        id: "S001", 
-        startTime: "10:00 AM", 
-        endTime: "11:30 AM", 
-        price: 799, 
-        maxParticipants: 12, 
-        currentParticipants: 7, 
-        status: "active",
-      },
-      { 
-        id: "S002", 
-        startTime: "02:00 PM", 
-        endTime: "03:30 PM", 
-        price: 799, 
-        maxParticipants: 12, 
-        currentParticipants: 4, 
-        status: "active",
-      },
-    ],
-    status: "scheduled",
-  },
-]
-
-// Mock cities data
-const cities = [
-  { id: "1", name: "Mumbai" },
-  { id: "2", name: "Delhi" },
-  { id: "3", name: "Bangalore" },
-  { id: "4", name: "Chennai" },
-  { id: "5", name: "Hyderabad" },
-  { id: "6", name: "Pune" },
-]
-
-// Mock venues data
-const venues = [
-  { id: "1", name: "Little Explorers Center", city: "Mumbai" },
-  { id: "2", name: "Rhythm Studio", city: "Delhi" },
-  { id: "3", name: "Tiny Champions Arena", city: "Bangalore" },
-  { id: "4", name: "Zen Baby Studio", city: "Mumbai" },
-  { id: "5", name: "Aqua Tots Center", city: "Pune" },
-  { id: "6", name: "Creative Kids Studio", city: "Chennai" },
-  { id: "7", name: "Little Movers Gym", city: "Hyderabad" },
-]
+import { toast } from "@/components/ui/use-toast"
+import { getEventById, createEvent, formatEventDataForAPI, EventListItem } from "@/services/eventService"
+import { getAllCities, City } from "@/services/cityService"
+import { getVenuesByCity, Venue } from "@/services/venueService"
 
 type Props = {
   params: { id: string }
@@ -94,8 +28,15 @@ type Props = {
 
 export default function CloneEventPage({ params }: Props) {
   const router = useRouter()
-  const sourceEvent = events.find((e) => e.id === params.id)
-  
+  const eventId = params.id
+
+  // State for source event and loading
+  const [sourceEvent, setSourceEvent] = useState<EventListItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [cities, setCities] = useState<City[]>([])
+  const [venues, setVenues] = useState<Venue[]>([])
+
+  // Form state
   const [cloneType, setCloneType] = useState<"single" | "multiple">("single")
   const [eventTitle, setEventTitle] = useState("")
   const [eventDescription, setEventDescription] = useState("")
@@ -104,26 +45,119 @@ export default function CloneEventPage({ params }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [eventStatus, setEventStatus] = useState("draft")
   const [cloneSlots, setCloneSlots] = useState(true)
-  
+
   // Multiple dates options
   const [repeatType, setRepeatType] = useState<"daily" | "weekly">("weekly")
   const [repeatCount, setRepeatCount] = useState(4)
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
 
+  // Custom time slots when not cloning
+  const [customSlots, setCustomSlots] = useState<Array<{
+    id: string
+    startTime: string
+    endTime: string
+    price: number
+    maxParticipants: number
+  }>>([{
+    id: "1",
+    startTime: "10:00",
+    endTime: "11:00",
+    price: 500,
+    maxParticipants: 12
+  }])
+
   // Get filtered venues based on selected city
   const filteredVenues = selectedCity
-    ? venues.filter((venue) => venue.city === selectedCity)
+    ? venues.filter((venue) => venue.city_id.toString() === selectedCity)
     : []
 
+  // Fetch source event data
   useEffect(() => {
-    if (sourceEvent) {
-      setEventTitle(`${sourceEvent.title} (Copy)`)
-      setEventDescription(sourceEvent.description)
-      setSelectedCity(sourceEvent.city)
-      setSelectedVenue(sourceEvent.venueId)
-      setSelectedDate(addDays(new Date(sourceEvent.date), 7)) // Default to one week later
+    const fetchEventData = async () => {
+      try {
+        setLoading(true)
+        const event = await getEventById(parseInt(eventId))
+        setSourceEvent(event)
+
+        // Pre-fill form with source event data
+        setEventTitle(`${event.event_title || 'Event'} (Copy)`)
+        setEventDescription(event.event_description || "")
+        setSelectedCity(event.city_id?.toString() || "")
+        setSelectedVenue(event.venue_id?.toString() || "")
+        setSelectedDate(addDays(new Date(event.event_date), 7)) // Default to one week later
+      } catch (error) {
+        console.error("Error fetching event:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load event data",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [sourceEvent])
+
+    fetchEventData()
+  }, [eventId])
+
+  // Fetch cities and venues
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [citiesData] = await Promise.all([
+          getAllCities()
+        ])
+        setCities(citiesData)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load cities and venues",
+          variant: "destructive",
+        })
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // Fetch venues when city changes
+  useEffect(() => {
+    const fetchVenues = async () => {
+      if (selectedCity) {
+        try {
+          const venuesData = await getVenuesByCity(parseInt(selectedCity))
+          setVenues(venuesData)
+        } catch (error) {
+          console.error("Error fetching venues:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load venues",
+            variant: "destructive",
+          })
+        }
+      } else {
+        setVenues([])
+      }
+    }
+
+    fetchVenues()
+  }, [selectedCity])
+
+  // Generate dates for multiple events
+  useEffect(() => {
+    if (cloneType === "multiple" && selectedDate) {
+      const dates = []
+      for (let i = 0; i < repeatCount; i++) {
+        if (repeatType === "daily") {
+          dates.push(addDays(selectedDate, i))
+        } else {
+          dates.push(addWeeks(selectedDate, i))
+        }
+      }
+      setSelectedDates(dates)
+    }
+  }, [cloneType, selectedDate, repeatType, repeatCount])
 
   // Generate dates based on repeat options
   const generateDates = () => {
@@ -149,40 +183,150 @@ export default function CloneEventPage({ params }: Props) {
   }, [cloneType, selectedDate, repeatType, repeatCount])
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validate form
-    if (!selectedVenue || !selectedDate) {
-      alert("Please fill in all required fields.")
+    if (!selectedVenue || !selectedDate || !eventTitle.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
       return
     }
-    
-    // In a real app, this would be an API call to clone the event
-    if (cloneType === "single") {
-      console.log({
-        sourceEventId: params.id,
-        title: eventTitle,
-        description: eventDescription,
-        venueId: selectedVenue,
-        date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : "",
-        status: eventStatus,
-        cloneSlots,
+
+    // Validate custom slots if not cloning
+    if (!cloneSlots && customSlots.some(slot => !slot.startTime || !slot.endTime || slot.price <= 0 || slot.maxParticipants <= 0)) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all time slot details correctly.",
+        variant: "destructive",
       })
-    } else {
-      console.log({
-        sourceEventId: params.id,
-        title: eventTitle,
-        description: eventDescription,
-        venueId: selectedVenue,
-        dates: selectedDates.map(date => format(date, "yyyy-MM-dd")),
-        status: eventStatus,
-        cloneSlots,
+      return
+    }
+
+    // For multiple dates, validate that dates are generated
+    if (cloneType === "multiple" && selectedDates.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a start date for multiple events.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (cloneType === "single") {
+        // Prepare games data for single event
+        const gamesData = sourceEvent?.games.map(game => ({
+          templateId: game.game_id.toString(),
+          customTitle: game.custom_title,
+          customDescription: game.custom_description,
+          customPrice: game.custom_price,
+          slots: cloneSlots
+            ? [{
+                id: "1",
+                startTime: game.start_time.substring(0, 5), // Remove seconds
+                endTime: game.end_time.substring(0, 5), // Remove seconds
+                price: game.slot_price,
+                maxParticipants: game.max_participants,
+              }]
+            : customSlots.map(slot => ({
+                id: slot.id,
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                price: slot.price,
+                maxParticipants: slot.maxParticipants,
+              }))
+        })) || []
+
+        // Clone single event
+        const eventData = formatEventDataForAPI({
+          title: eventTitle,
+          description: eventDescription,
+          venueId: selectedVenue,
+          date: format(selectedDate, "yyyy-MM-dd"),
+          status: eventStatus,
+          games: gamesData,
+          cityId: parseInt(selectedCity),
+        })
+
+        await createEvent(eventData)
+
+        toast({
+          title: "Success",
+          description: "Event cloned successfully!",
+        })
+      } else {
+        // Clone multiple events
+        for (const date of selectedDates) {
+          // Prepare games data for each event
+          const gamesData = sourceEvent?.games.map(game => ({
+            templateId: game.game_id.toString(),
+            customTitle: game.custom_title,
+            customDescription: game.custom_description,
+            customPrice: game.custom_price,
+            slots: cloneSlots
+              ? [{
+                  id: "1",
+                  startTime: game.start_time.substring(0, 5), // Remove seconds
+                  endTime: game.end_time.substring(0, 5), // Remove seconds
+                  price: game.slot_price,
+                  maxParticipants: game.max_participants,
+                }]
+              : customSlots.map(slot => ({
+                  id: slot.id,
+                  startTime: slot.startTime,
+                  endTime: slot.endTime,
+                  price: slot.price,
+                  maxParticipants: slot.maxParticipants,
+                }))
+          })) || []
+
+          const eventData = formatEventDataForAPI({
+            title: `${eventTitle} - ${format(date, "MMM dd")}`,
+            description: eventDescription,
+            venueId: selectedVenue,
+            date: format(date, "yyyy-MM-dd"),
+            status: eventStatus,
+            games: gamesData,
+            cityId: parseInt(selectedCity),
+          })
+
+          await createEvent(eventData)
+        }
+
+        toast({
+          title: "Success",
+          description: `${selectedDates.length} events cloned successfully!`,
+        })
+      }
+
+      // Redirect to events list after a short delay
+      setTimeout(() => {
+        router.push("/admin/events")
+      }, 1500)
+
+    } catch (error: any) {
+      console.error("Error cloning event:", error)
+      toast({
+        title: "Error",
+        description: `Failed to clone event: ${error.message || "Unknown error"}`,
+        variant: "destructive",
       })
     }
-    
-    // Redirect to events list
-    router.push("/admin/events")
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Loading...</h2>
+          <p className="text-muted-foreground">Fetching event data...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!sourceEvent) {
@@ -210,7 +354,7 @@ export default function CloneEventPage({ params }: Props) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Clone Event</h1>
-          <p className="text-muted-foreground">Create a copy of {sourceEvent.title}</p>
+          <p className="text-muted-foreground">Create a copy of {sourceEvent.event_title}</p>
         </div>
       </div>
 
@@ -331,6 +475,107 @@ export default function CloneEventPage({ params }: Props) {
                 />
                 <Label htmlFor="cloneSlots">Clone time slots</Label>
               </div>
+
+              {!cloneSlots && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Time Slots</CardTitle>
+                    <CardDescription>Configure time slots for the cloned event</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {customSlots.map((slot, index) => (
+                      <div key={slot.id} className="grid gap-4 p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Slot {index + 1}</h4>
+                          {customSlots.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setCustomSlots(customSlots.filter((_, i) => i !== index))
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`startTime-${index}`}>Start Time</Label>
+                            <Input
+                              id={`startTime-${index}`}
+                              type="time"
+                              value={slot.startTime}
+                              onChange={(e) => {
+                                const newSlots = [...customSlots]
+                                newSlots[index].startTime = e.target.value
+                                setCustomSlots(newSlots)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`endTime-${index}`}>End Time</Label>
+                            <Input
+                              id={`endTime-${index}`}
+                              type="time"
+                              value={slot.endTime}
+                              onChange={(e) => {
+                                const newSlots = [...customSlots]
+                                newSlots[index].endTime = e.target.value
+                                setCustomSlots(newSlots)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`price-${index}`}>Price (₹)</Label>
+                            <Input
+                              id={`price-${index}`}
+                              type="number"
+                              min="0"
+                              value={slot.price}
+                              onChange={(e) => {
+                                const newSlots = [...customSlots]
+                                newSlots[index].price = parseInt(e.target.value) || 0
+                                setCustomSlots(newSlots)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`maxParticipants-${index}`}>Max Participants</Label>
+                            <Input
+                              id={`maxParticipants-${index}`}
+                              type="number"
+                              min="1"
+                              value={slot.maxParticipants}
+                              onChange={(e) => {
+                                const newSlots = [...customSlots]
+                                newSlots[index].maxParticipants = parseInt(e.target.value) || 1
+                                setCustomSlots(newSlots)
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setCustomSlots([...customSlots, {
+                          id: (customSlots.length + 1).toString(),
+                          startTime: "10:00",
+                          endTime: "11:00",
+                          price: 500,
+                          maxParticipants: 12
+                        }])
+                      }}
+                    >
+                      Add Time Slot
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </CardContent>
           </Card>
 
@@ -375,8 +620,8 @@ export default function CloneEventPage({ params }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {cities.map((city) => (
-                      <SelectItem key={city.id} value={city.name}>
-                        {city.name}
+                      <SelectItem key={city.id} value={city.id?.toString() || ""}>
+                        {city.city_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -395,8 +640,8 @@ export default function CloneEventPage({ params }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {filteredVenues.map((venue) => (
-                      <SelectItem key={venue.id} value={venue.id}>
-                        {venue.name}
+                      <SelectItem key={venue.id} value={venue.id?.toString() || ""}>
+                        {venue.venue_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
