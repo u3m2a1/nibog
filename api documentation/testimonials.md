@@ -102,7 +102,7 @@ response
 
 ## delete testimonial
 
-DELETE https://ai.alviongs.com/webhook/v1/nibog/testimonials/delete
+POST https://ai.alviongs.com/webhook/v1/nibog/testimonials/delete
 {
     "id": 1
 }
