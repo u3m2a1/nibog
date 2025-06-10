@@ -19,7 +19,7 @@ import { deleteEvent, updateEvent } from "@/services/eventService"
 import { getAllCities, City } from "@/services/cityService"
 import { getVenuesByCity } from "@/services/venueService"
 import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { TruncatedText } from "@/components/ui/truncated-text"
 import {
   AlertDialog,

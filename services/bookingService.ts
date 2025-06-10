@@ -75,8 +75,6 @@ export interface Booking {
  */
 export async function getAllBookings(): Promise<Booking[]> {
   try {
-    console.log("Fetching all bookings...");
-
     // Use our internal API route to avoid CORS issues
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -91,19 +89,14 @@ export async function getAllBookings(): Promise<Booking[]> {
       });
 
       clearTimeout(timeoutId);
-      console.log(`Get all bookings response status: ${response.status}`);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error response: ${errorText}`);
         throw new Error(`API returned error status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`Retrieved ${data.length} bookings`);
 
       if (!Array.isArray(data)) {
-        console.warn("API did not return an array for bookings:", data);
         return [];
       }
 
@@ -111,13 +104,11 @@ export async function getAllBookings(): Promise<Booking[]> {
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.error("Fetch request timed out");
         throw new Error("Request timed out. The server took too long to respond.");
       }
       throw fetchError;
     }
   } catch (error: any) {
-    console.error("Error fetching bookings:", error);
     throw error;
   }
 }
@@ -130,8 +121,6 @@ export async function getAllBookings(): Promise<Booking[]> {
  */
 export async function updateBookingStatus(bookingId: number, status: string): Promise<any> {
   try {
-    console.log(`Updating booking ${bookingId} status to ${status}`);
-
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/bookings/update-status', {
       method: "POST",
@@ -145,20 +134,13 @@ export async function updateBookingStatus(bookingId: number, status: string): Pr
       }),
     });
 
-    console.log(`Update booking status response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Booking status updated successfully:", data);
-
     return data;
   } catch (error: any) {
-    console.error(`Error updating booking ${bookingId} status:`, error);
     throw error;
   }
 }
@@ -170,7 +152,9 @@ export async function updateBookingStatus(bookingId: number, status: string): Pr
  */
 export async function getBookingById(bookingId: string | number): Promise<Booking> {
   try {
-    console.log(`Fetching booking with ID: ${bookingId}`);
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
     // Use our internal API route to avoid CORS issues
     const response = await fetch(`/api/bookings/get/${bookingId}`, {
@@ -178,55 +162,30 @@ export async function getBookingById(bookingId: string | number): Promise<Bookin
       headers: {
         "Content-Type": "application/json",
       },
+      signal: controller.signal,
     });
 
-    console.log(`Get booking by ID response status: ${response.status}`);
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
-
       // If it's a 404, the booking doesn't exist
       if (response.status === 404) {
         throw new Error(`Booking with ID ${bookingId} not found`);
       }
 
-      // For other errors, try to get all bookings and find the one we need
-      console.log("Trying fallback method to get booking...");
-      const allBookings = await getAllBookings();
-      const booking = allBookings.find(b => String(b.booking_id) === String(bookingId));
-
-      if (booking) {
-        console.log("Found booking using fallback method:", booking);
-        return booking;
-      }
-
-      throw new Error(`Booking with ID ${bookingId} not found`);
+      // For other errors, throw immediately without fallback to prevent loops
+      throw new Error(`Failed to fetch booking: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Booking retrieved successfully:", data);
-
     return data;
   } catch (error: any) {
-    console.error(`Error fetching booking ${bookingId}:`, error);
-
-    // If the main API fails, try the fallback method
-    if (!error.message.includes('not found')) {
-      try {
-        console.log("Main API failed, trying fallback method...");
-        const allBookings = await getAllBookings();
-        const booking = allBookings.find(b => String(b.booking_id) === String(bookingId));
-
-        if (booking) {
-          console.log("Found booking using fallback method:", booking);
-          return booking;
-        }
-      } catch (fallbackError) {
-        console.error("Fallback method also failed:", fallbackError);
-      }
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - the booking service is taking too long to respond');
     }
 
+    // Re-throw the error without fallback to prevent infinite loops
     throw error;
   }
 }
@@ -264,8 +223,6 @@ export async function createBooking(bookingData: {
   };
 }): Promise<any> {
   try {
-    console.log("Creating booking with data:", bookingData);
-
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/bookings/create', {
       method: "POST",
@@ -275,20 +232,13 @@ export async function createBooking(bookingData: {
       body: JSON.stringify(bookingData),
     });
 
-    console.log(`Create booking response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Booking created successfully:", data);
-
     return data;
   } catch (error: any) {
-    console.error("Error creating booking:", error);
     throw error;
   }
 }

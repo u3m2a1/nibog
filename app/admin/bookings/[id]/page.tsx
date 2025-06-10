@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Edit, X, Check, AlertTriangle, User, Mail, Phone, Calendar, Clock, MapPin, Users, CreditCard, Loader2, RefreshCw } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { getBookingById, updateBookingStatus, getAllBookings, type Booking } from "@/services/bookingService"
 import {
   AlertDialog,
@@ -72,25 +72,17 @@ export default function BookingDetailPage({ params }: Props) {
         setIsLoading(true)
         setError(null)
 
-        // Add a timeout to the fetch operation
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timeout')), 15000) // 15 second timeout
-        })
-
-        const fetchPromise = getBookingById(bookingId)
-
-        const data = await Promise.race([fetchPromise, timeoutPromise]) as Booking
+        const data = await getBookingById(bookingId)
         setBooking(data)
       } catch (error: any) {
-        console.error("Failed to fetch booking:", error)
         let errorMessage = "Failed to load booking details"
 
-        if (error.message === 'Request timeout') {
+        if (error.message.includes('timeout') || error.message.includes('Request timeout')) {
           errorMessage = "The request is taking too long. Please try again or check your connection."
-        } else if (error.message.includes('timeout')) {
-          errorMessage = "The booking service is currently slow. Please try again in a moment."
         } else if (error.message.includes('503') || error.message.includes('504')) {
           errorMessage = "The booking service is temporarily unavailable. Please try again later."
+        } else if (error.message.includes('not found')) {
+          errorMessage = "Booking not found. It may have been deleted or the ID is incorrect."
         }
 
         setError(errorMessage)
@@ -104,10 +96,10 @@ export default function BookingDetailPage({ params }: Props) {
       }
     }
 
-    if (bookingId) {
+    if (bookingId && !booking) {
       fetchBooking()
     }
-  }, [bookingId, toast, retryCount])
+  }, [bookingId, retryCount]) // Removed toast dependency to prevent loops
   
   // Handle confirm booking
   const handleConfirmBooking = async () => {
