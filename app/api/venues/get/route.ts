@@ -33,7 +33,7 @@ async function getVenueById(id: number) {
     // This is more reliable since we know this endpoint works
     console.log("Server API route: Trying to find venue in all venues with city details...");
 
-    const allVenuesResponse = await fetch("https://ai.alviongs.com/webhook/V1/nibog/venues/getall-with-city", {
+    const allVenuesResponse = await fetch("https://ai.alviongs.com/webhook/v1/nibog/venues/getall-with-city", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -60,7 +60,7 @@ async function getVenueById(id: number) {
     console.log("Server API route: Trying direct API call...");
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/V1/nibog/venues/get";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/venues/get";
     console.log("Server API route: Calling API URL:", apiUrl);
 
     // Try POST method first (most reliable for sending data)

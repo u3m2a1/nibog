@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     console.log("Server API route: Normalized venue data:", normalizedData);
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/V1/nibog/venues/create";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/venues/create";
     console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {

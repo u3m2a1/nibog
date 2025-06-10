@@ -92,6 +92,11 @@ export default function EditVenuePage({ params }: Props) {
 
       console.log("Venue updated successfully:", updatedVenue)
 
+      // Additional validation to ensure the update was successful
+      if (!updatedVenue) {
+        throw new Error("Update returned empty response")
+      }
+
       setIsSaved(true)
 
       toast({
@@ -102,8 +107,8 @@ export default function EditVenuePage({ params }: Props) {
       // Reset the saved state after 1.5 seconds and redirect
       setTimeout(() => {
         setIsSaved(false)
-        // Redirect to the venue details page
-        router.push(`/admin/venues/${venueId}`)
+        // Redirect to the venues list page
+        router.push('/admin/venues')
       }, 1500)
     } catch (error: any) {
       console.error("Error updating venue:", error)
@@ -148,7 +153,7 @@ export default function EditVenuePage({ params }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href={`/admin/venues/${venueId}`}>
+            <Link href="/admin/venues">
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
@@ -236,7 +241,7 @@ export default function EditVenuePage({ params }: Props) {
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" type="button" asChild>
-              <Link href={`/admin/venues/${venueId}`}>
+              <Link href="/admin/venues">
                 Cancel
               </Link>
             </Button>

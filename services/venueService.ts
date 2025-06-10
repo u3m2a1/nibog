@@ -168,10 +168,11 @@ export const updateVenue = async (venueData: Venue): Promise<Venue> => {
     }
 
     console.log("Updating venue with data:", venueData);
+    console.log("Venue service: Sending data to API:", JSON.stringify(venueData, null, 2));
 
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/venues/update', {
-      method: "PUT",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -179,18 +180,24 @@ export const updateVenue = async (venueData: Venue): Promise<Venue> => {
     });
 
     console.log(`Update venue response status: ${response.status}`);
+    console.log(`Update venue response headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Venue service: Error response text:`, errorText);
+
       let errorMessage = `Error updating venue: ${response.status}`;
 
       try {
         const errorData = JSON.parse(errorText);
+        console.error(`Venue service: Parsed error data:`, errorData);
         if (errorData.error) {
           errorMessage = errorData.error;
         }
       } catch (e) {
-        // If we can't parse the error as JSON, use the status code
+        console.error(`Venue service: Could not parse error response as JSON:`, e);
+        // If we can't parse the error as JSON, use the raw text
+        errorMessage = `Error updating venue: ${response.status} - ${errorText}`;
       }
 
       throw new Error(errorMessage);
@@ -219,11 +226,15 @@ export const updateVenue = async (venueData: Venue): Promise<Venue> => {
  */
 export const deleteVenue = async (id: number): Promise<{ success: boolean }> => {
   try {
+    if (!id || isNaN(id) || id <= 0) {
+      throw new Error(`Invalid venue ID: ${id}. ID must be a positive number.`);
+    }
+
     console.log(`Attempting to delete venue with ID: ${id}`);
 
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/venues/delete', {
-      method: "DELETE",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -231,18 +242,24 @@ export const deleteVenue = async (id: number): Promise<{ success: boolean }> => 
     });
 
     console.log(`Delete venue response status: ${response.status}`);
+    console.log(`Delete venue response headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`Venue service: Delete error response text:`, errorText);
+
       let errorMessage = `Error deleting venue: ${response.status}`;
 
       try {
         const errorData = JSON.parse(errorText);
+        console.error(`Venue service: Parsed delete error data:`, errorData);
         if (errorData.error) {
           errorMessage = errorData.error;
         }
       } catch (e) {
-        // If we can't parse the error as JSON, use the status code
+        console.error(`Venue service: Could not parse delete error response as JSON:`, e);
+        // If we can't parse the error as JSON, use the raw text
+        errorMessage = `Error deleting venue: ${response.status} - ${errorText}`;
       }
 
       throw new Error(errorMessage);
@@ -251,10 +268,18 @@ export const deleteVenue = async (id: number): Promise<{ success: boolean }> => 
     const data = await response.json();
     console.log("Venue deleted successfully:", data);
 
+    // Handle different response formats
     if (Array.isArray(data) && data.length > 0 && data[0].success) {
+      return { success: true };
+    } else if (data && data.success) {
+      return { success: true };
+    } else if (data && typeof data === 'object') {
+      // If we get any object response from a successful API call, consider it successful
+      console.log("Delete operation completed, assuming success based on 200 response");
       return { success: true };
     }
 
+    console.warn("Delete response format unexpected:", data);
     return { success: false };
   } catch (error) {
     console.error(`Error deleting venue with ID ${id}:`, error);
@@ -340,6 +365,41 @@ export const getAllVenuesWithCity = async (): Promise<any[]> => {
         }
       } catch (e) {
         // If we can't parse the error as JSON, use the status code
+      }
+
+      // If the specific endpoint fails, try to get venues and cities separately
+      console.log("Primary endpoint failed, trying to fetch venues and cities separately...");
+
+      try {
+        const [venuesResponse, citiesResponse] = await Promise.all([
+          fetch('/api/venues/get-all', {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }),
+          fetch('/api/cities/get-all', {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          })
+        ]);
+
+        if (venuesResponse.ok && citiesResponse.ok) {
+          const venues = await venuesResponse.json();
+          const cities = await citiesResponse.json();
+
+          // Merge venues with city data
+          const venuesWithCity = venues.map((venue: any) => {
+            const city = cities.find((c: any) => c.id === venue.city_id);
+            return {
+              ...venue,
+              city: city || { id: venue.city_id, city_name: 'Unknown City' }
+            };
+          });
+
+          console.log(`Retrieved ${venuesWithCity.length} venues with city details using fallback method`);
+          return venuesWithCity;
+        }
+      } catch (fallbackError) {
+        console.error("Fallback method also failed:", fallbackError);
       }
 
       throw new Error(errorMessage);
