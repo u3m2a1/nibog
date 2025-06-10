@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle, Loader2 } from "lucide-react"
+import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle, Loader2, RefreshCw, CheckCircle, XCircle } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format, parseISO } from "date-fns"
@@ -34,6 +34,7 @@ const statusOptions = [
   { id: "3", name: "Cancelled", value: "cancelled" },
   { id: "4", name: "Completed", value: "completed" },
   { id: "5", name: "No Show", value: "no show" },
+  { id: "6", name: "Refunded", value: "refunded" },
 ]
 
 // Booking statuses
@@ -43,6 +44,7 @@ const statuses = [
   { id: "3", name: "Cancelled" },
   { id: "4", name: "Completed" },
   { id: "5", name: "No Show" },
+  { id: "6", name: "Refunded" },
 ]
 
 const getStatusBadge = (status: string) => {
@@ -56,7 +58,9 @@ const getStatusBadge = (status: string) => {
     case "completed":
       return <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
     case "no show":
-      return <Badge variant="outline">No Show</Badge>
+      return <Badge className="bg-gray-500 hover:bg-gray-600">No Show</Badge>
+    case "refunded":
+      return <Badge className="bg-purple-500 hover:bg-purple-600">Refunded</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
   }
@@ -169,18 +173,127 @@ export default function BookingsPage() {
     }
   }
 
+  // Handle refresh bookings
+  const handleRefreshBookings = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const data = await getAllBookings()
+      setBookings(data)
+
+      // Extract unique cities and events from the bookings data
+      const uniqueCities = Array.from(new Set(data.map(booking => booking.city_name)))
+        .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
+
+      const uniqueEvents = Array.from(new Set(data.map(booking => booking.event_title)))
+        .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
+
+      setCities(uniqueCities)
+      setEvents(uniqueEvents)
+
+      toast({
+        title: "Success",
+        description: "Bookings refreshed successfully",
+      })
+    } catch (error: any) {
+      console.error("Failed to refresh bookings:", error)
+      setError(error.message || "Failed to refresh bookings. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to refresh bookings. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Handle mark as completed
+  const handleMarkCompleted = async (id: number) => {
+    try {
+      setIsProcessing(id)
+
+      // Call the API to update the booking status
+      await updateBookingStatus(id, "Completed")
+
+      // Update the local state
+      setBookings(bookings.map(booking =>
+        booking.booking_id === id ? { ...booking, booking_status: "Completed" } : booking
+      ))
+
+      toast({
+        title: "Success",
+        description: `Booking #${id} has been marked as completed.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to mark booking ${id} as completed:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to mark booking as completed. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(null)
+    }
+  }
+
+  // Handle mark as no show
+  const handleMarkNoShow = async (id: number) => {
+    try {
+      setIsProcessing(id)
+
+      // Call the API to update the booking status
+      await updateBookingStatus(id, "No Show")
+
+      // Update the local state
+      setBookings(bookings.map(booking =>
+        booking.booking_id === id ? { ...booking, booking_status: "No Show" } : booking
+      ))
+
+      toast({
+        title: "Success",
+        description: `Booking #${id} has been marked as no show.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to mark booking ${id} as no show:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to mark booking as no show. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(null)
+    }
+  }
+
   // Filter bookings based on search and filters
   const filteredBookings = bookings.filter((booking) => {
-    // Search query filter
-    if (
-      searchQuery &&
-      !String(booking.booking_id).includes(searchQuery) &&
-      !booking.parent_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !booking.parent_email.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !booking.parent_additional_phone.includes(searchQuery) &&
-      !booking.event_title.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return false
+    // Search query filter - search across multiple fields
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const searchableFields = [
+        String(booking.booking_id),
+        booking.parent_name?.toLowerCase() || '',
+        booking.parent_email?.toLowerCase() || '',
+        booking.parent_additional_phone || '',
+        booking.child_full_name?.toLowerCase() || '',
+        booking.event_title?.toLowerCase() || '',
+        booking.city_name?.toLowerCase() || '',
+        booking.venue_name?.toLowerCase() || '',
+        booking.booking_status?.toLowerCase() || '',
+        booking.payment_method?.toLowerCase() || '',
+        booking.payment_status?.toLowerCase() || '',
+        booking.game_name?.toLowerCase() || ''
+      ]
+
+      const matchesSearch = searchableFields.some(field =>
+        field.includes(query)
+      )
+
+      if (!matchesSearch) {
+        return false
+      }
     }
 
     // City filter
@@ -215,6 +328,16 @@ export default function BookingsPage() {
     return true
   })
 
+  // Calculate summary statistics
+  const totalBookings = bookings.length
+  const confirmedBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'confirmed').length
+  const pendingBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'pending').length
+  const cancelledBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'cancelled').length
+  const completedBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'completed').length
+  const totalRevenue = bookings
+    .filter(b => ['confirmed', 'completed'].includes(b.booking_status.toLowerCase()))
+    .reduce((sum, b) => sum + parseFloat(b.total_amount || '0'), 0)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -222,12 +345,52 @@ export default function BookingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
           <p className="text-muted-foreground">Manage NIBOG event bookings</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/bookings/new">
-            <Eye className="mr-2 h-4 w-4" />
-            Create New Booking
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefreshBookings} disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/admin/bookings/new">
+              <Eye className="mr-2 h-4 w-4" />
+              Create New Booking
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary Statistics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{totalBookings}</div>
+            <p className="text-xs text-muted-foreground">Total Bookings</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-green-600">{confirmedBookings}</div>
+            <p className="text-xs text-muted-foreground">Confirmed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-yellow-600">{pendingBookings}</div>
+            <p className="text-xs text-muted-foreground">Pending</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-blue-600">{completedBookings}</div>
+            <p className="text-xs text-muted-foreground">Completed</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">₹{totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total Revenue</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -236,7 +399,7 @@ export default function BookingsPage() {
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search bookings..."
+                placeholder="Search by ID, name, email, phone, event, city..."
                 className="h-9 w-full md:w-[300px]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -413,46 +576,68 @@ export default function BookingsPage() {
                         </Button>
                       )}
                       {booking.booking_status.toLowerCase() === "confirmed" && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <X className="h-4 w-4" />
-                              <span className="sr-only">Cancel</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                <div className="flex items-start gap-2">
-                                  <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
-                                  <div className="space-y-2">
-                                    <div className="font-medium">Are you sure you want to cancel this booking?</div>
-                                    <div>
-                                      This will cancel booking {booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
-                                      The user will be notified and may be eligible for a refund.
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMarkCompleted(booking.booking_id)}
+                            disabled={isProcessing === booking.booking_id}
+                            className="text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950/20"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="sr-only">Mark Completed</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleMarkNoShow(booking.booking_id)}
+                            disabled={isProcessing === booking.booking_id}
+                            className="text-gray-600 hover:bg-gray-50 hover:text-gray-700 dark:hover:bg-gray-950/20"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            <span className="sr-only">Mark No Show</span>
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <X className="h-4 w-4" />
+                                <span className="sr-only">Cancel</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  <div className="flex items-start gap-2">
+                                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                    <div className="space-y-2">
+                                      <div className="font-medium">Are you sure you want to cancel this booking?</div>
+                                      <div>
+                                        This will cancel booking {booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
+                                        The user will be notified and may be eligible for a refund.
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-red-500 hover:bg-red-600"
-                                onClick={() => handleCancelBooking(booking.booking_id)}
-                                disabled={isProcessing === booking.booking_id}
-                              >
-                                {isProcessing === booking.booking_id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Cancelling...
-                                  </>
-                                ) : "Yes, Cancel Booking"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-red-500 hover:bg-red-600"
+                                  onClick={() => handleCancelBooking(booking.booking_id)}
+                                  disabled={isProcessing === booking.booking_id}
+                                >
+                                  {isProcessing === booking.booking_id ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Cancelling...
+                                    </>
+                                  ) : "Yes, Cancel Booking"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
                       )}
                     </div>
                   </TableCell>

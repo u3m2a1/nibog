@@ -128,83 +128,169 @@ export async function getAllBookings(): Promise<Booking[]> {
  * @param status New status
  * @returns Promise with updated booking data
  */
-export async function updateBookingStatus(bookingId: number, status: string): Promise<Booking> {
+export async function updateBookingStatus(bookingId: number, status: string): Promise<any> {
   try {
     console.log(`Updating booking ${bookingId} status to ${status}`);
 
-    // For now, just simulate the API call
-    // In a real implementation, you would call the API to update the booking status
-    return {
-      booking_id: bookingId,
-      booking_status: status,
-      // Add other required fields with placeholder values
-      booking_ref: "",
-      total_amount: "",
-      payment_method: "",
-      payment_status: "",
-      terms_accepted: false,
-      booking_is_active: true,
-      booking_created_at: new Date().toISOString(),
-      booking_updated_at: new Date().toISOString(),
-      cancelled_at: null,
-      completed_at: null,
-      parent_id: 0,
-      parent_name: "",
-      parent_email: "",
-      parent_additional_phone: "",
-      parent_is_active: true,
-      parent_created_at: "",
-      parent_updated_at: "",
-      child_id: 0,
-      child_full_name: "",
-      child_date_of_birth: "",
-      child_school_name: "",
-      child_gender: "",
-      child_is_active: true,
-      child_created_at: "",
-      child_updated_at: "",
-      game_name: "",
-      game_description: "",
-      game_min_age: 0,
-      game_max_age: 0,
-      game_duration_minutes: 0,
-      game_categories: [],
-      game_is_active: true,
-      game_created_at: "",
-      game_updated_at: "",
-      event_title: "",
-      event_description: "",
-      event_event_date: "",
-      event_status: "",
-      event_created_at: "",
-      event_updated_at: "",
-      user_full_name: "",
-      user_email: "",
-      user_phone: "",
-      user_city_id: 0,
-      user_accepted_terms: false,
-      user_terms_accepted_at: null,
-      user_is_active: true,
-      user_is_locked: false,
-      user_locked_until: null,
-      user_deactivated_at: null,
-      user_created_at: "",
-      user_updated_at: "",
-      user_last_login_at: null,
-      city_name: "",
-      city_state: "",
-      city_is_active: true,
-      city_created_at: "",
-      city_updated_at: "",
-      venue_name: "",
-      venue_address: "",
-      venue_capacity: 0,
-      venue_is_active: true,
-      venue_created_at: "",
-      venue_updated_at: ""
-    };
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/bookings/update-status', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookingId,
+        status,
+        transactionId: `TXN_${Date.now()}` // Generate a transaction ID
+      }),
+    });
+
+    console.log(`Update booking status response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Booking status updated successfully:", data);
+
+    return data;
   } catch (error: any) {
     console.error(`Error updating booking ${bookingId} status:`, error);
     throw error;
   }
 }
+
+/**
+ * Get booking by ID
+ * @param bookingId Booking ID
+ * @returns Promise with booking data
+ */
+export async function getBookingById(bookingId: string | number): Promise<Booking> {
+  try {
+    console.log(`Fetching booking with ID: ${bookingId}`);
+
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch(`/api/bookings/get/${bookingId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log(`Get booking by ID response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+
+      // If it's a 404, the booking doesn't exist
+      if (response.status === 404) {
+        throw new Error(`Booking with ID ${bookingId} not found`);
+      }
+
+      // For other errors, try to get all bookings and find the one we need
+      console.log("Trying fallback method to get booking...");
+      const allBookings = await getAllBookings();
+      const booking = allBookings.find(b => String(b.booking_id) === String(bookingId));
+
+      if (booking) {
+        console.log("Found booking using fallback method:", booking);
+        return booking;
+      }
+
+      throw new Error(`Booking with ID ${bookingId} not found`);
+    }
+
+    const data = await response.json();
+    console.log("Booking retrieved successfully:", data);
+
+    return data;
+  } catch (error: any) {
+    console.error(`Error fetching booking ${bookingId}:`, error);
+
+    // If the main API fails, try the fallback method
+    if (!error.message.includes('not found')) {
+      try {
+        console.log("Main API failed, trying fallback method...");
+        const allBookings = await getAllBookings();
+        const booking = allBookings.find(b => String(b.booking_id) === String(bookingId));
+
+        if (booking) {
+          console.log("Found booking using fallback method:", booking);
+          return booking;
+        }
+      } catch (fallbackError) {
+        console.error("Fallback method also failed:", fallbackError);
+      }
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Create a new booking
+ * @param bookingData The booking data to create
+ * @returns Promise with the created booking data
+ */
+export async function createBooking(bookingData: {
+  parent: {
+    user_id: number;
+    parent_name: string;
+    email: string;
+    additional_phone: string;
+  };
+  children: {
+    full_name: string;
+    date_of_birth: string;
+    school_name: string;
+    gender: string;
+  };
+  booking: {
+    user_id: number;
+    event_id: number;
+    total_amount: number;
+    payment_method: string;
+    payment_status: string;
+    terms_accepted: boolean;
+  };
+  booking_games: {
+    game_id: number;
+    child_index: number;
+    game_price: number;
+  };
+}): Promise<any> {
+  try {
+    console.log("Creating booking with data:", bookingData);
+
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/bookings/create', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(bookingData),
+    });
+
+    console.log(`Create booking response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Booking created successfully:", data);
+
+    return data;
+  } catch (error: any) {
+    console.error("Error creating booking:", error);
+    throw error;
+  }
+}
+
+

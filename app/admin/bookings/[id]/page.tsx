@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, X, Check, AlertTriangle, User, Mail, Phone, Calendar, Clock, MapPin, Users, CreditCard } from "lucide-react"
+import { ArrowLeft, Edit, X, Check, AlertTriangle, User, Mail, Phone, Calendar, Clock, MapPin, Users, CreditCard, Loader2, RefreshCw } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { getBookingById, updateBookingStatus, getAllBookings, type Booking } from "@/services/bookingService"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,164 +22,22 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-// Mock data - in a real app, this would come from an API
-const bookings = [
-  {
-    id: "B001",
-    user: "Harikrishna",
-    email: "harikrishna@example.com",
-    phone: "+91 9876543210",
-    event: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "confirmed",
-    childDetails: [
-      {
-        name: "Arjun",
-        age: "14 months",
-        gender: "Male"
-      }
-    ],
-    paymentDetails: {
-      method: "Credit Card",
-      transactionId: "TXN123456789",
-      paidOn: "2025-10-20"
-    },
-    bookingDate: "2025-10-20"
-  },
-  {
-    id: "B002",
-    user: "Durga Prasad",
-    email: "durgaprasad@example.com",
-    phone: "+91 9876543211",
-    event: "Baby Walker",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "pending_payment",
-    childDetails: [
-      {
-        name: "Aarav",
-        age: "16 months",
-        gender: "Male"
-      }
-    ],
-    paymentDetails: null,
-    bookingDate: "2025-10-21"
-  },
-  {
-    id: "B003",
-    user: "Srujana",
-    email: "srujana@example.com",
-    phone: "+91 9876543212",
-    event: "Running Race",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    time: "9:00 AM",
-    children: 2,
-    amount: 3600,
-    status: "confirmed",
-    childDetails: [
-      {
-        name: "Ananya",
-        age: "3 years",
-        gender: "Female"
-      },
-      {
-        name: "Advika",
-        age: "5 years",
-        gender: "Female"
-      }
-    ],
-    paymentDetails: {
-      method: "UPI",
-      transactionId: "UPI987654321",
-      paidOn: "2025-10-19"
-    },
-    bookingDate: "2025-10-19"
-  },
-  {
-    id: "B004",
-    user: "Ramesh Kumar",
-    email: "ramesh@example.com",
-    phone: "+91 9876543213",
-    event: "Hurdle Toddle",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    date: "2025-03-16",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "cancelled_by_user",
-    childDetails: [
-      {
-        name: "Vihaan",
-        age: "2 years",
-        gender: "Male"
-      }
-    ],
-    paymentDetails: {
-      method: "Credit Card",
-      transactionId: "TXN987654321",
-      paidOn: "2025-03-10",
-      refundStatus: "Refunded",
-      refundDate: "2025-03-12"
-    },
-    bookingDate: "2025-03-10",
-    cancellationDate: "2025-03-12",
-    cancellationReason: "Unable to attend due to personal reasons"
-  },
-  {
-    id: "B005",
-    user: "Suresh Reddy",
-    email: "suresh@example.com",
-    phone: "+91 9876543214",
-    event: "Cycle Race",
-    venue: "Sports Complex",
-    city: "Vizag",
-    date: "2025-08-15",
-    time: "9:00 AM",
-    children: 1,
-    amount: 1800,
-    status: "confirmed",
-    childDetails: [
-      {
-        name: "Reyansh",
-        age: "6 years",
-        gender: "Male"
-      }
-    ],
-    paymentDetails: {
-      method: "Net Banking",
-      transactionId: "NB123456789",
-      paidOn: "2025-08-01"
-    },
-    bookingDate: "2025-08-01"
-  }
-]
+
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case "confirmed":
       return <Badge className="bg-green-500 hover:bg-green-600">Confirmed</Badge>
-    case "pending_payment":
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending Payment</Badge>
-    case "cancelled_by_user":
-      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled by User</Badge>
-    case "cancelled_by_admin":
-      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled by Admin</Badge>
-    case "attended":
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Attended</Badge>
-    case "no_show":
-      return <Badge variant="outline">No Show</Badge>
+    case "pending":
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Pending</Badge>
+    case "cancelled":
+      return <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
+    case "completed":
+      return <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
+    case "no show":
+      return <Badge className="bg-gray-500 hover:bg-gray-600">No Show</Badge>
+    case "refunded":
+      return <Badge className="bg-purple-500 hover:bg-purple-600">Refunded</Badge>
     default:
       return <Badge variant="outline">{status}</Badge>
   }
@@ -189,49 +49,161 @@ type Props = {
 
 export default function BookingDetailPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const bookingId = unwrappedParams.id
-  
-  const booking = bookings.find((b) => b.id === bookingId)
+  const { toast } = useToast()
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+
+  // Extract booking ID from params
+  const bookingId = params.id
+
+  // Retry function
+  const retryFetch = () => {
+    setRetryCount(prev => prev + 1)
+    setError(null)
+  }
+
+  // Fetch booking data
+  useEffect(() => {
+    const fetchBooking = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        // Add a timeout to the fetch operation
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout')), 15000) // 15 second timeout
+        })
+
+        const fetchPromise = getBookingById(bookingId)
+
+        const data = await Promise.race([fetchPromise, timeoutPromise]) as Booking
+        setBooking(data)
+      } catch (error: any) {
+        console.error("Failed to fetch booking:", error)
+        let errorMessage = "Failed to load booking details"
+
+        if (error.message === 'Request timeout') {
+          errorMessage = "The request is taking too long. Please try again or check your connection."
+        } else if (error.message.includes('timeout')) {
+          errorMessage = "The booking service is currently slow. Please try again in a moment."
+        } else if (error.message.includes('503') || error.message.includes('504')) {
+          errorMessage = "The booking service is temporarily unavailable. Please try again later."
+        }
+
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (bookingId) {
+      fetchBooking()
+    }
+  }, [bookingId, toast, retryCount])
   
   // Handle confirm booking
-  const handleConfirmBooking = () => {
-    setIsProcessing("confirm")
-    
-    // Simulate API call to confirm the booking
-    setTimeout(() => {
-      console.log(`Confirming booking ${bookingId}`)
+  const handleConfirmBooking = async () => {
+    try {
+      setIsProcessing("confirm")
+
+      await updateBookingStatus(Number(bookingId), "Confirmed")
+
+      // Update local state
+      if (booking) {
+        setBooking({ ...booking, booking_status: "Confirmed" })
+      }
+
+      toast({
+        title: "Success",
+        description: `Booking #${bookingId} has been confirmed.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to confirm booking ${bookingId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to confirm booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-      // In a real app, you would update the booking status and refresh the page
-      router.refresh()
-    }, 1000)
+    }
   }
-  
+
   // Handle cancel booking
-  const handleCancelBooking = () => {
-    setIsProcessing("cancel")
-    
-    // Simulate API call to cancel the booking
-    setTimeout(() => {
-      console.log(`Cancelling booking ${bookingId}`)
+  const handleCancelBooking = async () => {
+    try {
+      setIsProcessing("cancel")
+
+      await updateBookingStatus(Number(bookingId), "Cancelled")
+
+      // Update local state
+      if (booking) {
+        setBooking({ ...booking, booking_status: "Cancelled" })
+      }
+
+      toast({
+        title: "Success",
+        description: `Booking #${bookingId} has been cancelled.`,
+      })
+    } catch (error: any) {
+      console.error(`Failed to cancel booking ${bookingId}:`, error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel booking. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-      // In a real app, you would update the booking status and refresh the page
-      router.refresh()
-    }, 1000)
+    }
   }
   
-  if (!booking) {
+  if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Booking not found</h2>
-          <p className="text-muted-foreground">The booking you are looking for does not exist.</p>
-          <Button className="mt-4" onClick={() => router.push("/admin/bookings")}>
-            Back to Bookings
-          </Button>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <h2 className="text-xl font-semibold">Loading booking details...</h2>
+          <p className="text-muted-foreground">
+            {retryCount > 0 ? `Retrying... (Attempt ${retryCount + 1})` : "Please wait while we fetch the booking information."}
+          </p>
+          <div className="text-xs text-muted-foreground">
+            Booking ID: {bookingId}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || (!booking && !isLoading)) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
+          <h2 className="text-xl font-semibold">
+            {error ? "Error loading booking" : "Booking not found"}
+          </h2>
+          <p className="text-muted-foreground max-w-md">
+            {error || "The booking you are looking for does not exist."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            {error && (
+              <Button variant="outline" onClick={retryFetch}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            )}
+            <Button onClick={() => router.push("/admin/bookings")}>
+              Back to Bookings
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -248,30 +220,30 @@ export default function BookingDetailPage({ params }: Props) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Booking {booking.id}</h1>
-            <p className="text-muted-foreground">{booking.event} - {booking.date}</p>
+            <h1 className="text-3xl font-bold tracking-tight">Booking #{booking.booking_id}</h1>
+            <p className="text-muted-foreground">{booking.event_title} - {new Date(booking.event_event_date).toLocaleDateString()}</p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/admin/bookings/${booking.id}/edit`}>
+            <Link href={`/admin/bookings/${booking.booking_id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Booking
             </Link>
           </Button>
-          
-          {booking.status === "pending_payment" && (
-            <Button 
+
+          {booking.booking_status.toLowerCase() === "pending" && (
+            <Button
               variant="default"
               onClick={handleConfirmBooking}
               disabled={isProcessing === "confirm"}
             >
               <Check className="mr-2 h-4 w-4" />
-              {isProcessing === "confirm" ? "Confirming..." : "Confirm Payment"}
+              {isProcessing === "confirm" ? "Confirming..." : "Confirm Booking"}
             </Button>
           )}
-          
-          {booking.status === "confirmed" && (
+
+          {booking.booking_status.toLowerCase() === "confirmed" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20">
@@ -288,7 +260,7 @@ export default function BookingDetailPage({ params }: Props) {
                       <div className="space-y-2">
                         <div className="font-medium">Are you sure you want to cancel this booking?</div>
                         <div>
-                          This will cancel booking {booking.id} for {booking.user} for the {booking.event} event.
+                          This will cancel booking #{booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
                           The user will be notified and may be eligible for a refund.
                         </div>
                       </div>
@@ -297,7 +269,7 @@ export default function BookingDetailPage({ params }: Props) {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
-                  <AlertDialogAction 
+                  <AlertDialogAction
                     className="bg-red-500 hover:bg-red-600"
                     onClick={handleCancelBooking}
                     disabled={isProcessing === "cancel"}
@@ -316,7 +288,7 @@ export default function BookingDetailPage({ params }: Props) {
           <CardHeader>
             <CardTitle>Booking Details</CardTitle>
             <div className="mt-2">
-              {getStatusBadge(booking.status)}
+              {getStatusBadge(booking.booking_status)}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -327,19 +299,22 @@ export default function BookingDetailPage({ params }: Props) {
                   <div className="flex items-start gap-2">
                     <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p>{booking.event}</p>
-                      <p className="text-sm text-muted-foreground">{booking.date}</p>
+                      <p>{booking.event_title}</p>
+                      <p className="text-sm text-muted-foreground">{new Date(booking.event_event_date).toLocaleDateString()}</p>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Clock className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{booking.time}</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p>{booking.venue}</p>
-                      <p className="text-sm text-muted-foreground">{booking.city}</p>
+                      <p>{booking.venue_name}</p>
+                      <p className="text-sm text-muted-foreground">{booking.city_name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Users className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p>Game: {booking.game_name}</p>
+                      <p className="text-sm text-muted-foreground">{booking.game_description}</p>
                     </div>
                   </div>
                 </div>
@@ -349,15 +324,15 @@ export default function BookingDetailPage({ params }: Props) {
                 <div className="space-y-2">
                   <div className="flex items-start gap-2">
                     <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <p>{booking.user}</p>
+                    <p>{booking.parent_name}</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Mail className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{booking.email}</p>
+                    <p className="text-sm text-muted-foreground">{booking.parent_email}</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{booking.phone}</p>
+                    <p className="text-sm text-muted-foreground">{booking.parent_additional_phone}</p>
                   </div>
                 </div>
               </div>
@@ -368,17 +343,20 @@ export default function BookingDetailPage({ params }: Props) {
             <div>
               <h3 className="mb-2 font-medium">Child Information</h3>
               <div className="space-y-2">
-                {booking.childDetails.map((child, index) => (
-                  <div key={index} className="rounded-lg border p-3">
-                    <div className="flex items-start gap-2">
-                      <Users className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p>{child.name}</p>
-                        <p className="text-sm text-muted-foreground">{child.age}, {child.gender}</p>
-                      </div>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-start gap-2">
+                    <Users className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p>{booking.child_full_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Born: {new Date(booking.child_date_of_birth).toLocaleDateString()}, {booking.child_gender}
+                      </p>
+                      {booking.child_school_name && (
+                        <p className="text-sm text-muted-foreground">School: {booking.child_school_name}</p>
+                      )}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
             </div>
             
@@ -387,25 +365,18 @@ export default function BookingDetailPage({ params }: Props) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <h3 className="mb-2 font-medium">Payment Information</h3>
-                {booking.paymentDetails ? (
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <CreditCard className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p>{booking.paymentDetails.method}</p>
-                        <p className="text-sm text-muted-foreground">Transaction ID: {booking.paymentDetails.transactionId}</p>
-                        <p className="text-sm text-muted-foreground">Paid on: {booking.paymentDetails.paidOn}</p>
-                        {booking.paymentDetails.refundStatus && (
-                          <p className="mt-1 text-sm text-red-500">
-                            {booking.paymentDetails.refundStatus} on {booking.paymentDetails.refundDate}
-                          </p>
-                        )}
-                      </div>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <CreditCard className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p>{booking.payment_method || 'Not specified'}</p>
+                      <p className="text-sm text-muted-foreground">Status: {booking.payment_status}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Terms Accepted: {booking.terms_accepted ? 'Yes' : 'No'}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Payment pending</p>
-                )}
+                </div>
               </div>
               <div>
                 <h3 className="mb-2 font-medium">Booking Information</h3>
@@ -413,18 +384,24 @@ export default function BookingDetailPage({ params }: Props) {
                   <div className="flex items-start gap-2">
                     <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Booked on: {booking.bookingDate}</p>
-                      {booking.cancellationDate && (
-                        <p className="text-sm text-red-500">Cancelled on: {booking.cancellationDate}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Booked on: {new Date(booking.booking_created_at).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Last updated: {new Date(booking.booking_updated_at).toLocaleDateString()}
+                      </p>
+                      {booking.cancelled_at && (
+                        <p className="text-sm text-red-500">
+                          Cancelled on: {new Date(booking.cancelled_at).toLocaleDateString()}
+                        </p>
+                      )}
+                      {booking.completed_at && (
+                        <p className="text-sm text-green-500">
+                          Completed on: {new Date(booking.completed_at).toLocaleDateString()}
+                        </p>
                       )}
                     </div>
                   </div>
-                  {booking.cancellationReason && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium">Cancellation Reason:</p>
-                      <p className="text-sm text-muted-foreground">{booking.cancellationReason}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -438,26 +415,32 @@ export default function BookingDetailPage({ params }: Props) {
           <CardContent className="space-y-4">
             <div className="rounded-lg border p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Number of Children</span>
-                <span className="font-medium">{booking.children}</span>
+                <span className="text-sm text-muted-foreground">Booking Reference</span>
+                <span className="font-medium">{booking.booking_ref || `#${booking.booking_id}`}</span>
               </div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Price per Child</span>
-                <span className="font-medium">₹{booking.amount / booking.children}</span>
+                <span className="text-sm text-muted-foreground">Game Duration</span>
+                <span className="font-medium">{booking.game_duration_minutes} minutes</span>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Age Range</span>
+                <span className="font-medium">{booking.game_min_age} - {booking.game_max_age} months</span>
               </div>
             </div>
             <div className="rounded-lg border p-4 bg-muted/50">
               <div className="flex items-center justify-between">
                 <span className="font-medium">Total Amount</span>
-                <span className="text-xl font-bold">₹{booking.amount}</span>
+                <span className="text-xl font-bold">₹{booking.total_amount}</span>
               </div>
             </div>
-            
+
             <div className="mt-4">
               <Button className="w-full" asChild>
-                <Link href={`/admin/bookings/${booking.id}/receipt`}>
+                <Link href={`/admin/bookings/${booking.booking_id}/receipt`}>
                   View Receipt
                 </Link>
               </Button>
