@@ -482,5 +482,37 @@ CREATE TABLE testimonials (
 );
 
 
+-- Add-ons table
+CREATE TABLE addons (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL,
+    category VARCHAR(20) CHECK (category IN ('meal', 'merchandise', 'service', 'other')) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    has_variants BOOLEAN DEFAULT false,
+    stock_quantity INTEGER DEFAULT 0,
+    sku TEXT UNIQUE NOT NULL,
+    bundle_min_quantity INTEGER,
+    bundle_discount_percentage NUMERIC(5, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add-on variants table
+CREATE TABLE addon_variants (
+    id SERIAL PRIMARY KEY,
+    addon_id INTEGER REFERENCES addons(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    price_modifier NUMERIC(10, 2) DEFAULT 0, -- e.g., +₹20 or -₹10
+    sku TEXT UNIQUE,
+    stock_quantity INTEGER DEFAULT 0
+);
 
 
+-- Add-on images table
+CREATE TABLE addon_images (
+    id SERIAL PRIMARY KEY,
+    addon_id INTEGER REFERENCES addons(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL
+);
