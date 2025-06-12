@@ -51,14 +51,13 @@ export async function POST(request: Request) {
     const bookingId = bookingIdMatch[1];
     console.log(`Server API route: Extracted booking ID: ${bookingId}`);
 
-    // Update the booking status based on the payment state
+    // Update the booking status and create payment record based on the payment state
     if (paymentState === 'COMPLETED') {
       // Payment was successful, update the booking status to confirmed
-      // This would typically involve a call to your booking API
       console.log(`Server API route: Payment successful for booking ID: ${bookingId}`);
 
-      // Example: Update booking status to confirmed
       try {
+        // 1. Update booking status
         const updateResponse = await fetch(`${BOOKING_API.UPDATE}`, {
           method: "POST",
           headers: {
@@ -76,15 +75,39 @@ export async function POST(request: Request) {
         } else {
           console.log(`Server API route: Successfully updated booking status for booking ID: ${bookingId}`);
         }
+
+        // 2. Create payment record
+        const paymentResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            booking_id: parseInt(bookingId),
+            transaction_id: transactionId,
+            phonepe_transaction_id: merchantTransactionId,
+            amount: amount / 100, // Convert from paise to rupees
+            payment_method: "PhonePe",
+            payment_status: "successful",
+            payment_date: new Date().toISOString(),
+            gateway_response: callbackData,
+          }),
+        });
+
+        if (!paymentResponse.ok) {
+          console.error(`Server API route: Failed to create payment record. API returned status: ${paymentResponse.status}`);
+        } else {
+          console.log(`Server API route: Successfully created payment record for booking ID: ${bookingId}`);
+        }
       } catch (updateError) {
-        console.error("Server API route: Error updating booking status:", updateError);
+        console.error("Server API route: Error updating booking status or creating payment record:", updateError);
       }
     } else {
       // Payment failed or is pending, update the booking status accordingly
       console.log(`Server API route: Payment not successful for booking ID: ${bookingId}. Status: ${paymentState}`);
 
-      // Example: Update booking status to payment_failed
       try {
+        // 1. Update booking status
         const updateResponse = await fetch(`${BOOKING_API.UPDATE}`, {
           method: "POST",
           headers: {
@@ -92,7 +115,7 @@ export async function POST(request: Request) {
           },
           body: JSON.stringify({
             booking_id: bookingId,
-            payment_status: "Failed",
+            payment_status: paymentState === 'PENDING' ? "Pending" : "Failed",
             transaction_id: transactionId,
           }),
         });
@@ -102,8 +125,32 @@ export async function POST(request: Request) {
         } else {
           console.log(`Server API route: Successfully updated booking status for booking ID: ${bookingId}`);
         }
+
+        // 2. Create payment record for failed/pending payments too
+        const paymentResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            booking_id: parseInt(bookingId),
+            transaction_id: transactionId,
+            phonepe_transaction_id: merchantTransactionId,
+            amount: amount / 100, // Convert from paise to rupees
+            payment_method: "PhonePe",
+            payment_status: paymentState === 'PENDING' ? "pending" : "failed",
+            payment_date: new Date().toISOString(),
+            gateway_response: callbackData,
+          }),
+        });
+
+        if (!paymentResponse.ok) {
+          console.error(`Server API route: Failed to create payment record. API returned status: ${paymentResponse.status}`);
+        } else {
+          console.log(`Server API route: Successfully created payment record for booking ID: ${bookingId}`);
+        }
       } catch (updateError) {
-        console.error("Server API route: Error updating booking status:", updateError);
+        console.error("Server API route: Error updating booking status or creating payment record:", updateError);
       }
     }
 

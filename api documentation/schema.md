@@ -516,3 +516,23 @@ CREATE TABLE addon_images (
     addon_id INTEGER REFERENCES addons(id) ON DELETE CASCADE,
     image_url TEXT NOT NULL
 );
+
+--- Payments table
+
+CREATE TABLE payments (
+  payment_id SERIAL PRIMARY KEY,
+  booking_id INTEGER NOT NULL REFERENCES bookings(booking_id),
+  transaction_id VARCHAR(100) UNIQUE NOT NULL,
+  phonepe_transaction_id VARCHAR(100) UNIQUE,
+  amount DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(50) DEFAULT 'PhonePe',
+  payment_status VARCHAR(20) NOT NULL CHECK (payment_status IN ('successful', 'pending', 'failed', 'refunded')),
+  payment_date TIMESTAMP,
+  gateway_response JSONB,
+  refund_amount DECIMAL(10,2) DEFAULT 0,
+  refund_date TIMESTAMP,
+  refund_reason TEXT,
+  admin_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

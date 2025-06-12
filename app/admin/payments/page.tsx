@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -8,88 +8,22 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Download } from "lucide-react"
+import { Search, Filter, Eye, Download, RefreshCw, AlertCircle } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+import {
+  getAllPayments,
+  getPaymentAnalytics,
+  exportPayments,
+  Payment,
+  PaymentAnalytics
+} from "@/services/paymentService"
+import { ExportPaymentsModal, ExportFilters } from "@/components/admin/ExportPaymentsModal"
 
-// Mock data - in a real app, this would come from an API
-const payments = [
-  {
-    id: "P001",
-    bookingId: "B001",
-    user: "Harikrishna",
-    event: "Baby Crawling",
-    date: "2025-10-20",
-    amount: 1800,
-    paymentMethod: "Credit Card",
-    transactionId: "TXN123456789",
-    status: "successful",
-  },
-  {
-    id: "P002",
-    bookingId: "B003",
-    user: "Srujana",
-    event: "Running Race",
-    date: "2025-10-21",
-    amount: 3600,
-    paymentMethod: "UPI",
-    transactionId: "TXN987654321",
-    status: "successful",
-  },
-  {
-    id: "P003",
-    bookingId: "B002",
-    user: "Durga Prasad",
-    event: "Baby Walker",
-    date: "2025-10-22",
-    amount: 1800,
-    paymentMethod: "Net Banking",
-    transactionId: "TXN456789123",
-    status: "pending",
-  },
-  {
-    id: "P004",
-    bookingId: "B005",
-    user: "Suresh Reddy",
-    event: "Cycle Race",
-    date: "2025-08-10",
-    amount: 1800,
-    paymentMethod: "Debit Card",
-    transactionId: "TXN789123456",
-    status: "successful",
-  },
-  {
-    id: "P005",
-    bookingId: "B004",
-    user: "Ramesh Kumar",
-    event: "Hurdle Toddle",
-    date: "2025-03-10",
-    amount: 1800,
-    paymentMethod: "Credit Card",
-    transactionId: "TXN321654987",
-    status: "refunded",
-  },
-]
-
-// Payment methods
-const paymentMethods = [
-  { id: "1", name: "Credit Card" },
-  { id: "2", name: "Debit Card" },
-  { id: "3", name: "UPI" },
-  { id: "4", name: "Net Banking" },
-  { id: "5", name: "Wallet" },
-]
-
-// Payment statuses
-const statuses = [
-  { id: "1", name: "successful" },
-  { id: "2", name: "pending" },
-  { id: "3", name: "failed" },
-  { id: "4", name: "refunded" },
-]
-
+// Payment status mapping
 const getStatusBadge = (status: string) => {
   switch (status) {
     case "successful":
@@ -105,18 +39,96 @@ const getStatusBadge = (status: string) => {
   }
 }
 
+// Payment methods and statuses
+const paymentMethods = [
+  { id: "1", name: "PhonePe" },
+  { id: "2", name: "Credit Card" },
+  { id: "3", name: "Debit Card" },
+  { id: "4", name: "UPI" },
+  { id: "5", name: "Net Banking" },
+  { id: "6", name: "Wallet" },
+]
+
+const statuses = [
+  { id: "1", name: "successful" },
+  { id: "2", name: "pending" },
+  { id: "3", name: "failed" },
+  { id: "4", name: "refunded" },
+]
+
 export default function PaymentsPage() {
+  // State management
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMethod, setSelectedMethod] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedDate, setSelectedDate] = useState<Date>()
-  const [paymentsList, setPaymentsList] = useState(payments)
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [analytics, setAnalytics] = useState<PaymentAnalytics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
-  // Handle export payments
-  const handleExportPayments = () => {
-    console.log("Exporting payments...")
-    // In a real app, this would trigger a download of a CSV or Excel file
-    alert("Payments exported successfully!")
+  // Fetch payments data
+  const fetchPayments = async () => {
+    try {
+      setLoading(true)
+      const filters = {
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        start_date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined,
+        end_date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined,
+        search: searchQuery || undefined,
+      }
+
+      // Fetch payments first
+      const paymentsData = await getAllPayments(filters)
+      setPayments(paymentsData)
+
+      // Try to fetch analytics, but don't fail if it doesn't work
+      try {
+        const analyticsData = await getPaymentAnalytics(filters)
+        setAnalytics(analyticsData)
+      } catch (analyticsError) {
+        console.error("Error fetching analytics:", analyticsError)
+        // Set analytics to null so we fall back to calculated values
+        setAnalytics(null)
+      }
+
+    } catch (error) {
+      console.error("Error fetching payments:", error)
+      toast.error("Failed to fetch payments data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Refresh data
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await fetchPayments()
+    setRefreshing(false)
+    toast.success("Payments data refreshed")
+  }
+
+  // Handle export payments with modal
+  const handleExportPayments = async (exportFilters: ExportFilters) => {
+    try {
+      setIsExporting(true)
+
+      const result = await exportPayments(exportFilters)
+      toast.success(result)
+      setExportModalOpen(false)
+    } catch (error) {
+      console.error("Error exporting payments:", error)
+      toast.error("Failed to export payments")
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Open export modal
+  const openExportModal = () => {
+    setExportModalOpen(true)
   }
 
   // Handle clear date filter
@@ -124,45 +136,44 @@ export default function PaymentsPage() {
     setSelectedDate(undefined)
   }
 
-  // Filter payments based on search and filters
-  const filteredPayments = paymentsList.filter((payment) => {
+  // Load data on component mount and when filters change
+  useEffect(() => {
+    fetchPayments()
+  }, [selectedStatus, selectedDate, searchQuery])
+
+  // Filter payments based on search and filters (client-side filtering for better UX)
+  const filteredPayments = payments.filter((payment) => {
     // Search query filter
     if (
       searchQuery &&
-      !payment.id.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.user.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.event.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
+      !payment.payment_id.toString().toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !payment.booking_id.toString().toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !payment.user_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !payment.event_title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !payment.transaction_id.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
       return false
     }
 
     // Payment method filter
-    if (selectedMethod !== "all" && payment.paymentMethod !== selectedMethod) {
-      return false
-    }
-
-    // Status filter
-    if (selectedStatus !== "all" && payment.status !== selectedStatus) {
-      return false
-    }
-
-    // Date filter
-    if (selectedDate && payment.date !== format(selectedDate, "yyyy-MM-dd")) {
+    if (selectedMethod !== "all" && payment.payment_method !== selectedMethod) {
       return false
     }
 
     return true
   })
 
-  // Calculate total amount
-  const totalAmount = filteredPayments.reduce((sum, payment) => {
-    if (payment.status === "successful") {
+  // Use analytics data for summary or calculate from filtered payments
+  const totalAmount = analytics?.summary?.total_revenue || analytics?.total_revenue || filteredPayments.reduce((sum, payment) => {
+    if (payment.payment_status === "successful") {
       return sum + payment.amount
     }
     return sum
   }, 0)
+
+  const successfulCount = analytics?.summary?.successful_payments || analytics?.successful_payments || filteredPayments.filter(p => p.payment_status === "successful").length
+  const pendingCount = analytics?.summary?.pending_payments || analytics?.pending_payments || filteredPayments.filter(p => p.payment_status === "pending").length
+  const refundedCount = analytics?.summary?.refunded_payments || analytics?.refunded_payments || filteredPayments.filter(p => p.payment_status === "refunded").length
 
   return (
     <div className="space-y-6">
@@ -171,40 +182,60 @@ export default function PaymentsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
           <p className="text-muted-foreground">Manage NIBOG event payments</p>
         </div>
-        <Button onClick={handleExportPayments}>
-          <Download className="mr-2 h-4 w-4" />
-          Export Payments
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button onClick={openExportModal}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Payments
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="text-2xl font-bold">₹{totalAmount}</div>
+            {loading ? (
+              <div className="text-2xl font-bold">Loading...</div>
+            ) : (
+              <div className="text-2xl font-bold">₹{(totalAmount || 0).toLocaleString()}</div>
+            )}
             <p className="text-sm text-muted-foreground">Total Revenue</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="text-2xl font-bold">
-              {filteredPayments.filter((p) => p.status === "successful").length}
-            </div>
+            {loading ? (
+              <div className="text-2xl font-bold">-</div>
+            ) : (
+              <div className="text-2xl font-bold">{successfulCount || 0}</div>
+            )}
             <p className="text-sm text-muted-foreground">Successful Payments</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="text-2xl font-bold">
-              {filteredPayments.filter((p) => p.status === "pending").length}
-            </div>
+            {loading ? (
+              <div className="text-2xl font-bold">-</div>
+            ) : (
+              <div className="text-2xl font-bold">{pendingCount || 0}</div>
+            )}
             <p className="text-sm text-muted-foreground">Pending Payments</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="text-2xl font-bold">
-              {filteredPayments.filter((p) => p.status === "refunded").length}
-            </div>
+            {loading ? (
+              <div className="text-2xl font-bold">-</div>
+            ) : (
+              <div className="text-2xl font-bold">{refundedCount || 0}</div>
+            )}
             <p className="text-sm text-muted-foreground">Refunded Payments</p>
           </CardContent>
         </Card>
@@ -306,27 +337,40 @@ export default function PaymentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredPayments.length === 0 ? (
+            {loading ? (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center">
-                  No payments found.
+                  <div className="flex items-center justify-center">
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Loading payments...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredPayments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="h-24 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p>No payments found.</p>
+                    <p className="text-sm text-muted-foreground">Try adjusting your filters or refresh the data.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               filteredPayments.map((payment) => (
-                <TableRow key={payment.id}>
-                  <TableCell className="font-medium">{payment.id}</TableCell>
-                  <TableCell>{payment.bookingId}</TableCell>
-                  <TableCell>{payment.user}</TableCell>
-                  <TableCell>{payment.event}</TableCell>
-                  <TableCell>{payment.date}</TableCell>
-                  <TableCell>₹{payment.amount}</TableCell>
-                  <TableCell>{payment.paymentMethod}</TableCell>
-                  <TableCell className="font-mono text-xs">{payment.transactionId}</TableCell>
-                  <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                <TableRow key={payment.payment_id}>
+                  <TableCell className="font-medium">{payment.payment_id}</TableCell>
+                  <TableCell>{payment.booking_id}</TableCell>
+                  <TableCell>{payment.user_name}</TableCell>
+                  <TableCell>{payment.event_title}</TableCell>
+                  <TableCell>{format(new Date(payment.payment_date), "yyyy-MM-dd")}</TableCell>
+                  <TableCell>₹{payment.amount.toLocaleString()}</TableCell>
+                  <TableCell>{payment.payment_method}</TableCell>
+                  <TableCell className="font-mono text-xs">{payment.transaction_id}</TableCell>
+                  <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/admin/payments/${payment.id}`}>
+                      <Link href={`/admin/payments/${payment.payment_id}`}>
                         <Eye className="h-4 w-4" />
                         <span className="sr-only">View</span>
                       </Link>
@@ -338,6 +382,14 @@ export default function PaymentsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Export Modal */}
+      <ExportPaymentsModal
+        open={exportModalOpen}
+        onOpenChange={setExportModalOpen}
+        onExport={handleExportPayments}
+        isExporting={isExporting}
+      />
     </div>
   )
 }
