@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Download, RefreshCw, AlertCircle } from "lucide-react"
+import { Search, Filter, Eye, Download, RefreshCw, AlertCircle, Edit } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
@@ -21,7 +21,9 @@ import {
   Payment,
   PaymentAnalytics
 } from "@/services/paymentService"
+import { getAllEvents } from "@/services/eventService"
 import { ExportPaymentsModal, ExportFilters } from "@/components/admin/ExportPaymentsModal"
+import { PaymentStatusEditDialog } from "@/components/admin/PaymentStatusEditDialog"
 
 // Payment status mapping
 const getStatusBadge = (status: string) => {
@@ -61,13 +63,28 @@ export default function PaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMethod, setSelectedMethod] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedEvent, setSelectedEvent] = useState("all")
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [payments, setPayments] = useState<Payment[]>([])
   const [analytics, setAnalytics] = useState<PaymentAnalytics | null>(null)
+  const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [statusEditDialogOpen, setStatusEditDialogOpen] = useState(false)
+  const [selectedPaymentForEdit, setSelectedPaymentForEdit] = useState<Payment | null>(null)
+
+  // Fetch events data
+  const fetchEvents = async () => {
+    try {
+      const eventsData = await getAllEvents()
+      setEvents(eventsData)
+    } catch (error) {
+      console.error("Error fetching events:", error)
+      // Don't show error toast for events as it's not critical
+    }
+  }
 
   // Fetch payments data
   const fetchPayments = async () => {
@@ -75,6 +92,7 @@ export default function PaymentsPage() {
       setLoading(true)
       const filters = {
         status: selectedStatus !== "all" ? selectedStatus : undefined,
+        event_id: selectedEvent !== "all" ? parseInt(selectedEvent) : undefined,
         start_date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined,
         end_date: selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined,
         search: searchQuery || undefined,
@@ -136,10 +154,50 @@ export default function PaymentsPage() {
     setSelectedDate(undefined)
   }
 
+  // Handle event name click to filter by event
+  const handleEventClick = (eventTitle: string) => {
+    const event = events.find(e => e.event_title === eventTitle)
+    if (event) {
+      setSelectedEvent(event.event_id.toString())
+    }
+  }
+
+  // Handle edit status
+  const handleEditStatus = (payment: Payment) => {
+    setSelectedPaymentForEdit(payment)
+    setStatusEditDialogOpen(true)
+  }
+
+  // Handle status update
+  const handleStatusUpdate = (updatedPayment: Payment) => {
+    // Update the payment in the list
+    setPayments(prev => prev.map(p =>
+      p.payment_id === updatedPayment.payment_id ? updatedPayment : p
+    ))
+
+    // Show success message
+    const isRefund = updatedPayment.payment_status === 'refunded'
+    toast.success(
+      isRefund
+        ? `Refund processed successfully for ₹${updatedPayment.amount}`
+        : `Payment status updated to ${updatedPayment.payment_status}`
+    )
+  }
+
+  // Check if edit status should be disabled
+  const isEditStatusDisabled = (status: string) => {
+    return status === 'refunded' || status === 'failed'
+  }
+
+  // Load events on component mount
+  useEffect(() => {
+    fetchEvents()
+  }, [])
+
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchPayments()
-  }, [selectedStatus, selectedDate, searchQuery])
+  }, [selectedStatus, selectedMethod, selectedEvent, selectedDate, searchQuery])
 
   // Filter payments based on search and filters (client-side filtering for better UX)
   const filteredPayments = payments.filter((payment) => {
@@ -160,20 +218,34 @@ export default function PaymentsPage() {
       return false
     }
 
+    // Payment status filter
+    if (selectedStatus !== "all" && payment.payment_status !== selectedStatus) {
+      return false
+    }
+
+    // Event filter
+    if (selectedEvent !== "all" && payment.event_title) {
+      const eventId = events.find(event => event.event_title === payment.event_title)?.event_id?.toString()
+      if (eventId !== selectedEvent) {
+        return false
+      }
+    }
+
     return true
   })
 
   // Use analytics data for summary or calculate from filtered payments
-  const totalAmount = analytics?.summary?.total_revenue || analytics?.total_revenue || filteredPayments.reduce((sum, payment) => {
+  const totalAmount = analytics?.summary?.total_revenue || filteredPayments.reduce((sum, payment) => {
     if (payment.payment_status === "successful") {
-      return sum + payment.amount
+      const amount = typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount
+      return sum + amount
     }
     return sum
   }, 0)
 
-  const successfulCount = analytics?.summary?.successful_payments || analytics?.successful_payments || filteredPayments.filter(p => p.payment_status === "successful").length
-  const pendingCount = analytics?.summary?.pending_payments || analytics?.pending_payments || filteredPayments.filter(p => p.payment_status === "pending").length
-  const refundedCount = analytics?.summary?.refunded_payments || analytics?.refunded_payments || filteredPayments.filter(p => p.payment_status === "refunded").length
+  const successfulCount = analytics?.summary?.successful_payments || filteredPayments.filter(p => p.payment_status === "successful").length
+  const pendingCount = analytics?.summary?.pending_payments || filteredPayments.filter(p => p.payment_status === "pending").length
+  const refundedCount = analytics?.summary?.refunded_payments || filteredPayments.filter(p => p.payment_status === "refunded").length
 
   return (
     <div className="space-y-6">
@@ -282,6 +354,20 @@ export default function PaymentsPage() {
                 </SelectContent>
               </Select>
 
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger className="h-9 w-full md:w-[180px]">
+                  <SelectValue placeholder="All Events" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Events</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.event_id} value={event.event_id.toString()}>
+                      {event.event_title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -362,19 +448,41 @@ export default function PaymentsPage() {
                   <TableCell className="font-medium">{payment.payment_id}</TableCell>
                   <TableCell>{payment.booking_id}</TableCell>
                   <TableCell>{payment.user_name}</TableCell>
-                  <TableCell>{payment.event_title}</TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => handleEventClick(payment.event_title)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                    >
+                      {payment.event_title}
+                    </button>
+                  </TableCell>
                   <TableCell>{format(new Date(payment.payment_date), "yyyy-MM-dd")}</TableCell>
-                  <TableCell>₹{payment.amount.toLocaleString()}</TableCell>
+                  <TableCell>₹{(typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount).toLocaleString()}</TableCell>
                   <TableCell>{payment.payment_method}</TableCell>
                   <TableCell className="font-mono text-xs">{payment.transaction_id}</TableCell>
                   <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/admin/payments/${payment.payment_id}`}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">View</span>
-                      </Link>
-                    </Button>
+                    <div className="flex gap-1 justify-end">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/payments/${payment.payment_id}`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View</span>
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditStatus(payment)}
+                        disabled={isEditStatusDisabled(payment.payment_status)}
+                        title={isEditStatusDisabled(payment.payment_status)
+                          ? `Cannot edit ${payment.payment_status} payments`
+                          : "Edit payment status"
+                        }
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Edit Status</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -390,6 +498,16 @@ export default function PaymentsPage() {
         onExport={handleExportPayments}
         isExporting={isExporting}
       />
+
+      {/* Payment Status Edit Dialog */}
+      {selectedPaymentForEdit && (
+        <PaymentStatusEditDialog
+          open={statusEditDialogOpen}
+          onOpenChange={setStatusEditDialogOpen}
+          payment={selectedPaymentForEdit}
+          onStatusUpdate={handleStatusUpdate}
+        />
+      )}
     </div>
   )
 }

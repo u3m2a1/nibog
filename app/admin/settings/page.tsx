@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Save, Upload } from "lucide-react"
+import { Save, Upload, Mail } from "lucide-react"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -150,39 +150,54 @@ export default function SettingsPage() {
   }, [])
 
   // Email settings
-  const [smtpHost, setSmtpHost] = useState("smtp.example.com")
+  const [smtpHost, setSmtpHost] = useState("")
   const [smtpPort, setSmtpPort] = useState("587")
-  const [smtpUser, setSmtpUser] = useState("notifications@nibog.in")
-  const [smtpPassword, setSmtpPassword] = useState("********")
-  const [senderName, setSenderName] = useState("NIBOG Team")
-  const [senderEmail, setSenderEmail] = useState("notifications@nibog.in")
+  const [smtpUser, setSmtpUser] = useState("")
+  const [smtpPassword, setSmtpPassword] = useState("")
+  const [senderName, setSenderName] = useState("")
+  const [senderEmail, setSenderEmail] = useState("")
   const [emailSettingId, setEmailSettingId] = useState<number | undefined>(undefined)
   const [isSavingEmailSetting, setIsSavingEmailSetting] = useState(false)
   const [isLoadingEmailSetting, setIsLoadingEmailSetting] = useState(true)
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [emailSettingsExist, setEmailSettingsExist] = useState(false)
+  const [emailLoadError, setEmailLoadError] = useState<string | null>(null)
 
   // Fetch email settings when component mounts
   useEffect(() => {
     const fetchEmailSetting = async () => {
       try {
         setIsLoadingEmailSetting(true)
+        setEmailLoadError(null)
         const data = await getEmailSetting()
 
         if (data) {
-          setSmtpHost(data.smtp_host)
-          setSmtpPort(data.smtp_port.toString())
-          setSmtpUser(data.smtp_username)
-          setSmtpPassword(data.smtp_password)
-          setSenderName(data.sender_name)
-          setSenderEmail(data.sender_email)
+          setSmtpHost(data.smtp_host || "")
+          setSmtpPort(data.smtp_port ? data.smtp_port.toString() : "587")
+          setSmtpUser(data.smtp_username || "")
+          setSmtpPassword(data.smtp_password || "")
+          setSenderName(data.sender_name || "")
+          setSenderEmail(data.sender_email || "")
           setEmailSettingId(data.id)
+          setEmailSettingsExist(true)
+        } else {
+          setEmailSettingsExist(false)
         }
       } catch (error: any) {
-        console.error("Failed to fetch email settings:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load email settings",
-          variant: "destructive",
-        })
+        console.error("💥 Failed to fetch email settings:", error)
+        setEmailSettingsExist(false)
+
+        // Handle 404 gracefully (no settings configured yet)
+        if (error.message?.includes('404')) {
+          setEmailLoadError("No email settings configured yet")
+        } else {
+          setEmailLoadError(error.message || "Failed to load email settings")
+          toast({
+            title: "Error",
+            description: "Failed to load email settings",
+            variant: "destructive",
+          })
+        }
       } finally {
         setIsLoadingEmailSetting(false)
       }
@@ -190,6 +205,41 @@ export default function SettingsPage() {
 
     fetchEmailSetting()
   }, [])
+
+  // Handle edit email settings
+  const handleEditEmailSettings = () => {
+    setIsEditingEmail(true)
+  }
+
+  // Handle cancel email editing
+  const handleCancelEmailEdit = async () => {
+    setIsEditingEmail(false)
+
+    // Reset form to original values
+    if (emailSettingsExist) {
+      try {
+        const data = await getEmailSetting()
+        if (data) {
+          setSmtpHost(data.smtp_host || "")
+          setSmtpPort(data.smtp_port ? data.smtp_port.toString() : "587")
+          setSmtpUser(data.smtp_username || "")
+          setSmtpPassword(data.smtp_password || "")
+          setSenderName(data.sender_name || "")
+          setSenderEmail(data.sender_email || "")
+        }
+      } catch (error) {
+        console.error("Failed to reset email settings:", error)
+      }
+    } else {
+      // Reset to empty values if no settings exist
+      setSmtpHost("")
+      setSmtpPort("587")
+      setSmtpUser("")
+      setSmtpPassword("")
+      setSenderName("")
+      setSenderEmail("")
+    }
+  }
 
   // Notification settings
   const [bookingConfirmation, setBookingConfirmation] = useState(true)
@@ -509,117 +559,230 @@ export default function SettingsPage() {
                   <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   <p className="text-sm text-muted-foreground">Loading email settings...</p>
                 </div>
-              ) : (
+              ) : !isEditingEmail ? (
+                /* Display Mode */
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-host">SMTP Host</Label>
-                    <Input
-                      id="smtp-host"
-                      value={smtpHost}
-                      onChange={(e) => setSmtpHost(e.target.value)}
-                    />
+                  {emailSettingsExist ? (
+                    <div className="space-y-6">
+                      {/* SMTP Configuration Display */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">SMTP Configuration</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">SMTP Host</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{smtpHost || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">SMTP Port</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{smtpPort || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">SMTP Username</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{smtpUser || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">SMTP Password</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">
+                              {smtpPassword ? "••••••••••••" : "Not configured"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* Sender Information Display */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Sender Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Sender Name</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{senderName || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Sender Email</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{senderEmail || "Not configured"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit Button */}
+                      <div className="flex justify-end pt-4">
+                        <Button onClick={handleEditEmailSettings} variant="outline">
+                          <Save className="mr-2 h-4 w-4" />
+                          Edit Email Settings
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* No Settings Configured */
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="text-center space-y-4">
+                        <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                          <Mail className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">No Email Settings Configured</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {emailLoadError || "Configure your SMTP settings to enable email notifications"}
+                          </p>
+                        </div>
+                        <Button onClick={handleEditEmailSettings} className="mt-4">
+                          <Save className="mr-2 h-4 w-4" />
+                          Configure Email Settings
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Edit Mode - Form */
+                <>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-host">SMTP Host</Label>
+                      <Input
+                        id="smtp-host"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        placeholder="smtp.example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-port">SMTP Port</Label>
+                      <Input
+                        id="smtp-port"
+                        value={smtpPort}
+                        onChange={(e) => setSmtpPort(e.target.value)}
+                        placeholder="587"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-user">SMTP Username</Label>
+                      <Input
+                        id="smtp-user"
+                        value={smtpUser}
+                        onChange={(e) => setSmtpUser(e.target.value)}
+                        placeholder="your-email@domain.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-password">SMTP Password</Label>
+                      <Input
+                        id="smtp-password"
+                        type="password"
+                        value={smtpPassword}
+                        onChange={(e) => setSmtpPassword(e.target.value)}
+                        placeholder="Your SMTP password"
+                      />
+                    </div>
+                    <Separator className="my-4" />
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-name">Sender Name</Label>
+                      <Input
+                        id="sender-name"
+                        value={senderName}
+                        onChange={(e) => setSenderName(e.target.value)}
+                        placeholder="NIBOG Team"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-email">Sender Email</Label>
+                      <Input
+                        id="sender-email"
+                        type="email"
+                        value={senderEmail}
+                        onChange={(e) => setSenderEmail(e.target.value)}
+                        placeholder="notifications@nibog.in"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-port">SMTP Port</Label>
-                    <Input
-                      id="smtp-port"
-                      value={smtpPort}
-                      onChange={(e) => setSmtpPort(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-user">SMTP Username</Label>
-                    <Input
-                      id="smtp-user"
-                      value={smtpUser}
-                      onChange={(e) => setSmtpUser(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-password">SMTP Password</Label>
-                    <Input
-                      id="smtp-password"
-                      type="password"
-                      value={smtpPassword}
-                      onChange={(e) => setSmtpPassword(e.target.value)}
-                    />
-                  </div>
-                  <Separator className="my-4" />
-                  <div className="space-y-2">
-                    <Label htmlFor="sender-name">Sender Name</Label>
-                    <Input
-                      id="sender-name"
-                      value={senderName}
-                      onChange={(e) => setSenderName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sender-email">Sender Email</Label>
-                    <Input
-                      id="sender-email"
-                      type="email"
-                      value={senderEmail}
-                      onChange={(e) => setSenderEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="mt-4">
-                    <Button variant="outline">Test Email Configuration</Button>
+
+                  {/* Form Action Buttons */}
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEmailEdit}
+                      disabled={isSavingEmailSetting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          setIsSavingEmailSetting(true)
+
+                          const emailSettingData = {
+                            id: emailSettingId,
+                            smtp_host: smtpHost,
+                            smtp_port: parseInt(smtpPort),
+                            smtp_username: smtpUser,
+                            smtp_password: smtpPassword,
+                            sender_name: senderName,
+                            sender_email: senderEmail
+                          }
+
+                          const result = await saveEmailSetting(emailSettingData)
+
+                          if (result && result.id) {
+                            // Refetch the email settings to get the latest data from database
+                            try {
+                              const updatedData = await getEmailSetting()
+
+                              if (updatedData) {
+                                setEmailSettingId(updatedData.id)
+                                setSmtpHost(updatedData.smtp_host || "")
+                                setSmtpPort(updatedData.smtp_port ? updatedData.smtp_port.toString() : "587")
+                                setSmtpUser(updatedData.smtp_username || "")
+                                setSmtpPassword(updatedData.smtp_password || "")
+                                setSenderName(updatedData.sender_name || "")
+                                setSenderEmail(updatedData.sender_email || "")
+                              }
+                            } catch (refetchError) {
+                              console.error("Failed to refetch email settings:", refetchError)
+                              // Still show success message even if refetch fails
+                            }
+
+                            // Switch back to display mode and update state
+                            setIsEditingEmail(false)
+                            setEmailSettingsExist(true)
+                            setEmailLoadError(null)
+
+                            toast({
+                              title: "Success",
+                              description: "Email settings saved successfully",
+                            })
+                          }
+                        } catch (error: any) {
+                          console.error("Failed to save email settings:", error)
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to save email settings",
+                            variant: "destructive",
+                          })
+                        } finally {
+                          setIsSavingEmailSetting(false)
+                        }
+                      }}
+                      disabled={isSavingEmailSetting}
+                    >
+                      {isSavingEmailSetting ? (
+                        <>
+                          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </>
               )}
             </CardContent>
           </Card>
-          <div className="flex justify-end">
-            <Button
-              onClick={async () => {
-                try {
-                  setIsSavingEmailSetting(true)
-
-                  const emailSettingData = {
-                    id: emailSettingId,
-                    smtp_host: smtpHost,
-                    smtp_port: parseInt(smtpPort),
-                    smtp_username: smtpUser,
-                    smtp_password: smtpPassword,
-                    sender_name: senderName,
-                    sender_email: senderEmail
-                  }
-
-                  const result = await saveEmailSetting(emailSettingData)
-
-                  if (result && result.id) {
-                    setEmailSettingId(result.id)
-                    toast({
-                      title: "Success",
-                      description: "Email settings saved successfully",
-                    })
-                  }
-                } catch (error: any) {
-                  console.error("Failed to save email settings:", error)
-                  toast({
-                    title: "Error",
-                    description: error.message || "Failed to save email settings",
-                    variant: "destructive",
-                  })
-                } finally {
-                  setIsSavingEmailSetting(false)
-                }
-              }}
-              disabled={isSavingEmailSetting}
-            >
-              {isSavingEmailSetting ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
         </TabsContent>
 
         {/* Notification Settings */}

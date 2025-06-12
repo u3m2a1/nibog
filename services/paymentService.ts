@@ -20,7 +20,7 @@ export interface Payment {
   booking_id: number;
   transaction_id: string;
   phonepe_transaction_id?: string;
-  amount: number;
+  amount: string | number;
   payment_method: string;
   payment_status: 'successful' | 'pending' | 'failed' | 'refunded';
   payment_date: string;
@@ -35,19 +35,35 @@ export interface Payment {
   // Event details
   event_title: string;
   event_date: string;
+  event_description?: string;
   city_name: string;
   venue_name: string;
+  venue_address?: string;
 
-  // Child details
-  child_name: string;
+  // Booking details
+  booking_ref?: string;
+  booking_status?: string;
+  booking_total_amount?: string;
+
+  // Gateway response (optional)
+  gateway_response?: {
+    code: string;
+    state?: string;
+    amount?: number;
+    merchantId?: string;
+    transactionId?: string;
+  };
+
+  // Child details (optional)
+  child_name?: string;
   child_age?: number;
 
-  // Game details
-  game_name: string;
-  game_price: number;
+  // Game details (optional)
+  game_name?: string;
+  game_price?: number;
 
   // Refund details (optional)
-  refund_amount?: number;
+  refund_amount?: string | number;
   refund_date?: string;
   refund_reason?: string;
   admin_notes?: string;
@@ -234,6 +250,7 @@ export async function getAllPayments(filters?: {
   start_date?: string;
   end_date?: string;
   city_id?: number;
+  event_id?: number;
   search?: string;
 }): Promise<Payment[]> {
   try {
@@ -242,6 +259,7 @@ export async function getAllPayments(filters?: {
     if (filters?.start_date) queryParams.append('start_date', filters.start_date);
     if (filters?.end_date) queryParams.append('end_date', filters.end_date);
     if (filters?.city_id) queryParams.append('city_id', filters.city_id.toString());
+    if (filters?.event_id) queryParams.append('event_id', filters.event_id.toString());
     if (filters?.search) queryParams.append('search', filters.search);
 
     const url = `https://ai.alviongs.com/webhook/v1/nibog/payments/get-all${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
@@ -307,7 +325,7 @@ export async function getPaymentById(paymentId: number): Promise<Payment> {
  * @param paymentId Payment ID
  * @param status New payment status
  * @param refundData Optional refund information
- * @returns Updated payment
+ * @returns Updated payment response from API
  */
 export async function updatePaymentStatus(
   paymentId: number,
@@ -317,13 +335,23 @@ export async function updatePaymentStatus(
     refund_reason?: string;
     admin_notes?: string;
   }
-): Promise<{ success: boolean; message: string; payment: Payment }> {
+): Promise<{
+  payment_id: number;
+  payment_status: string;
+  refund_amount?: string;
+  refund_date?: string;
+  updated_at: string;
+  is_valid_update: boolean;
+  message: string;
+}> {
   try {
     const payload = {
       payment_id: paymentId,
       status,
       ...refundData,
     };
+
+    console.log('Updating payment status with payload:', payload);
 
     const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/update-status', {
       method: 'POST',
@@ -338,7 +366,16 @@ export async function updatePaymentStatus(
     }
 
     const data = await response.json();
-    return data;
+    console.log('Payment status update response:', data);
+
+    // API returns array with single object, extract it
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    } else if (!Array.isArray(data)) {
+      return data;
+    } else {
+      throw new Error('Invalid response format from payment status update API');
+    }
   } catch (error) {
     console.error('Error updating payment status:', error);
     throw error;
