@@ -536,3 +536,64 @@ CREATE TABLE payments (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+--- Certificate Templates table
+
+CREATE TABLE certificate_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('participation', 'winner', 'event_specific')),
+    background_image VARCHAR(500), -- File path URL (e.g., '/images/certificatetemplates/template_1_bg.jpg')
+    paper_size VARCHAR(20) DEFAULT 'a4' CHECK (paper_size IN ('a4', 'letter', 'a3')),
+    orientation VARCHAR(20) DEFAULT 'landscape' CHECK (orientation IN ('landscape', 'portrait')),
+    fields JSONB NOT NULL, -- Store field configurations as JSON
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--- Generated Certificates table
+
+CREATE TABLE generated_certificates (
+    id SERIAL PRIMARY KEY,
+    template_id INTEGER NOT NULL REFERENCES certificate_templates(id),
+    event_id INTEGER NOT NULL REFERENCES events(id),
+    game_id INTEGER REFERENCES baby_games(id), -- Optional, for game-specific certificates
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    child_id INTEGER REFERENCES children(child_id), -- Optional, for child-specific certificates
+    certificate_data JSONB NOT NULL, -- Store filled certificate data
+    pdf_url VARCHAR(255), -- URL to generated PDF file
+    status VARCHAR(50) DEFAULT 'generated' CHECK (status IN ('generated', 'sent', 'downloaded', 'failed')),
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP,
+    downloaded_at TIMESTAMP
+);
+
+--- Certificate Email Log table
+
+CREATE TABLE certificate_email_log (
+    id SERIAL PRIMARY KEY,
+    certificate_id INTEGER NOT NULL REFERENCES generated_certificates(id),
+    recipient_email VARCHAR(255) NOT NULL,
+    subject VARCHAR(255),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('sent', 'failed', 'bounced')),
+    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    error_message TEXT
+);
+
+--- Indexes for performance
+
+-- Indexes for certificate_templates
+CREATE INDEX idx_certificate_templates_type ON certificate_templates(type);
+CREATE INDEX idx_certificate_templates_active ON certificate_templates(is_active);
+
+-- Indexes for generated_certificates
+CREATE INDEX idx_generated_certificates_event ON generated_certificates(event_id);
+CREATE INDEX idx_generated_certificates_user ON generated_certificates(user_id);
+CREATE INDEX idx_generated_certificates_status ON generated_certificates(status);
+CREATE INDEX idx_generated_certificates_template ON generated_certificates(template_id);
+
+-- Indexes for certificate_email_log
+CREATE INDEX idx_certificate_email_log_certificate ON certificate_email_log(certificate_id);
+CREATE INDEX idx_certificate_email_log_status ON certificate_email_log(status);

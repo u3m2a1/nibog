@@ -204,7 +204,38 @@ response
     }
 ]
 
+## update booking status
 
+POST https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update-status
+
+payload
+
+{
+    "booking_id": 2,
+    "status": "Confirmed"
+}
+
+response
+
+[
+  {
+    "booking_id": 2,
+    "booking_ref": "nibog",
+    "user_id": 4,
+    "parent_id": 5,
+    "event_id": 11,
+    "status": "Confirmed",
+    "total_amount": "120.00",
+    "payment_method": "Credit Card",
+    "payment_status": "Paid",
+    "terms_accepted": true,
+    "is_active": true,
+    "created_at": "2025-05-07T17:20:17.060Z",
+    "updated_at": "2025-06-13T15:36:41.455Z",
+    "cancelled_at": null,
+    "completed_at": null
+  }
+]
 
 
 
