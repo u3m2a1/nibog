@@ -6,8 +6,8 @@ export async function POST(request: Request) {
     console.log("Server API route: Starting booking status update request");
 
     // Parse the request body
-    const { bookingId, transactionId, status } = await request.json();
-    console.log(`Server API route: Updating booking ID: ${bookingId}, status: ${status}, transaction ID: ${transactionId}`);
+    const { bookingId, status } = await request.json();
+    console.log(`Server API route: Updating booking ID: ${bookingId}, status: ${status}`);
 
     // Validate required fields
     if (!bookingId || !status) {
@@ -17,24 +17,35 @@ export async function POST(request: Request) {
       );
     }
 
-    // For now, simulate the status update since the API documentation doesn't show a specific status update endpoint
-    // In a real implementation, you would call the external API to update the booking status
-    console.log("Server API route: Simulating booking status update (no specific status update endpoint available)");
+    // Call the external API to update the booking status
+    const apiUrl = BOOKING_API.UPDATE_STATUS;
+    console.log("Server API route: Calling external API:", apiUrl);
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        booking_id: bookingId,
+        status: status
+      }),
+      cache: "no-store",
+    });
 
-    // Return success response with updated booking data
-    const result = {
-      booking_id: bookingId,
-      booking_status: status,
-      updated_at: new Date().toISOString(),
-      success: true
-    };
+    console.log(`External API response status: ${response.status}`);
 
-    console.log("Server API route: Booking status update simulated:", result);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`External API error: ${errorText}`);
+      throw new Error(`External API returned error status: ${response.status}`);
+    }
 
-    return NextResponse.json(result, { status: 200 });
+    const data = await response.json();
+    console.log("External API response data:", data);
+
+    // Return the response from the external API
+    return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     console.error("Server API route: Error updating booking status:", error);
     return NextResponse.json(

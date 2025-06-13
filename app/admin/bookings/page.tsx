@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle, Loader2, RefreshCw, CheckCircle, XCircle } from "lucide-react"
+import { Search, Filter, Eye, Edit, Copy, X, Check, AlertTriangle, Loader2, RefreshCw, CheckCircle } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format, parseISO } from "date-fns"
@@ -121,9 +121,9 @@ export default function BookingsPage() {
       setIsProcessing(id)
 
       // Call the API to update the booking status
-      await updateBookingStatus(id, "Confirmed")
+      const updatedBooking = await updateBookingStatus(id, "Confirmed")
 
-      // Update the local state
+      // Update the local state optimistically
       setBookings(bookings.map(booking =>
         booking.booking_id === id ? { ...booking, booking_status: "Confirmed" } : booking
       ))
@@ -132,11 +132,16 @@ export default function BookingsPage() {
         title: "Success",
         description: `Booking #${id} has been confirmed.`,
       })
+
+      // Refresh the bookings list to ensure data consistency
+      setTimeout(() => {
+        handleRefreshBookings(false)
+      }, 1000)
     } catch (error: any) {
       console.error(`Failed to confirm booking ${id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to confirm booking. Please try again.",
+        description: error.message || "Failed to confirm booking. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -150,9 +155,9 @@ export default function BookingsPage() {
       setIsProcessing(id)
 
       // Call the API to update the booking status
-      await updateBookingStatus(id, "Cancelled")
+      const updatedBooking = await updateBookingStatus(id, "Cancelled")
 
-      // Update the local state
+      // Update the local state optimistically
       setBookings(bookings.map(booking =>
         booking.booking_id === id ? { ...booking, booking_status: "Cancelled" } : booking
       ))
@@ -161,11 +166,16 @@ export default function BookingsPage() {
         title: "Success",
         description: `Booking #${id} has been cancelled.`,
       })
+
+      // Refresh the bookings list to ensure data consistency
+      setTimeout(() => {
+        handleRefreshBookings(false)
+      }, 1000)
     } catch (error: any) {
       console.error(`Failed to cancel booking ${id}:`, error)
       toast({
         title: "Error",
-        description: "Failed to cancel booking. Please try again.",
+        description: error.message || "Failed to cancel booking. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -174,7 +184,7 @@ export default function BookingsPage() {
   }
 
   // Handle refresh bookings
-  const handleRefreshBookings = async () => {
+  const handleRefreshBookings = async (showToast: boolean = true) => {
     try {
       setIsLoading(true)
       setError(null)
@@ -192,80 +202,28 @@ export default function BookingsPage() {
       setCities(uniqueCities)
       setEvents(uniqueEvents)
 
-      toast({
-        title: "Success",
-        description: "Bookings refreshed successfully",
-      })
+      if (showToast) {
+        toast({
+          title: "Success",
+          description: "Bookings refreshed successfully",
+        })
+      }
     } catch (error: any) {
       console.error("Failed to refresh bookings:", error)
       setError(error.message || "Failed to refresh bookings. Please try again.")
-      toast({
-        title: "Error",
-        description: "Failed to refresh bookings. Please try again.",
-        variant: "destructive",
-      })
+      if (showToast) {
+        toast({
+          title: "Error",
+          description: "Failed to refresh bookings. Please try again.",
+          variant: "destructive",
+        })
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Handle mark as completed
-  const handleMarkCompleted = async (id: number) => {
-    try {
-      setIsProcessing(id)
 
-      // Call the API to update the booking status
-      await updateBookingStatus(id, "Completed")
-
-      // Update the local state
-      setBookings(bookings.map(booking =>
-        booking.booking_id === id ? { ...booking, booking_status: "Completed" } : booking
-      ))
-
-      toast({
-        title: "Success",
-        description: `Booking #${id} has been marked as completed.`,
-      })
-    } catch (error: any) {
-      console.error(`Failed to mark booking ${id} as completed:`, error)
-      toast({
-        title: "Error",
-        description: "Failed to mark booking as completed. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsProcessing(null)
-    }
-  }
-
-  // Handle mark as no show
-  const handleMarkNoShow = async (id: number) => {
-    try {
-      setIsProcessing(id)
-
-      // Call the API to update the booking status
-      await updateBookingStatus(id, "No Show")
-
-      // Update the local state
-      setBookings(bookings.map(booking =>
-        booking.booking_id === id ? { ...booking, booking_status: "No Show" } : booking
-      ))
-
-      toast({
-        title: "Success",
-        description: `Booking #${id} has been marked as no show.`,
-      })
-    } catch (error: any) {
-      console.error(`Failed to mark booking ${id} as no show:`, error)
-      toast({
-        title: "Error",
-        description: "Failed to mark booking as no show. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsProcessing(null)
-    }
-  }
 
   // Filter bookings based on search and filters
   const filteredBookings = bookings.filter((booking) => {
@@ -565,38 +523,53 @@ export default function BookingsPage() {
                         </Link>
                       </Button>
                       {booking.booking_status.toLowerCase() === "pending" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleConfirmBooking(booking.booking_id)}
-                          disabled={isProcessing === booking.booking_id}
-                        >
-                          <Check className="h-4 w-4" />
-                          <span className="sr-only">Confirm</span>
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={isProcessing === booking.booking_id}
+                            >
+                              <Check className="h-4 w-4" />
+                              <span className="sr-only">Confirm</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirm Booking</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                <div className="flex items-start gap-2">
+                                  <CheckCircle className="mt-0.5 h-5 w-5 text-green-500" />
+                                  <div className="space-y-2">
+                                    <div className="font-medium">Do you want to confirm this booking?</div>
+                                    <div>
+                                      This will confirm booking #{booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
+                                      The booking status will change from "Pending" to "Confirmed".
+                                    </div>
+                                  </div>
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>No, Keep Pending</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-green-500 hover:bg-green-600"
+                                onClick={() => handleConfirmBooking(booking.booking_id)}
+                                disabled={isProcessing === booking.booking_id}
+                              >
+                                {isProcessing === booking.booking_id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Confirming...
+                                  </>
+                                ) : "Yes, Confirm Booking"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                       {booking.booking_status.toLowerCase() === "confirmed" && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleMarkCompleted(booking.booking_id)}
-                            disabled={isProcessing === booking.booking_id}
-                            className="text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950/20"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            <span className="sr-only">Mark Completed</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleMarkNoShow(booking.booking_id)}
-                            disabled={isProcessing === booking.booking_id}
-                            className="text-gray-600 hover:bg-gray-50 hover:text-gray-700 dark:hover:bg-gray-950/20"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            <span className="sr-only">Mark No Show</span>
-                          </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon">

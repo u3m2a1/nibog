@@ -113,13 +113,38 @@ export async function getAllBookings(): Promise<Booking[]> {
   }
 }
 
+// Interface for status update request
+export interface UpdateStatusRequest {
+  booking_id: number;
+  status: string;
+}
+
+// Interface for status update response
+export interface UpdateStatusResponse {
+  booking_id: number;
+  booking_ref: string;
+  user_id: number;
+  parent_id: number;
+  event_id: number;
+  status: string;
+  total_amount: string;
+  payment_method: string;
+  payment_status: string;
+  terms_accepted: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
+}
+
 /**
  * Update booking status
  * @param bookingId Booking ID
  * @param status New status
  * @returns Promise with updated booking data
  */
-export async function updateBookingStatus(bookingId: number, status: string): Promise<any> {
+export async function updateBookingStatus(bookingId: number, status: string): Promise<UpdateStatusResponse> {
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/bookings/update-status', {
@@ -129,17 +154,36 @@ export async function updateBookingStatus(bookingId: number, status: string): Pr
       },
       body: JSON.stringify({
         bookingId,
-        status,
-        transactionId: `TXN_${Date.now()}` // Generate a transaction ID
+        status
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`API returned error status: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `API returned error status: ${response.status}`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
-    return data;
+
+    // The API returns an array with a single booking object
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    } else if (!Array.isArray(data)) {
+      return data;
+    }
+
+    throw new Error("Invalid response format from status update API");
   } catch (error: any) {
     throw error;
   }

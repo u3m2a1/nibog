@@ -118,6 +118,7 @@ export const BOOKING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create", // POST
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all", // GET
   UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update", // POST
+  UPDATE_STATUS: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update-status", // POST
 };
 
 // Promo Code API endpoints
