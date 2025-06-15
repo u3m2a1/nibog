@@ -16,6 +16,13 @@ import { useToast } from "@/hooks/use-toast"
 import { BOOKING_API, PAYMENT_API } from "@/config/api"
 import { getAllCities, City } from "@/services/cityService"
 import { getAllAddOns, AddOn, AddOnVariant } from "@/services/addOnService"
+import {
+  getPromoCodesByEventAndGames,
+  validatePromoCodePreview,
+  validatePromoCodeFinal,
+  rollbackPromoCodeUsage,
+  PromoCodeDetail
+} from "@/services/promoCodeService"
 
 
 
@@ -126,6 +133,17 @@ export default function NewBookingPage() {
   const [isLoadingGames, setIsLoadingGames] = useState(false)
   const [isLoadingDates, setIsLoadingDates] = useState(false)
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false)
+
+  // Promo code state
+  const [promoCodes, setPromoCodes] = useState<PromoCodeDetail[]>([])
+  const [promoCodeInput, setPromoCodeInput] = useState("")
+  const [promoCodeDiscount, setPromoCodeDiscount] = useState<{
+    discountAmount: number
+    finalAmount: number
+    message: string
+    promoCodeId?: number
+  } | null>(null)
+  const [isValidatingPromoCode, setIsValidatingPromoCode] = useState(false)
 
 
   // Fetch initial data on component mount
@@ -274,6 +292,11 @@ export default function NewBookingPage() {
       console.log("Processed games:", games)
       setGames(games)
 
+      // Reset promo codes when event changes - will fetch when games are selected
+      setPromoCodes([])
+      setPromoCodeDiscount(null)
+      setPromoCodeInput("")
+
     } catch (error) {
       console.error("Error processing games for event:", error)
       toast({
@@ -286,23 +309,146 @@ export default function NewBookingPage() {
     }
   }
 
-  // Handle game selection - support multiple games
-  const handleGameToggle = (gameId: string) => {
-    setSelectedGameIds(prev => {
-      if (prev.includes(gameId)) {
-        // Remove game if already selected
-        return prev.filter(id => id !== gameId)
-      } else {
-        // Add game if not selected
-        return [...prev, gameId]
+  // Fetch promo codes for selected event and games
+  const fetchPromoCodesForEventAndGames = async (eventId: number, gameIds: number[]) => {
+    try {
+      console.log("Fetching promo codes for event:", eventId, "games:", gameIds)
+
+      if (gameIds.length === 0) {
+        setPromoCodes([])
+        setPromoCodeDiscount(null)
+        return
       }
+
+      const promoCodesData = await getPromoCodesByEventAndGames(eventId, gameIds)
+      console.log("Promo codes loaded for event-games:", promoCodesData)
+
+      setPromoCodes(promoCodesData)
+
+      // Reset discount when event/games change
+      setPromoCodeDiscount(null)
+
+    } catch (error) {
+      console.error("Error fetching promo codes for event-games:", error)
+      setPromoCodes([])
+      setPromoCodeDiscount(null)
+    }
+  }
+
+  // Handle promo code input validation (preview)
+  const handlePromoCodeValidation = async () => {
+    if (!promoCodeInput.trim()) {
+      setPromoCodeDiscount(null)
+      return
+    }
+
+    if (!selectedEventId || selectedGameIds.length === 0) {
+      toast({
+        title: "Selection Required",
+        description: "Please select event and games first",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setIsValidatingPromoCode(true)
+      const originalAmount = calculateOriginalTotalAmount()
+
+      const result = await validatePromoCodePreview(
+        promoCodeInput.trim(),
+        parseInt(selectedEventId),
+        selectedGameIds.map(id => parseInt(id)),
+        originalAmount
+      )
+
+      if (result.isValid) {
+        setPromoCodeDiscount({
+          discountAmount: result.discountAmount,
+          finalAmount: result.finalAmount,
+          message: result.message
+        })
+        toast({
+          title: "Promo Code Valid",
+          description: result.message,
+        })
+      } else {
+        setPromoCodeDiscount(null)
+        toast({
+          title: "Invalid Promo Code",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error validating promo code:", error)
+      setPromoCodeDiscount(null)
+      toast({
+        title: "Validation Error",
+        description: "Failed to validate promo code",
+        variant: "destructive",
+      })
+    } finally {
+      setIsValidatingPromoCode(false)
+    }
+  }
+
+  // Clear promo code discount when input changes
+  const handlePromoCodeInputChange = (value: string) => {
+    setPromoCodeInput(value)
+    if (!value.trim()) {
+      setPromoCodeDiscount(null)
+    }
+  }
+
+  // Calculate total amount including add-ons but excluding promo discount
+  const calculateOriginalTotalAmount = () => {
+    let total = 0
+
+    // Add game price
+    const selectedSlot = availableTimeSlots.find(slot => slot.id.toString() === selectedTimeSlotId)
+    if (selectedSlot) {
+      total += parseFloat(selectedSlot.slot_price)
+    }
+
+    // Add add-ons price
+    selectedAddOns.forEach(item => {
+      const basePrice = parseFloat(item.addon.price)
+      const variantModifier = item.variant ? item.variant.price_modifier : 0
+      const itemPrice = basePrice + variantModifier
+      total += itemPrice * item.quantity
     })
+
+    return total
+  }
+
+  // Handle game selection - support multiple games
+  const handleGameToggle = async (gameId: string) => {
+    const newGameIds = selectedGameIds.includes(gameId)
+      ? selectedGameIds.filter(id => id !== gameId)
+      : [...selectedGameIds, gameId]
+
+    setSelectedGameIds(newGameIds)
 
     // Reset date and time slot selection when games change
     setSelectedDate("")
     setSelectedTimeSlotId("")
     setAvailableDates([])
     setAvailableTimeSlots([])
+
+    // Reset promo code selection when games change
+    setPromoCodeDiscount(null)
+    setPromoCodeInput("")
+
+    // Fetch promo codes for the new game selection
+    if (selectedEventId && newGameIds.length > 0) {
+      await fetchPromoCodesForEventAndGames(
+        parseInt(selectedEventId),
+        newGameIds.map(id => parseInt(id))
+      )
+    } else {
+      setPromoCodes([])
+    }
   }
 
   // Handle date selection - fetch time slots for selected games
@@ -394,7 +540,14 @@ export default function NewBookingPage() {
     }
   }, [selectedGameIds, selectedEventId, eventGameSlots, toast])
 
-
+  // Clear promo code discount when total amount changes
+  useEffect(() => {
+    if (promoCodeDiscount && promoCodeInput.trim()) {
+      // Re-validate promo code when amount changes
+      handlePromoCodeValidation()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddOns, selectedTimeSlotId])
 
   // Handle add-on selection
   const handleAddOnSelect = (addon: AddOn, variant?: AddOnVariant, quantity: number = 1) => {
@@ -432,28 +585,21 @@ export default function NewBookingPage() {
 
   // Calculate total amount including add-ons
   const calculateTotalAmount = () => {
-    let total = 0
+    const originalAmount = calculateOriginalTotalAmount()
 
-    // Add game price
-    const selectedSlot = availableTimeSlots.find(slot => slot.id.toString() === selectedTimeSlotId)
-    if (selectedSlot) {
-      total += parseFloat(selectedSlot.slot_price)
+    // Apply promo code discount if available
+    if (promoCodeDiscount) {
+      return promoCodeDiscount.finalAmount
     }
 
-    // Add add-ons price
-    selectedAddOns.forEach(item => {
-      const basePrice = parseFloat(item.addon.price)
-      const variantModifier = item.variant ? item.variant.price_modifier : 0
-      const itemPrice = basePrice + variantModifier
-      total += itemPrice * item.quantity
-    })
-
-    return total
+    return originalAmount
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+
+    let finalPromoValidation: any = null
 
     try {
       // Validate required fields
@@ -495,6 +641,29 @@ export default function NewBookingPage() {
 
       if (!selectedEvent || selectedGames.length === 0 || !selectedSlot) {
         throw new Error("Invalid selection. Please try again.")
+      }
+
+      // Final promo code validation if promo code is applied
+      if (promoCodeInput.trim() && promoCodeDiscount) {
+        const originalAmount = calculateOriginalTotalAmount()
+        finalPromoValidation = await validatePromoCodeFinal(
+          promoCodeInput.trim(),
+          parseInt(selectedEventId),
+          selectedGameIds.map(id => parseInt(id)),
+          originalAmount
+        )
+
+        if (!finalPromoValidation.isValid) {
+          throw new Error(`Promo code validation failed: ${finalPromoValidation.message}`)
+        }
+
+        // Update discount with final validation result
+        setPromoCodeDiscount({
+          discountAmount: finalPromoValidation.discountAmount,
+          finalAmount: finalPromoValidation.finalAmount,
+          message: finalPromoValidation.message,
+          promoCodeId: finalPromoValidation.promoCodeId
+        })
       }
 
       // Generate unique transaction IDs for payment
@@ -561,7 +730,11 @@ export default function NewBookingPage() {
 
       const bookingRequest = {
         ...baseBookingRequest,
-        booking_addons: processedAddons
+        booking_addons: processedAddons,
+        ...(finalPromoValidation && {
+          promo_code: promoCodeInput.trim(),
+          promo_code_id: finalPromoValidation.promoCodeId
+        })
       }
 
       console.log("=== BOOKING CREATION DEBUG ===")
@@ -636,6 +809,16 @@ export default function NewBookingPage() {
             console.error("Failed to parse error as JSON:", parseError)
             // Use raw error text if JSON parsing fails
             errorMessage = errorText || errorMessage
+          }
+        }
+
+        // Rollback promo code usage if booking failed and promo was validated
+        if (finalPromoValidation?.promoCodeId) {
+          try {
+            await rollbackPromoCodeUsage(finalPromoValidation.promoCodeId)
+            console.log("Promo code usage rolled back due to booking failure")
+          } catch (rollbackError) {
+            console.error("Failed to rollback promo code usage:", rollbackError)
           }
         }
 
@@ -1289,6 +1472,88 @@ export default function NewBookingPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Promo Code Section */}
+          {selectedEventId && selectedGameIds.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Promo Code (Optional)</CardTitle>
+                <CardDescription>Enter a promo code to get discount on your booking</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="promoCodeInput">Promo Code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="promoCodeInput"
+                      value={promoCodeInput}
+                      onChange={(e) => handlePromoCodeInputChange(e.target.value)}
+                      placeholder="Enter promo code"
+                      disabled={isValidatingPromoCode}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handlePromoCodeValidation}
+                      disabled={!promoCodeInput.trim() || isValidatingPromoCode}
+                    >
+                      {isValidatingPromoCode ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Validating...
+                        </>
+                      ) : (
+                        "Apply"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Show discount calculation */}
+                {promoCodeDiscount && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Original Amount:</span>
+                        <span>₹{calculateOriginalTotalAmount().toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Discount ({promoCodeInput}):</span>
+                        <span>-₹{promoCodeDiscount.discountAmount.toLocaleString()}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between font-medium text-green-700">
+                        <span>Final Amount:</span>
+                        <span>₹{promoCodeDiscount.finalAmount.toLocaleString()}</span>
+                      </div>
+                      <p className="text-xs text-green-600 mt-2">{promoCodeDiscount.message}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show available promo codes hint */}
+                {promoCodes.length > 0 && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 font-medium mb-2">Available promo codes for this event:</p>
+                    <div className="space-y-1">
+                      {promoCodes.slice(0, 3).map((promo) => (
+                        <div key={promo.id} className="text-xs text-blue-700">
+                          <span className="font-medium">{promo.promo_code}</span> - {' '}
+                          {promo.type === 'percentage'
+                            ? `${promo.value}% off${promo.maximum_discount_amount ? ` (max ₹${promo.maximum_discount_amount})` : ''}`
+                            : `₹${promo.value} off`
+                          }
+                        </div>
+                      ))}
+                      {promoCodes.length > 3 && (
+                        <p className="text-xs text-blue-600">...and {promoCodes.length - 3} more</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex justify-end gap-4">
             <Button variant="outline" type="button" asChild>

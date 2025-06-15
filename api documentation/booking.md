@@ -39,7 +39,8 @@ payload
       "addon_id": 2,
       "quantity" : 2
     }
-  ]
+  ],
+  "promo_code" : "NIBOG25UP"
 }
 
 note

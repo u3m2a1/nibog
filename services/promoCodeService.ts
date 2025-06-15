@@ -492,6 +492,252 @@ export async function deletePromoCode(id: number): Promise<DeletePromoCodeRespon
 }
 
 /**
+ * Get promo codes by event ID and game IDs for booking creation
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @returns Array of promo codes
+ */
+export async function getPromoCodesByEventAndGames(eventId: number, gameIds: number[]): Promise<PromoCodeDetail[]> {
+  console.log(`Fetching promo codes for event ID: ${eventId}, game IDs: ${gameIds}`);
+
+  try {
+    const response = await fetch('/api/promo-codes/get-by-event-games', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        event_id: eventId,
+        game_ids: gameIds
+      }),
+    });
+
+    console.log(`Get promo codes by event-games response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Retrieved promo codes for event-games:", data);
+
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching promo codes by event-games:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get all active promo codes for booking creation
+ * @returns Array of active promo codes
+ */
+export async function getAllActivePromoCodes(): Promise<PromoCodeDetail[]> {
+  console.log("Fetching all active promo codes");
+
+  try {
+    const response = await fetch('/api/promo-codes/get-all', {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log(`Get all promo codes response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Retrieved all promo codes:", data);
+
+    // Filter only active promo codes
+    const activePromoCodes = Array.isArray(data) ? data.filter((promo: any) => promo.is_active !== false) : [];
+    return activePromoCodes;
+  } catch (error) {
+    console.error("Error fetching all promo codes:", error);
+    throw error;
+  }
+}
+
+/**
+ * Preview promo code validation (without incrementing usage)
+ * @param promoCode Promo code string
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @param amount Original amount
+ * @returns Preview validation result
+ */
+export async function validatePromoCodePreview(
+  promoCode: string,
+  eventId: number,
+  gameIds: number[],
+  amount: number
+): Promise<{ isValid: boolean; discountAmount: number; finalAmount: number; message: string }> {
+  console.log(`Preview validating promo code: ${promoCode} for event: ${eventId}, games: ${gameIds}, amount: ${amount}`);
+
+  try {
+    const response = await fetch('/api/promo-codes/validate-preview', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code: promoCode,
+        event_id: eventId,
+        game_ids: gameIds,
+        amount: amount
+      }),
+    });
+
+    console.log(`Preview validation response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Preview validation error: ${errorText}`);
+      return {
+        isValid: false,
+        discountAmount: 0,
+        finalAmount: amount,
+        message: "Failed to validate promo code"
+      };
+    }
+
+    const data = await response.json();
+    console.log("Preview validation result:", data);
+
+    // Handle array response from n8n
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      isValid: result.is_valid || false,
+      discountAmount: parseFloat(result.discount_amount) || 0,
+      finalAmount: parseFloat(result.final_amount) || amount,
+      message: result.message || "Validation completed"
+    };
+  } catch (error) {
+    console.error("Error in preview validation:", error);
+    return {
+      isValid: false,
+      discountAmount: 0,
+      finalAmount: amount,
+      message: "Failed to validate promo code"
+    };
+  }
+}
+
+/**
+ * Final promo code validation (with usage increment)
+ * @param promoCode Promo code string
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @param amount Original amount
+ * @returns Final validation result with promo details
+ */
+export async function validatePromoCodeFinal(
+  promoCode: string,
+  eventId: number,
+  gameIds: number[],
+  amount: number
+): Promise<{
+  isValid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  message: string;
+  promoCodeId?: number;
+  promoCode?: string;
+}> {
+  console.log(`Final validating promo code: ${promoCode} for event: ${eventId}, games: ${gameIds}, amount: ${amount}`);
+
+  try {
+    const response = await fetch('/api/promo-codes/validate-final', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code: promoCode,
+        event_id: eventId,
+        game_ids: gameIds,
+        amount: amount
+      }),
+    });
+
+    console.log(`Final validation response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Final validation error: ${errorText}`);
+      throw new Error(`Promo code validation failed: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Final validation result:", data);
+
+    // Handle array response from n8n
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      isValid: result.is_valid || false,
+      discountAmount: parseFloat(result.discount_amount) || 0,
+      finalAmount: parseFloat(result.final_amount) || amount,
+      message: result.message || "Validation completed",
+      promoCodeId: result.promo_id || result.promo_details?.id,
+      promoCode: promoCode
+    };
+  } catch (error) {
+    console.error("Error in final validation:", error);
+    throw error;
+  }
+}
+
+/**
+ * Rollback promo code usage count
+ * @param promoCodeId Promo code ID to rollback
+ * @returns Rollback result
+ */
+export async function rollbackPromoCodeUsage(promoCodeId: number): Promise<{ success: boolean; message: string }> {
+  console.log(`Rolling back promo code usage for ID: ${promoCodeId}`);
+
+  try {
+    const response = await fetch('/api/promo-codes/rollback-usage', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code_id: promoCodeId,
+        reason: "booking_failed"
+      }),
+    });
+
+    console.log(`Rollback response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Rollback error: ${errorText}`);
+      throw new Error(`Failed to rollback promo code usage: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Rollback result:", data);
+
+    return {
+      success: data.success || false,
+      message: data.message || "Rollback completed"
+    };
+  } catch (error) {
+    console.error("Error in rollback:", error);
+    throw error;
+  }
+}
+
+/**
  * Validate promo code form data
  * @param formData Form data to validate
  * @returns Validation result
