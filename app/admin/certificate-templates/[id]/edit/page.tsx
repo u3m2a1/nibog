@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Upload, Plus, Trash2, Move, Loader2, Eye, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, Upload, Plus, Trash2, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,18 +16,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
-import { CertificateField, CreateCertificateTemplateRequest } from "@/types/certificate"
-import { uploadCertificateBackground, createCertificateTemplate } from "@/services/certificateTemplateService"
+import { CertificateField, CertificateTemplate, UpdateCertificateTemplateRequest } from "@/types/certificate"
+import { 
+  getCertificateTemplateById, 
+  updateCertificateTemplate, 
+  uploadCertificateBackground 
+} from "@/services/certificateTemplateService"
 
-export default function NewCertificateTemplatePage() {
+export default function EditCertificateTemplatePage() {
   const router = useRouter()
+  const params = useParams()
   const { toast } = useToast()
-
+  const templateId = parseInt(params.id as string)
+  
   // Form state
+  const [template, setTemplate] = useState<CertificateTemplate | null>(null)
   const [templateName, setTemplateName] = useState("")
   const [templateDescription, setTemplateDescription] = useState("")
   const [templateType, setTemplateType] = useState<"participation" | "winner" | "event_specific">("participation")
@@ -36,14 +41,50 @@ export default function NewCertificateTemplatePage() {
   const [paperSize, setPaperSize] = useState<"a4" | "letter" | "a3">("a4")
   const [orientation, setOrientation] = useState<"landscape" | "portrait">("landscape")
   const [fields, setFields] = useState<CertificateField[]>([])
-
+  
   // Loading states
+  const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingBackground, setIsUploadingBackground] = useState(false)
-
+  
   // Step management
   const [currentStep, setCurrentStep] = useState(1)
   const totalSteps = 3
+
+  // Load template data
+  useEffect(() => {
+    if (templateId) {
+      loadTemplate()
+    }
+  }, [templateId])
+
+  const loadTemplate = async () => {
+    try {
+      setLoading(true)
+      const templateData = await getCertificateTemplateById(templateId)
+      setTemplate(templateData)
+      
+      // Populate form fields
+      setTemplateName(templateData.name)
+      setTemplateDescription(templateData.description)
+      setTemplateType(templateData.type)
+      setBackgroundImageUrl(templateData.background_image)
+      setPaperSize(templateData.paper_size)
+      setOrientation(templateData.orientation)
+      setFields(templateData.fields)
+    } catch (error) {
+      console.error('Error loading template:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load certificate template",
+        variant: "destructive"
+      })
+      router.push("/admin/certificate-templates")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -53,7 +94,7 @@ export default function NewCertificateTemplatePage() {
       const imageUrl = await uploadCertificateBackground(file)
       setBackgroundImage(file)
       setBackgroundImageUrl(imageUrl)
-
+      
       toast({
         title: "Success",
         description: "Background image uploaded successfully"
@@ -76,8 +117,8 @@ export default function NewCertificateTemplatePage() {
       name: "New Field",
       type: "text",
       required: true,
-      x: 50, // Percentage
-      y: 50, // Percentage
+      x: 50,
+      y: 50,
       font_size: 16,
       font_family: "Arial",
       color: "#000000",
@@ -89,7 +130,7 @@ export default function NewCertificateTemplatePage() {
   }
 
   const updateField = (id: string, updates: Partial<CertificateField>) => {
-    setFields(fields.map(field =>
+    setFields(fields.map(field => 
       field.id === id ? { ...field, ...updates } : field
     ))
   }
@@ -125,7 +166,7 @@ export default function NewCertificateTemplatePage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-
+    
     if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
       toast({
         title: "Error",
@@ -138,7 +179,8 @@ export default function NewCertificateTemplatePage() {
     setIsSubmitting(true)
 
     try {
-      const templateData: CreateCertificateTemplateRequest = {
+      const templateData: UpdateCertificateTemplateRequest = {
+        id: templateId,
         name: templateName,
         description: templateDescription,
         type: templateType,
@@ -148,25 +190,26 @@ export default function NewCertificateTemplatePage() {
         fields: fields
       }
 
-      await createCertificateTemplate(templateData)
+      await updateCertificateTemplate(templateData)
 
       toast({
         title: "Success",
-        description: "Certificate template created successfully"
+        description: "Certificate template updated successfully"
       })
 
       router.push("/admin/certificate-templates")
     } catch (error) {
-      console.error("Error creating template:", error)
+      console.error("Error updating template:", error)
       toast({
         title: "Error",
-        description: "Failed to create certificate template",
+        description: "Failed to update certificate template",
         variant: "destructive"
       })
     } finally {
       setIsSubmitting(false)
     }
   }
+
   const getStepTitle = (step: number) => {
     switch (step) {
       case 1: return "Basic Details"
@@ -174,6 +217,51 @@ export default function NewCertificateTemplatePage() {
       case 3: return "Field Configuration"
       default: return ""
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/admin/certificate-templates">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Edit Certificate Template</h1>
+            <p className="text-muted-foreground">Loading template...</p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Loading template...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!template) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/admin/certificate-templates">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Template Not Found</h1>
+            <p className="text-muted-foreground">The requested template could not be found.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const renderStepContent = () => {
@@ -229,23 +317,29 @@ export default function NewCertificateTemplatePage() {
                 {backgroundImageUrl ? (
                   <div className="space-y-4">
                     <div className="relative">
-                      <img
-                        src={backgroundImageUrl}
+                      <img 
+                        src={backgroundImageUrl} 
                         alt="Background preview"
                         className="max-w-full h-48 object-contain mx-auto rounded"
                       />
                     </div>
-                    <div className="flex justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setBackgroundImage(null)
-                          setBackgroundImageUrl("")
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove Image
-                      </Button>
+                    <div className="flex justify-center gap-2">
+                      <Label htmlFor="background-upload" className="cursor-pointer">
+                        <Button variant="outline" asChild>
+                          <span>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Replace Image
+                          </span>
+                        </Button>
+                      </Label>
+                      <Input
+                        id="background-upload"
+                        type="file"
+                        className="hidden"
+                        accept="image/*,.pdf"
+                        onChange={handleBackgroundUpload}
+                        disabled={isUploadingBackground}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -345,8 +439,8 @@ export default function NewCertificateTemplatePage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Field Type</Label>
-                          <Select
-                            value={field.type}
+                          <Select 
+                            value={field.type} 
                             onValueChange={(value: any) => updateField(field.id, { type: value })}
                           >
                             <SelectTrigger>
@@ -411,8 +505,8 @@ export default function NewCertificateTemplatePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Create Certificate Template</h1>
-          <p className="text-muted-foreground">Design a new certificate template for NIBOG events</p>
+          <h1 className="text-3xl font-bold tracking-tight">Edit Certificate Template</h1>
+          <p className="text-muted-foreground">Update the "{template.name}" template</p>
         </div>
       </div>
 
@@ -434,9 +528,9 @@ export default function NewCertificateTemplatePage() {
         <CardHeader>
           <CardTitle>{getStepTitle(currentStep)}</CardTitle>
           <CardDescription>
-            {currentStep === 1 && "Enter the basic information for your certificate template"}
-            {currentStep === 2 && "Upload a background image and configure the layout settings"}
-            {currentStep === 3 && "Add and position the fields that will appear on the certificate"}
+            {currentStep === 1 && "Update the basic information for your certificate template"}
+            {currentStep === 2 && "Update the background image and configure the layout settings"}
+            {currentStep === 3 && "Modify the fields that will appear on the certificate"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -472,10 +566,10 @@ export default function NewCertificateTemplatePage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  Updating...
                 </>
               ) : (
-                "Create Template"
+                "Update Template"
               )}
             </Button>
           )}
@@ -484,4 +578,3 @@ export default function NewCertificateTemplatePage() {
     </div>
   )
 }
-

@@ -284,90 +284,6 @@ Response (200 OK)
 
 ## Certificate Generation APIs
 
-### Generate Certificates (Bulk)
-
-**POST** https://ai.alviongs.com/webhook/v1/nibog/certificates/generate
-
-Payload
-
-```json
-{
-  "template_id": 2,
-  "event_id": 5,
-  "game_id": 3,
-  "certificate_type": "participation",
-  "include_no_shows": false,
-  "participants": [
-    {
-      "user_id": 10,
-      "child_id": 15,
-      "participant_name": "John Doe",
-      "additional_data": {
-        "position": "1st Place",
-        "score": "95"
-      }
-    },
-    {
-      "user_id": 11,
-      "child_id": 16,
-      "participant_name": "Jane Smith",
-      "additional_data": {
-        "position": "2nd Place",
-        "score": "90"
-      }
-    }
-  ]
-}
-```
-
-Response (201 Created)
-
-```json
-{
-  "success": true,
-  "generated_count": 2,
-  "failed_count": 0,
-  "certificates": [
-    {
-      "id": 1,
-      "template_id": 2,
-      "event_id": 5,
-      "game_id": 3,
-      "user_id": 10,
-      "child_id": 15,
-      "certificate_data": {
-        "participant_name": "John Doe",
-        "event_name": "Baby Olympics 2025",
-        "date": "2025-06-13",
-        "position": "1st Place",
-        "score": "95"
-      },
-      "pdf_url": "https://storage.example.com/certificates/cert_1.pdf",
-      "status": "generated",
-      "generated_at": "2025-06-13T06:30:00Z"
-    },
-    {
-      "id": 2,
-      "template_id": 2,
-      "event_id": 5,
-      "game_id": 3,
-      "user_id": 11,
-      "child_id": 16,
-      "certificate_data": {
-        "participant_name": "Jane Smith",
-        "event_name": "Baby Olympics 2025",
-        "date": "2025-06-13",
-        "position": "2nd Place",
-        "score": "90"
-      },
-      "pdf_url": "https://storage.example.com/certificates/cert_2.pdf",
-      "status": "generated",
-      "generated_at": "2025-06-13T06:30:00Z"
-    }
-  ]
-}
-```
-
 ### Generate Single Certificate
 
 **POST** https://ai.alviongs.com/webhook/v1/nibog/certificates/generate-single
@@ -414,51 +330,6 @@ Response (201 Created)
     "generated_at": "2025-06-13T06:30:00Z"
   }
 ]
-```
-
-### Send Certificates via Email
-
-**POST** https://ai.alviongs.com/webhook/v1/nibog/certificates/send-email
-
-Payload
-
-```json
-{
-  "certificate_ids": [1, 2, 3],
-  "email_subject": "Your NIBOG Certificate",
-  "email_message": "Congratulations! Please find your certificate attached."
-}
-```
-
-Response (200 OK)
-
-```json
-{
-  "success": true,
-  "sent_count": 3,
-  "failed_count": 0,
-  "email_logs": [
-    {
-      "certificate_id": 1,
-      "recipient_email": "parent1@example.com",
-      "status": "sent",
-      "sent_at": "2025-06-13T06:35:00Z"
-    },
-    {
-      "certificate_id": 2,
-      "recipient_email": "parent2@example.com",
-      "status": "sent",
-      "sent_at": "2025-06-13T06:35:00Z"
-    },
-    {
-      "certificate_id": 3,
-      "recipient_email": "parent3@example.com",
-      "status": "sent",
-      "sent_at": "2025-06-13T06:35:00Z"
-    }
-  ]
-}
-```
 
 ### Download Certificate PDF
 
@@ -519,7 +390,7 @@ Response (200 OK)
       "child_age": 24,
       "game_id": 3,
       "game_name": "Baby Crawling",
-      "attendance_status": "attended",
+      "attendance_status": "Attended",
       "position": null,
       "score": null
     },
@@ -532,7 +403,7 @@ Response (200 OK)
       "child_age": 26,
       "game_id": 3,
       "game_name": "Baby Crawling",
-      "attendance_status": "attended",
+      "attendance_status": "Attended",
       "position": null,
       "score": null
     }
