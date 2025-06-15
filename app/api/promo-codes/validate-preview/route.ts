@@ -5,9 +5,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { promo_code, event_id, game_ids, amount } = body
 
-    console.log('Promo code preview validation API called with:', { promo_code, event_id, game_ids, amount })
-
-    // Validate required fields
     if (!promo_code || !event_id || !game_ids || !Array.isArray(game_ids) || game_ids.length === 0 || !amount) {
       return NextResponse.json(
         { error: 'promo_code, event_id, game_ids array, and amount are required' },
@@ -15,9 +12,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Call n8n webhook for preview validation
     const n8nWebhookUrl = 'https://ai.alviongs.com/webhook/v1/nibog/promocode/preview-validation'
-    
+
     const n8nResponse = await fetch(n8nWebhookUrl, {
       method: 'POST',
       headers: {
@@ -31,13 +27,9 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    console.log('N8N preview validation response status:', n8nResponse.status)
-
     if (!n8nResponse.ok) {
-      const errorText = await n8nResponse.text()
-      console.error('N8N preview validation error:', errorText)
       return NextResponse.json(
-        { 
+        {
           is_valid: false,
           discount_amount: 0,
           final_amount: parseFloat(amount),
@@ -48,18 +40,14 @@ export async function POST(request: NextRequest) {
     }
 
     const validationResult = await n8nResponse.json()
-    console.log('Preview validation result from n8n:', validationResult)
-
-    // Return the validation result
     return NextResponse.json(validationResult)
 
   } catch (error) {
-    console.error('Error in preview validation API:', error)
     return NextResponse.json(
-      { 
+      {
         is_valid: false,
         discount_amount: 0,
-        final_amount: parseFloat(request.body?.amount || 0),
+        final_amount: parseFloat(amount || 0),
         message: 'Internal server error'
       },
       { status: 200 }

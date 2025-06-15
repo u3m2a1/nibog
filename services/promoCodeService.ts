@@ -498,8 +498,6 @@ export async function deletePromoCode(id: number): Promise<DeletePromoCodeRespon
  * @returns Array of promo codes
  */
 export async function getPromoCodesByEventAndGames(eventId: number, gameIds: number[]): Promise<PromoCodeDetail[]> {
-  console.log(`Fetching promo codes for event ID: ${eventId}, game IDs: ${gameIds}`);
-
   try {
     const response = await fetch('/api/promo-codes/get-by-event-games', {
       method: "POST",
@@ -512,20 +510,13 @@ export async function getPromoCodesByEventAndGames(eventId: number, gameIds: num
       }),
     });
 
-    console.log(`Get promo codes by event-games response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Retrieved promo codes for event-games:", data);
-
     return Array.isArray(data) ? data : [];
   } catch (error) {
-    console.error("Error fetching promo codes by event-games:", error);
     throw error;
   }
 }
@@ -579,8 +570,6 @@ export async function validatePromoCodePreview(
   gameIds: number[],
   amount: number
 ): Promise<{ isValid: boolean; discountAmount: number; finalAmount: number; message: string }> {
-  console.log(`Preview validating promo code: ${promoCode} for event: ${eventId}, games: ${gameIds}, amount: ${amount}`);
-
   try {
     const response = await fetch('/api/promo-codes/validate-preview', {
       method: "POST",
@@ -595,11 +584,7 @@ export async function validatePromoCodePreview(
       }),
     });
 
-    console.log(`Preview validation response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Preview validation error: ${errorText}`);
       return {
         isValid: false,
         discountAmount: 0,
@@ -609,9 +594,6 @@ export async function validatePromoCodePreview(
     }
 
     const data = await response.json();
-    console.log("Preview validation result:", data);
-
-    // Handle array response from n8n
     const result = Array.isArray(data) ? data[0] : data;
 
     return {
@@ -621,7 +603,6 @@ export async function validatePromoCodePreview(
       message: result.message || "Validation completed"
     };
   } catch (error) {
-    console.error("Error in preview validation:", error);
     return {
       isValid: false,
       discountAmount: 0,
@@ -652,8 +633,6 @@ export async function validatePromoCodeFinal(
   promoCodeId?: number;
   promoCode?: string;
 }> {
-  console.log(`Final validating promo code: ${promoCode} for event: ${eventId}, games: ${gameIds}, amount: ${amount}`);
-
   try {
     const response = await fetch('/api/promo-codes/validate-final', {
       method: "POST",
@@ -668,18 +647,12 @@ export async function validatePromoCodeFinal(
       }),
     });
 
-    console.log(`Final validation response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Final validation error: ${errorText}`);
       throw new Error(`Promo code validation failed: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Final validation result:", data);
-
-    // Handle array response from n8n
     const result = Array.isArray(data) ? data[0] : data;
 
     return {
@@ -691,7 +664,6 @@ export async function validatePromoCodeFinal(
       promoCode: promoCode
     };
   } catch (error) {
-    console.error("Error in final validation:", error);
     throw error;
   }
 }
@@ -702,8 +674,6 @@ export async function validatePromoCodeFinal(
  * @returns Rollback result
  */
 export async function rollbackPromoCodeUsage(promoCodeId: number): Promise<{ success: boolean; message: string }> {
-  console.log(`Rolling back promo code usage for ID: ${promoCodeId}`);
-
   try {
     const response = await fetch('/api/promo-codes/rollback-usage', {
       method: "POST",
@@ -716,23 +686,17 @@ export async function rollbackPromoCodeUsage(promoCodeId: number): Promise<{ suc
       }),
     });
 
-    console.log(`Rollback response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Rollback error: ${errorText}`);
       throw new Error(`Failed to rollback promo code usage: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Rollback result:", data);
-
     return {
       success: data.success || false,
       message: data.message || "Rollback completed"
     };
   } catch (error) {
-    console.error("Error in rollback:", error);
     throw error;
   }
 }
