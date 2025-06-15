@@ -5,50 +5,46 @@ POST https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create
 payload
 
 {
+  "user_id": 4,
   "parent": {
-    "user_id": 4,
-    "parent_name": "John Doe",
-    "email": "johndoe@example.com",
+    "parent_name": "sarah",
+    "email": "sarah@example.com",
     "additional_phone": "+916303727148"
   },
-  "children": 
-    {
-      "full_name": "Alice Doe",
-      "date_of_birth": "2018-05-12",
-      "school_name": "Little Stars Academy",
-      "gender": "Female"
-    },
+  "child": {
+    "full_name": "dimbu",
+    "date_of_birth": "2018-05-12",
+    "school_name": "Little Stars Academy",
+    "gender": "Female"
+  },
   "booking": {
-    "user_id": 4,
     "event_id": 11,
-    "total_amount": 120.00,
-    "payment_method": "Credit Card",
-    "payment_status": "Paid",
+    "payment_method": "PhonePe",
+    "payment_status": "successful",
     "terms_accepted": true
   },
-  "booking_games": 
+  "booking_games": [
+    { "game_id": 2 },
+    { "game_id": 4 }
+  ],
+  "booking_addons": [
     {
-      "game_id": 2,
-      "child_index": 0,
-      "game_price": 60.00
+      "addon_id": 6,
+      "variants": [
+        { "variant_id": 4, "quantity": 2 },
+        { "variant_id": 5, "quantity": 1 }
+      ]
+    },
+    {
+      "addon_id": 2,
+      "quantity" : 2
     }
+  ]
 }
 
+note
 
-response
-
-[
-    {
-        "booking_game_id": 4,
-        "booking_id": 4,
-        "child_id": 7,
-        "game_id": 2,
-        "game_price": "60.00",
-        "attendance_status": "Registered",
-        "is_active": true,
-        "created_at": "2025-05-07T18:41:35.185Z"
-    }
-]
+the above payload will create a booking for 2 games and 1 addon and each information stored in separate table.
 
 ## get all bookings
 

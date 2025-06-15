@@ -339,8 +339,8 @@ export default function BookingsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-600">{completedBookings}</div>
-            <p className="text-xs text-muted-foreground">Completed</p>
+            <div className="text-2xl font-bold text-red-600">{cancelledBookings}</div>
+            <p className="text-xs text-muted-foreground">Cancelled</p>
           </CardContent>
         </Card>
         <Card>

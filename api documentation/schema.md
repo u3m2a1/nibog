@@ -69,41 +69,6 @@ CREATE TABLE venues (
   FOREIGN KEY (city_id) REFERENCES cities(id)
 );
 
-
-CREATE TABLE events (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  city_id INT NOT NULL,
-  venue_id INT NOT NULL,
-  event_date DATE NOT NULL,
-  status VARCHAR(20) DEFAULT 'Draft',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (city_id) REFERENCES cities(id),
-  FOREIGN KEY (venue_id) REFERENCES venues(id)
-);
-
-
-CREATE TABLE event_games_with_slots (
-  id SERIAL PRIMARY KEY,
-  event_id INT NOT NULL,
-  game_id INT NOT NULL,
-  custom_title VARCHAR(255),
-  custom_description TEXT,
-  custom_price DECIMAL(10, 2),
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  slot_price DECIMAL(10, 2),
-  max_participants INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (event_id) REFERENCES events(id),
-  FOREIGN KEY (game_id) REFERENCES baby_games(id)
-);
-
-
-
 CREATE TABLE employee (
     id SERIAL PRIMARY KEY,
     employee_id VARCHAR(255) NOT NULL,
@@ -151,9 +116,6 @@ CREATE TABLE employee (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     
 );
-
-
-
 
 CREATE TABLE social_media_settings (
     id SERIAL PRIMARY KEY,
@@ -597,3 +559,14 @@ CREATE INDEX idx_generated_certificates_template ON generated_certificates(templ
 -- Indexes for certificate_email_log
 CREATE INDEX idx_certificate_email_log_certificate ON certificate_email_log(certificate_id);
 CREATE INDEX idx_certificate_email_log_status ON certificate_email_log(status);
+
+--- Booking Add-ons table
+
+CREATE TABLE booking_addons (
+    id SERIAL PRIMARY KEY,
+    booking_id INTEGER NOT NULL,
+    addon_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

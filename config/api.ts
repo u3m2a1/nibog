@@ -128,4 +128,14 @@ export const PROMO_CODE_API = {
   GET_BY_ID: "https://ai.alviongs.com/webhook/v1/nibog/promocode/get", // POST
 };
 
+// Payment API endpoints
+export const PAYMENT_API = {
+  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/payments/create", // POST
+  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/payments/get-all", // GET
+  GET_BY_ID: "https://ai.alviongs.com/webhook/v1/nibog/payments/get", // POST
+  UPDATE_STATUS: "https://ai.alviongs.com/webhook/v1/nibog/payments/update-status", // POST
+  ANALYTICS: "https://ai.alviongs.com/webhook/v1/nibog/payments/analytics", // GET
+  EXPORT: "https://ai.alviongs.com/webhook/v1/nibog/payments/export", // GET
+};
+
 // PhonePe API endpoints are now in config/phonepe.ts

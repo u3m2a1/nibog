@@ -1,36 +1,29 @@
 import { NextResponse } from 'next/server';
-import { BOOKING_API } from '@/config/api';
+import { PAYMENT_API } from '@/config/api';
 
 export async function POST(request: Request) {
   try {
-    console.log("Server API route: Creating new booking");
+    console.log("Server API route: Creating new payment");
 
     // Parse the request body
-    const bookingData = await request.json();
-    console.log("Server API route: Booking data:", JSON.stringify(bookingData, null, 2));
+    const paymentData = await request.json();
+    console.log("Server API route: Payment data:", JSON.stringify(paymentData, null, 2));
 
     // Validate required fields
-    if (!bookingData.parent || !bookingData.child || !bookingData.booking || !bookingData.booking_games) {
+    if (!paymentData.booking_id || !paymentData.transaction_id || !paymentData.amount) {
       console.log("Server API route: Validation failed. Missing fields:", {
-        hasParent: !!bookingData.parent,
-        hasChild: !!bookingData.child,
-        hasBooking: !!bookingData.booking,
-        hasBookingGames: !!bookingData.booking_games,
-        hasBookingAddons: !!bookingData.booking_addons,
-        hasPayment: !!bookingData.payment
+        hasBookingId: !!paymentData.booking_id,
+        hasTransactionId: !!paymentData.transaction_id,
+        hasAmount: !!paymentData.amount
       });
       return NextResponse.json(
-        { error: "Missing required booking data" },
+        { error: "Missing required payment data: booking_id, transaction_id, and amount are required" },
         { status: 400 }
       );
     }
 
-    // Log the structure for debugging
-    console.log("Server API route: Booking structure validation passed");
-    console.log("Server API route: booking_addons:", bookingData.booking_addons);
-
     // Forward the request to the external API
-    const apiUrl = BOOKING_API.CREATE;
+    const apiUrl = PAYMENT_API.CREATE;
     console.log("Server API route: Calling API URL:", apiUrl);
 
     const response = await fetch(apiUrl, {
@@ -38,19 +31,19 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(bookingData),
+      body: JSON.stringify(paymentData),
     });
 
-    console.log(`Server API route: Create booking response status: ${response.status}`);
+    console.log(`Server API route: Create payment response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Server API route: Error response (${response.status}):`, errorText);
-      console.error("Server API route: Request payload was:", JSON.stringify(bookingData, null, 2));
-
-      let errorMessage = `Error creating booking: ${response.status} - ${response.statusText}`;
+      console.error("Server API route: Request payload was:", JSON.stringify(paymentData, null, 2));
+      
+      let errorMessage = `Error creating payment: ${response.status} - ${response.statusText}`;
       let errorDetails = errorText;
-
+      
       try {
         const errorData = JSON.parse(errorText);
         console.log("Server API route: Parsed error data:", errorData);
@@ -66,7 +59,7 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(
-        {
+        { 
           error: errorMessage,
           details: errorDetails,
           status: response.status,
@@ -99,9 +92,9 @@ export async function POST(request: Request) {
     // Return the response with success status
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
-    console.error("Server API route: Error creating booking:", error);
+    console.error("Server API route: Error creating payment:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create booking" },
+      { error: error.message || "Failed to create payment" },
       { status: 500 }
     );
   }
