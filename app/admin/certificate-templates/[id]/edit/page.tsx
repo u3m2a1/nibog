@@ -41,6 +41,9 @@ export default function EditCertificateTemplatePage() {
   const [paperSize, setPaperSize] = useState<"a4" | "letter" | "a3">("a4")
   const [orientation, setOrientation] = useState<"landscape" | "portrait">("landscape")
   const [fields, setFields] = useState<CertificateField[]>([])
+  const [appreciationText, setAppreciationText] = useState("")
+  const [defaultFontFamily, setDefaultFontFamily] = useState<string>("Arial")
+  const [defaultFontColor, setDefaultFontColor] = useState<string>("#000000")
   
   // Loading states
   const [loading, setLoading] = useState(true)
@@ -72,6 +75,18 @@ export default function EditCertificateTemplatePage() {
       setPaperSize(templateData.paper_size)
       setOrientation(templateData.orientation)
       setFields(templateData.fields)
+      
+      // Load appreciation text if available
+      if (templateData.appreciation_text) {
+        setAppreciationText(templateData.appreciation_text)
+      } else {
+        // Set default appreciation text based on template type
+        if (templateData.type === "participation") {
+          setAppreciationText("In recognition of enthusiastic participation in {event_name}.\nYour involvement, energy, and commitment at NIBOG are truly appreciated.\nThank you for being a valued part of the NIBOG community!")
+        } else if (templateData.type === "winner") {
+          setAppreciationText("For achieving {achievement} in {event_name}.\nYour dedication, talent, and outstanding performance at NIBOG have distinguished you among the best.\nCongratulations on this remarkable achievement from the entire NIBOG team!")
+        }
+      }
     } catch (error) {
       console.error('Error loading template:', error)
       toast({
@@ -94,7 +109,7 @@ export default function EditCertificateTemplatePage() {
       const imageUrl = await uploadCertificateBackground(file)
       setBackgroundImage(file)
       setBackgroundImageUrl(imageUrl)
-      
+
       toast({
         title: "Success",
         description: "Background image uploaded successfully"
@@ -103,7 +118,7 @@ export default function EditCertificateTemplatePage() {
       console.error('Error uploading background:', error)
       toast({
         title: "Error",
-        description: "Failed to upload background image",
+        description: `Failed to upload background image: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       })
     } finally {
@@ -111,17 +126,94 @@ export default function EditCertificateTemplatePage() {
     }
   }
 
+  // Smart positioning for certificate fields
+  const getSmartPosition = (fieldCount: number, fieldName: string = "New Field") => {
+    const name = fieldName.toLowerCase();
+
+    // Define common certificate layout positions
+    const positions = {
+      // Title area (top)
+      title: { x: 50, y: 15, font_size: 32 },
+      subtitle: { x: 50, y: 25, font_size: 20 },
+
+      // Main content area (center)
+      participant_name: { x: 50, y: 45, font_size: 28 },
+      event_name: { x: 50, y: 65, font_size: 24 },
+      achievement: { x: 50, y: 55, font_size: 20 },
+
+      // Bottom area
+      date: { x: 25, y: 85, font_size: 16 },
+      signature: { x: 75, y: 85, font_size: 16 },
+      certificate_number: { x: 50, y: 95, font_size: 14 },
+
+      // Side areas
+      venue: { x: 25, y: 75, font_size: 16 },
+      city: { x: 75, y: 75, font_size: 16 },
+      position: { x: 50, y: 35, font_size: 22 },
+      score: { x: 50, y: 75, font_size: 18 },
+
+      // Organization info
+      organization: { x: 50, y: 90, font_size: 16 },
+      instructor: { x: 25, y: 90, font_size: 14 }
+    };
+
+    // Smart field name detection and positioning
+    if (name.includes('participant') || name.includes('name') && !name.includes('event')) {
+      return positions.participant_name;
+    } else if (name.includes('title') || name.includes('certificate')) {
+      return positions.title;
+    } else if (name.includes('event') && !name.includes('date')) {
+      return positions.event_name;
+    } else if (name.includes('date')) {
+      return positions.date;
+    } else if (name.includes('signature')) {
+      return positions.signature;
+    } else if (name.includes('venue')) {
+      return positions.venue;
+    } else if (name.includes('city')) {
+      return positions.city;
+    } else if (name.includes('position') || name.includes('rank')) {
+      return positions.position;
+    } else if (name.includes('score')) {
+      return positions.score;
+    } else if (name.includes('achievement')) {
+      return positions.achievement;
+    } else if (name.includes('organization') || name.includes('company')) {
+      return positions.organization;
+    } else if (name.includes('instructor') || name.includes('teacher')) {
+      return positions.instructor;
+    } else if (name.includes('number')) {
+      return positions.certificate_number;
+    }
+
+    // Default positioning for unknown fields (stagger them)
+    const defaultPositions = [
+      { x: 50, y: 30 },
+      { x: 50, y: 40 },
+      { x: 50, y: 50 },
+      { x: 50, y: 60 },
+      { x: 50, y: 70 },
+      { x: 30, y: 80 },
+      { x: 70, y: 80 }
+    ];
+
+    const pos = defaultPositions[fieldCount % defaultPositions.length];
+    return { ...pos, font_size: 18 };
+  };
+
   const addField = () => {
+    const position = getSmartPosition(fields.length);
+
     const newField: CertificateField = {
       id: `field-${Date.now()}`,
       name: "New Field",
       type: "text",
       required: true,
-      x: 50,
-      y: 50,
-      font_size: 16,
-      font_family: "Arial",
-      color: "#000000",
+      x: position.x,
+      y: position.y,
+      font_size: position.font_size || 16,
+      font_family: defaultFontFamily,
+      color: defaultFontColor,
       width: 200,
       height: 30,
       alignment: "center"
@@ -130,9 +222,22 @@ export default function EditCertificateTemplatePage() {
   }
 
   const updateField = (id: string, updates: Partial<CertificateField>) => {
-    setFields(fields.map(field => 
-      field.id === id ? { ...field, ...updates } : field
-    ))
+    setFields(fields.map(field => {
+      if (field.id === id) {
+        const updatedField = { ...field, ...updates };
+
+        // If name is being updated, auto-position the field
+        if (updates.name && updates.name !== field.name) {
+          const position = getSmartPosition(0, updates.name);
+          updatedField.x = position.x;
+          updatedField.y = position.y;
+          updatedField.font_size = position.font_size || field.font_size;
+        }
+
+        return updatedField;
+      }
+      return field;
+    }))
   }
 
   const removeField = (id: string) => {
@@ -179,6 +284,7 @@ export default function EditCertificateTemplatePage() {
     setIsSubmitting(true)
 
     try {
+      // Include appreciation_text now that backend supports it
       const templateData: UpdateCertificateTemplateRequest = {
         id: templateId,
         name: templateName,
@@ -187,7 +293,8 @@ export default function EditCertificateTemplatePage() {
         background_image: backgroundImageUrl,
         paper_size: paperSize,
         orientation: orientation,
-        fields: fields
+        fields: fields,
+        appreciation_text: appreciationText
       }
 
       await updateCertificateTemplate(templateData)
@@ -301,7 +408,7 @@ export default function EditCertificateTemplatePage() {
                 <SelectContent>
                   <SelectItem value="participation">Participation</SelectItem>
                   <SelectItem value="winner">Winner</SelectItem>
-                  <SelectItem value="event_specific">Event Specific</SelectItem>
+                  
                 </SelectContent>
               </Select>
             </div>
@@ -317,8 +424,8 @@ export default function EditCertificateTemplatePage() {
                 {backgroundImageUrl ? (
                   <div className="space-y-4">
                     <div className="relative">
-                      <img 
-                        src={backgroundImageUrl} 
+                      <img
+                        src={backgroundImageUrl.startsWith('http') ? backgroundImageUrl : `http://localhost:3000${backgroundImageUrl}`}
                         alt="Background preview"
                         className="max-w-full h-48 object-contain mx-auto rounded"
                       />
@@ -408,16 +515,104 @@ export default function EditCertificateTemplatePage() {
       case 3:
         return (
           <div className="space-y-6">
+            <div className="space-y-4 mb-6">
+              <div>
+                <h3 className="text-lg font-medium">Field Defaults</h3>
+                <p className="text-sm text-gray-500">Set default styling for new fields</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Default Font</Label>
+                  <Select value={defaultFontFamily} onValueChange={(value: any) => setDefaultFontFamily(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Standard Fonts */}
+                      <SelectItem value="Arial"><span style={{fontFamily: 'Arial'}}>Arial</span></SelectItem>
+                      <SelectItem value="Helvetica"><span style={{fontFamily: 'Helvetica'}}>Helvetica</span></SelectItem>
+                      <SelectItem value="Times New Roman"><span style={{fontFamily: 'Times New Roman'}}>Times New Roman</span></SelectItem>
+                      <SelectItem value="Georgia"><span style={{fontFamily: 'Georgia'}}>Georgia</span></SelectItem>
+                      <SelectItem value="Verdana"><span style={{fontFamily: 'Verdana'}}>Verdana</span></SelectItem>
+                      <SelectItem value="Courier New"><span style={{fontFamily: 'Courier New'}}>Courier New</span></SelectItem>
+                      <SelectItem value="Tahoma"><span style={{fontFamily: 'Tahoma'}}>Tahoma</span></SelectItem>
+                      <SelectItem value="Trebuchet MS"><span style={{fontFamily: 'Trebuchet MS'}}>Trebuchet MS</span></SelectItem>
+                      <SelectItem value="Impact"><span style={{fontFamily: 'Impact'}}>Impact</span></SelectItem>
+                      <SelectItem value="Comic Sans MS"><span style={{fontFamily: 'Comic Sans MS'}}>Comic Sans MS</span></SelectItem>
+                      <SelectItem value="Palatino"><span style={{fontFamily: 'Palatino'}}>Palatino</span></SelectItem>
+                      <SelectItem value="Garamond"><span style={{fontFamily: 'Garamond'}}>Garamond</span></SelectItem>
+                      <SelectItem value="Bookman"><span style={{fontFamily: 'Bookman'}}>Bookman</span></SelectItem>
+                      <SelectItem value="Calibri"><span style={{fontFamily: 'Calibri'}}>Calibri</span></SelectItem>
+                      <SelectItem value="Century Gothic"><span style={{fontFamily: 'Century Gothic'}}>Century Gothic</span></SelectItem>
+                      <SelectItem value="Cambria"><span style={{fontFamily: 'Cambria'}}>Cambria</span></SelectItem>
+                      <SelectItem value="Candara"><span style={{fontFamily: 'Candara'}}>Candara</span></SelectItem>
+                      <SelectItem value="Consolas"><span style={{fontFamily: 'Consolas'}}>Consolas</span></SelectItem>
+                      <SelectItem value="Franklin Gothic"><span style={{fontFamily: 'Franklin Gothic'}}>Franklin Gothic</span></SelectItem>
+                      <SelectItem value="Segoe UI"><span style={{fontFamily: 'Segoe UI'}}>Segoe UI</span></SelectItem>
+                      
+                      {/* Decorative Cursive Fonts */}
+                      <SelectItem value="Great Vibes"><span style={{fontFamily: '"Great Vibes", cursive'}}>Great Vibes</span></SelectItem>
+                      <SelectItem value="Pacifico"><span style={{fontFamily: '"Pacifico", cursive'}}>Pacifico</span></SelectItem>
+                      <SelectItem value="Dancing Script"><span style={{fontFamily: '"Dancing Script", cursive'}}>Dancing Script</span></SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Default Color</Label>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-8 h-8 border rounded-md cursor-pointer" 
+                      style={{ backgroundColor: defaultFontColor }}
+                    />
+                    <Input
+                      type="color"
+                      value={defaultFontColor}
+                      onChange={(e) => setDefaultFontColor(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-medium">Certificate Fields</h3>
                 <p className="text-sm text-gray-500">Configure the fields that will appear on the certificate</p>
               </div>
-              <Button onClick={addField} variant="outline">
+              <Button onClick={(e) => addField()} variant="outline">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Field
               </Button>
             </div>
+            
+            {/* Appreciation Text */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-md">Appreciation Text</CardTitle>
+                <CardDescription>This text will appear below the participant name</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Textarea
+                    id="appreciationText"
+                    value={appreciationText}
+                    onChange={(e) => setAppreciationText(e.target.value)}
+                    placeholder="Enter appreciation text that will appear on the certificate"
+                    rows={5}
+                    required
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    You can use these placeholders in your text: <code>{`{event_name}`}</code>, <code>{`{achievement}`}</code>, and <code>{`{position}`}</code>.
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Note: The participant name will appear separately above this appreciation text, so you don't need to include it here.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">Tip:</span> Keep these fields out of your certificate template: <code>Event Name</code> and <code>Achievement</code>. Use the placeholders above instead.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
 
             {fields.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
@@ -472,6 +667,85 @@ export default function EditCertificateTemplatePage() {
                             value={field.y}
                             onChange={(e) => updateField(field.id, { y: parseInt(e.target.value) || 0 })}
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Font Size</Label>
+                          <Input
+                            type="number"
+                            min="10"
+                            max="72"
+                            value={field.font_size}
+                            onChange={(e) => updateField(field.id, { font_size: parseInt(e.target.value) || 16 })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Font Family</Label>
+                          <Select 
+                            value={field.font_family} 
+                            onValueChange={(value: any) => updateField(field.id, { font_family: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {/* Standard Fonts */}
+                              <SelectItem value="Arial"><span style={{fontFamily: 'Arial'}}>Arial</span></SelectItem>
+                              <SelectItem value="Helvetica"><span style={{fontFamily: 'Helvetica'}}>Helvetica</span></SelectItem>
+                              <SelectItem value="Times New Roman"><span style={{fontFamily: 'Times New Roman'}}>Times New Roman</span></SelectItem>
+                              <SelectItem value="Georgia"><span style={{fontFamily: 'Georgia'}}>Georgia</span></SelectItem>
+                              <SelectItem value="Verdana"><span style={{fontFamily: 'Verdana'}}>Verdana</span></SelectItem>
+                              <SelectItem value="Courier New"><span style={{fontFamily: 'Courier New'}}>Courier New</span></SelectItem>
+                              <SelectItem value="Tahoma"><span style={{fontFamily: 'Tahoma'}}>Tahoma</span></SelectItem>
+                              <SelectItem value="Trebuchet MS"><span style={{fontFamily: 'Trebuchet MS'}}>Trebuchet MS</span></SelectItem>
+                              <SelectItem value="Impact"><span style={{fontFamily: 'Impact'}}>Impact</span></SelectItem>
+                              <SelectItem value="Comic Sans MS"><span style={{fontFamily: 'Comic Sans MS'}}>Comic Sans MS</span></SelectItem>
+                              <SelectItem value="Palatino"><span style={{fontFamily: 'Palatino'}}>Palatino</span></SelectItem>
+                              <SelectItem value="Garamond"><span style={{fontFamily: 'Garamond'}}>Garamond</span></SelectItem>
+                              <SelectItem value="Bookman"><span style={{fontFamily: 'Bookman'}}>Bookman</span></SelectItem>
+                              <SelectItem value="Calibri"><span style={{fontFamily: 'Calibri'}}>Calibri</span></SelectItem>
+                              <SelectItem value="Century Gothic"><span style={{fontFamily: 'Century Gothic'}}>Century Gothic</span></SelectItem>
+                              <SelectItem value="Cambria"><span style={{fontFamily: 'Cambria'}}>Cambria</span></SelectItem>
+                              <SelectItem value="Candara"><span style={{fontFamily: 'Candara'}}>Candara</span></SelectItem>
+                              <SelectItem value="Consolas"><span style={{fontFamily: 'Consolas'}}>Consolas</span></SelectItem>
+                              <SelectItem value="Franklin Gothic"><span style={{fontFamily: 'Franklin Gothic'}}>Franklin Gothic</span></SelectItem>
+                              <SelectItem value="Segoe UI"><span style={{fontFamily: 'Segoe UI'}}>Segoe UI</span></SelectItem>
+                              
+                              {/* Decorative Cursive Fonts */}
+                              <SelectItem value="Great Vibes"><span style={{fontFamily: '"Great Vibes", cursive'}}>Great Vibes</span></SelectItem>
+                              <SelectItem value="Pacifico"><span style={{fontFamily: '"Pacifico", cursive'}}>Pacifico</span></SelectItem>
+                              <SelectItem value="Dancing Script"><span style={{fontFamily: '"Dancing Script", cursive'}}>Dancing Script</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Text Color</Label>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-8 h-8 border rounded-md cursor-pointer" 
+                              style={{ backgroundColor: field.color }}
+                            />
+                            <Input
+                              type="color"
+                              value={field.color}
+                              onChange={(e) => updateField(field.id, { color: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Text Alignment</Label>
+                          <Select 
+                            value={field.alignment || "center"} 
+                            onValueChange={(value: any) => updateField(field.id, { alignment: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="left">Left</SelectItem>
+                              <SelectItem value="center">Center</SelectItem>
+                              <SelectItem value="right">Right</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       <div className="flex justify-end mt-4">

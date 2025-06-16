@@ -65,7 +65,7 @@ export async function getEventParticipants(eventId: number): Promise<EventPartic
  */
 export async function downloadCertificateHTML(certificateId: number): Promise<CertificateDownloadResponse> {
   try {
-    const response = await fetch(`/api/certificates/download?certificate_id=${certificateId}`, {
+    const response = await fetch(`/api/certificates/download/${certificateId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -77,8 +77,8 @@ export async function downloadCertificateHTML(certificateId: number): Promise<Ce
       throw new Error(errorData.error || 'Failed to download certificate');
     }
 
-    const result: CertificateDownloadResponse = await response.json();
-    return result;
+    const result: CertificateDownloadResponse[] = await response.json();
+    return result[0];
   } catch (error) {
     console.error('Error downloading certificate:', error);
     throw error;

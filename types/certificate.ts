@@ -19,6 +19,7 @@ export interface CertificateTemplate {
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
+  appreciation_text?: string; // Custom appreciation text
   background_image: string; // File path URL
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
@@ -32,6 +33,7 @@ export interface CreateCertificateTemplateRequest {
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
+  appreciation_text?: string; // Custom appreciation text
   background_image: string;
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
@@ -127,11 +129,11 @@ export interface BackgroundUploadResponse {
 
 // Certificate Download Types
 export interface CertificateDownloadResponse {
-  success: boolean;
-  certificate_id: number;
   html: string;
+  certificate_id: number;
   filename: string;
-  message?: string;
+  pdf_path: string;
+  full_path: string;
 }
 
 // API Response Types

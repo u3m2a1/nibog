@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Plus, Search, Edit, Trash, Copy, FileText, Loader2 } from "lucide-react"
+import { Plus, Search, Edit, Trash, Copy, FileText, Loader2, Eye, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -34,6 +34,7 @@ import {
   deleteCertificateTemplate,
   duplicateCertificateTemplate
 } from "@/services/certificateTemplateService"
+import { generateCertificatePreview } from "@/services/certificatePdfService"
 
 export default function CertificateTemplatesPage() {
   const [templates, setTemplates] = useState<CertificateTemplate[]>([])
@@ -42,6 +43,7 @@ export default function CertificateTemplatesPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [loading, setLoading] = useState(true)
   const [deleteLoading, setDeleteLoading] = useState<number | null>(null)
+  const [previewLoading, setPreviewLoading] = useState<number | null>(null)
   const { toast } = useToast()
 
   // Load templates on component mount
@@ -126,6 +128,43 @@ export default function CertificateTemplatesPage() {
     }
   }
 
+  const handlePreview = async (template: CertificateTemplate) => {
+    try {
+      setPreviewLoading(template.id)
+
+      // Generate sample certificate data for preview
+      const sampleData = {
+        participant_name: "John Doe",
+        event_name: "Baby Crawling Championship 2024",
+        event_date: new Date().toLocaleDateString(),
+        venue_name: "Community Center Hall",
+        city_name: "Mumbai",
+        certificate_number: "CERT-001",
+        position: "1st Place",
+        score: "95 points",
+        achievement: "Outstanding Performance",
+        instructor: "Ms. Sarah Johnson",
+        organization: "Nibog Events"
+      }
+
+      await generateCertificatePreview(template, sampleData)
+
+      toast({
+        title: "Preview Generated",
+        description: "Certificate preview opened in new window"
+      })
+    } catch (error) {
+      console.error('Error generating preview:', error)
+      toast({
+        title: "Error",
+        description: "Failed to generate certificate preview",
+        variant: "destructive"
+      })
+    } finally {
+      setPreviewLoading(null)
+    }
+  }
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'participation':
@@ -155,12 +194,20 @@ export default function CertificateTemplatesPage() {
             <h1 className="text-3xl font-bold tracking-tight">Certificate Templates</h1>
             <p className="text-muted-foreground">Manage certificate templates for NIBOG events</p>
           </div>
-          <Button asChild>
-            <Link href="/admin/certificate-templates/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Create New Template
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/admin/events">
+                <Download className="mr-2 h-4 w-4" />
+                Generate for Events
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/admin/certificate-templates/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Template
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -182,12 +229,20 @@ export default function CertificateTemplatesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Certificate Templates</h1>
           <p className="text-muted-foreground">Manage certificate templates for NIBOG events</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/certificate-templates/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Template
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/events">
+              <Download className="mr-2 h-4 w-4" />
+              Generate for Events
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/certificate-templates/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Template
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -243,15 +298,19 @@ export default function CertificateTemplatesPage() {
                     <div className="relative h-16 w-24 overflow-hidden rounded-md border">
                       {template.background_image ? (
                         <img
-                          src={template.background_image}
+                          src={template.background_image.startsWith('http') ? template.background_image : `http://localhost:3000${template.background_image}`}
                           alt={template.name}
                           className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
                         />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                          <FileText className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
+                      ) : null}
+                      <div className={`absolute inset-0 flex items-center justify-center bg-muted ${template.background_image ? 'hidden' : ''}`}>
+                        <FileText className="h-6 w-6 text-muted-foreground" />
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">
@@ -272,6 +331,20 @@ export default function CertificateTemplatesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePreview(template)}
+                        disabled={previewLoading === template.id}
+                        title="Preview Certificate"
+                      >
+                        {previewLoading === template.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Preview</span>
+                      </Button>
                       <Button variant="outline" size="icon" asChild>
                         <Link href={`/admin/certificate-templates/${template.id}/edit`}>
                           <Edit className="h-4 w-4" />

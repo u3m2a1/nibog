@@ -26,8 +26,14 @@ export async function uploadCertificateBackground(file: File): Promise<string> {
       throw new Error(errorData.error || 'Failed to upload background image');
     }
 
-    const result: BackgroundUploadResponse[] = await response.json();
-    return result[0].file_path;
+    const result = await response.json();
+
+    // Handle the actual response format from n8n API
+    if (result && result.success && result.file_path) {
+      return result.file_path;
+    } else {
+      throw new Error(`Upload failed or no file_path in response. Response: ${JSON.stringify(result)}`);
+    }
   } catch (error) {
     console.error('Error uploading background:', error);
     throw error;

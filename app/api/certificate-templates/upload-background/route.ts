@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,25 +33,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Forward to n8n webhook
-    const n8nFormData = new FormData();
-    n8nFormData.append('file', file);
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomSuffix = Math.floor(Math.random() * 10000);
+    const fileExtension = file.name.split('.').pop() || 'jpg';
+    const filename = `template_${timestamp}_${randomSuffix}.${fileExtension}`;
 
-    const response = await fetch(
-      'https://ai.alviongs.com/webhook/v1/nibog/certificate-templates/upload-background',
-      {
-        method: 'POST',
-        body: n8nFormData,
-      }
-    );
+    // Create directory if it doesn't exist
+    const uploadDir = join(process.cwd(), 'public', 'images', 'certificatetemplates');
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('n8n upload error:', errorText);
-      throw new Error('Failed to upload to n8n');
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
     }
 
-    const result = await response.json();
+    // Convert file to buffer and save
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const filePath = join(uploadDir, filename);
+
+    await writeFile(filePath, buffer);
+
+    // Return the same format as n8n API for compatibility
+    const result = {
+      success: true,
+      file_path: `/images/certificatetemplates/${filename}`,
+      filename: filename
+    };
+
     return NextResponse.json(result);
 
   } catch (error) {

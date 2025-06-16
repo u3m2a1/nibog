@@ -1,26 +1,5 @@
 ## Certificate Templates API
 
-### create upload background path
-
-POST https://ai.alviongs.com/webhook/v1/nibog/certificate-templates/upload-background
-
-Payload
-
-Content-Type: multipart/form-data
-Payload: Form data with file
-
-Response (201 Created)
-
-```json
-[
-  {
-    "success": true,
-    "file_path": "/images/certificatetemplates/template_1749795583929_376.jpeg",
-    "filename": "template_1749795583929_376.jpeg"
-  }
-]
-```
-
 ### Create Certificate Template
 
 **POST** https://ai.alviongs.com/webhook/v1/nibog/certificate-templates/create
@@ -28,10 +7,10 @@ Response (201 Created)
 Payload
 
 ```json
-{
-  "name": "Participation Certificate",
-  "description": "General participation certificate for all events",
-  "type": "participation",
+ {
+  "name": "Winner Certificate",
+  "description": "Certificate awarded to winners of the event",
+  "type": "winner",
   "background_image": "/images/certificatetemplates/template_1749795583929_376.jpeg",
   "paper_size": "a4",
   "orientation": "landscape",
@@ -47,7 +26,8 @@ Payload
       "font_family": "Arial",
       "color": "#000000"
     }
-  ]
+  ],
+  "appreciation_text": "For achieving {achievement} in {event_name}. Your dedication, talent, and outstanding performance at NIBOG have distinguished you among the best. Congratulations on this remarkable achievement from the entire NIBOG team!"
 }
 ```
 
@@ -56,10 +36,10 @@ Response (201 Created)
 ```json
 [
   {
-    "id": 2,
-    "name": "Participation Certificate",
-    "description": "General participation certificate for all events",
-    "type": "participation",
+    "id": 20,
+    "name": "Winner Certificate",
+    "description": "Certificate awarded to winners of the event",
+    "type": "winner",
     "background_image": "/images/certificatetemplates/template_1749795583929_376.jpeg",
     "paper_size": "a4",
     "orientation": "landscape",
@@ -77,8 +57,9 @@ Response (201 Created)
       }
     ],
     "is_active": true,
-    "created_at": "2025-06-13T06:25:20.361Z",
-    "updated_at": "2025-06-13T06:25:20.361Z"
+    "created_at": "2025-06-16T02:26:05.240Z",
+    "updated_at": "2025-06-16T02:26:05.240Z",
+    "appreciation_text": "For achieving {achievement} in {event_name}. Your dedication, talent, and outstanding performance at NIBOG have distinguished you among the best. Congratulations on this remarkable achievement from the entire NIBOG team!"
   }
 ]
 ```
