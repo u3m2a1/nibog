@@ -68,8 +68,53 @@ export default function EventCertificatesPage() {
   const loadEventParticipants = async () => {
     try {
       setLoading(true)
+      console.log('Loading participants for event ID:', eventId)
       const data = await getEventParticipants(eventId)
-      setEventData(data)
+      console.log('Participants data received:', data)
+      // Handle both array response and direct object response formats
+      if (Array.isArray(data)) {
+        // If it's an array (new API format), take the first item
+        const firstResponse = data[0];
+        console.log('Array response format, first item:', JSON.stringify(firstResponse, null, 2));
+        
+        // If we have participants, extract event info from the first participant
+        if (firstResponse?.participants?.length > 0) {
+          const firstParticipant = firstResponse.participants[0];
+          console.log('First participant with event info:', firstParticipant);
+          
+          // Create enhanced event data with info from both the response and first participant
+          const enhancedEventData = {
+            ...firstResponse,
+            event_title: firstParticipant.event_title,
+            event_name: firstParticipant.event_title, // Use event_title as event_name if needed
+            venue_name: firstParticipant.venue_name,
+            event_date: firstParticipant.event_date
+          };
+          
+          console.log('Enhanced event data:', enhancedEventData);
+          setEventData(enhancedEventData);
+        } else {
+          setEventData(firstResponse);
+        }
+      } else {
+        // If it's already an object (old format)
+        console.log('Object response format:', JSON.stringify(data, null, 2));
+        
+        // Similar logic for object format
+        if (data?.participants?.length > 0) {
+          const firstParticipant = data.participants[0];
+          const enhancedEventData = {
+            ...data,
+            event_title: firstParticipant.event_title,
+            event_name: firstParticipant.event_title,
+            venue_name: firstParticipant.venue_name,
+            event_date: firstParticipant.event_date
+          };
+          setEventData(enhancedEventData);
+        } else {
+          setEventData(data);
+        }
+      }
     } catch (error) {
       console.error('Error loading participants:', error)
       toast({
@@ -99,42 +144,68 @@ export default function EventCertificatesPage() {
     }
   }
 
-  // Filter participants
-  const filteredParticipants = eventData?.participants.filter(participant => {
-    const matchesSearch = participant.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (participant.child_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
-    const matchesGame = gameFilter === "all" || participant.game_id.toString() === gameFilter
+  // Filter participants - API handles status filtering, we just filter by search term and game
+  const filteredParticipants = eventData?.participants?.filter(participant => {
+    // Add safety checks for all properties before accessing them
+    const parentName = participant?.parent_name || ''
+    const childName = participant?.child_name || ''
+    const gameId = participant?.game_id?.toString() || ''
+    
+    const matchesSearch = 
+      parentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      childName.toLowerCase().includes(searchTerm.toLowerCase())
+      
+    const matchesGame = gameFilter === "all" || gameId === gameFilter
+    
     return matchesSearch && matchesGame
   }) || []
 
   // Get unique games
-  const uniqueGames = eventData?.participants.reduce((acc, participant) => {
-    if (!acc.find(g => g.id === participant.game_id)) {
-      acc.push({ id: participant.game_id, name: participant.game_name })
+  const uniqueGames = eventData?.participants?.reduce((acc, participant) => {
+    const gameId = participant?.game_id
+    const gameName = participant?.game_name || ''
+    
+    if (gameId !== undefined && !acc.find(g => g.id === gameId)) {
+      acc.push({ id: gameId, name: gameName })
     }
     return acc
   }, [] as Array<{ id: number; name: string }>) || []
 
+  // Select all participants functionality
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const participantIds = filteredParticipants.map(p => `${p.user_id}-${p.child_id || 0}`)
-      setSelectedParticipants(new Set(participantIds))
+      // Create a new Set with all filtered participant IDs
+      const newSelection = new Set(
+        filteredParticipants.map(p => 
+          `${p.booking_id}-${p.parent_id}-${p.child_id || 0}-${p.game_name}`
+        )
+      )
+      setSelectedParticipants(newSelection)
     } else {
+      // Clear all selections
       setSelectedParticipants(new Set())
     }
   }
 
   const handleSelectParticipant = (participant: EventParticipant, checked: boolean) => {
-    const participantId = `${participant.user_id}-${participant.child_id || 0}`
-    const newSelected = new Set(selectedParticipants)
-
+    const bookingId = participant?.booking_id || 0
+    const parentId = participant?.parent_id || 0
+    const childId = participant?.child_id || 0
+    const gameName = participant?.game_name || ''
+    const participantId = `${bookingId}-${parentId}-${childId}-${gameName}`
+    
+    // Create a new Set based on current selections
+    const newSelections = new Set(selectedParticipants)
+    
     if (checked) {
-      newSelected.add(participantId)
+      // Add this participant to selections
+      newSelections.add(participantId)
     } else {
-      newSelected.delete(participantId)
+      // Remove this participant from selections
+      newSelections.delete(participantId)
     }
-
-    setSelectedParticipants(newSelected)
+    
+    setSelectedParticipants(newSelections)
   }
 
   const handleBulkGenerate = async () => {
@@ -148,18 +219,34 @@ export default function EventCertificatesPage() {
     }
 
     const participantsToGenerate = filteredParticipants.filter(p =>
-      selectedParticipants.has(`${p.user_id}-${p.child_id || 0}`)
+      selectedParticipants.has(`${p.booking_id}-${p.parent_id}-${p.child_id || 0}-${p.game_name}`)
     )
 
     try {
       setGenerating(true)
       setBulkProgress(null)
+      
+      // Create a game name to ID mapping from uniqueGames
+      const gameNameToIdMap = uniqueGames.reduce((map, game) => {
+        map[game.name] = game.id;
+        return map;
+      }, {} as Record<string, number>);
+      
+      console.log('Game name to ID mapping:', gameNameToIdMap);
+      
+      // Enhance participants with game IDs from the mapping
+      const enhancedParticipants = participantsToGenerate.map(p => ({
+        ...p,
+        game_id: p.game_id || gameNameToIdMap[p.game_name] || null
+      }));
+      
+      console.log('Enhanced participants with game IDs:', enhancedParticipants);
 
       const progress = await generateBulkCertificates(
         selectedTemplate,
         eventId,
-        participantsToGenerate,
-        undefined, // gameId - optional
+        enhancedParticipants,
+        undefined, // No longer needed as each participant has game_id
         (progress) => setBulkProgress(progress)
       )
 
@@ -237,9 +324,9 @@ export default function EventCertificatesPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Event Certificates</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{eventData.event_title || 'Event Certificates'}</h1>
           <p className="text-muted-foreground">
-            Generate certificates for {eventData.event_name} participants
+            Generate certificates for participants
           </p>
         </div>
       </div>
@@ -253,7 +340,7 @@ export default function EventCertificatesPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <p className="text-sm font-medium text-gray-500">Event Name</p>
-              <p className="text-lg font-semibold">{eventData.event_name}</p>
+              <p className="text-lg font-semibold">{eventData.event_title}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Date</p>
@@ -274,7 +361,9 @@ export default function EventCertificatesPage() {
       {/* Certificate Generation */}
       <Card>
         <CardHeader>
-          <CardTitle>Generate Certificates</CardTitle>
+          <CardTitle>
+            {eventData?.event_title || 'Generate Certificates'}
+          </CardTitle>
           <CardDescription>
             Select a template and participants to generate certificates
           </CardDescription>
@@ -396,14 +485,13 @@ export default function EventCertificatesPage() {
                   />
                 </TableHead>
                 <TableHead>Participant</TableHead>
+                <TableHead>Booking ID</TableHead>
                 <TableHead>Game</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Booking</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredParticipants.map((participant) => {
-                const participantId = `${participant.user_id}-${participant.child_id || 0}`
+                const participantId = `${participant.booking_id}-${participant.parent_id}-${participant.child_id || 0}-${participant.game_name}`
                 const isSelected = selectedParticipants.has(participantId)
 
                 return (
@@ -417,33 +505,25 @@ export default function EventCertificatesPage() {
                     <TableCell>
                       <div>
                         <p className="font-medium">
-                          {participant.child_name || participant.user_name}
+                          {participant.child_name || participant.parent_name}
                         </p>
-                        <p className="text-sm text-gray-500">{participant.user_email}</p>
-                        {participant.child_age_months && (
+                        <p className="text-sm text-gray-500">{participant.email}</p>
+                        {participant.date_of_birth && (
                           <p className="text-xs text-gray-400">
-                            Age: {Math.floor(participant.child_age_months / 12)}y {participant.child_age_months % 12}m
+                            DOB: {new Date(participant.date_of_birth).toLocaleDateString()}
                           </p>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
+                      <Badge variant="secondary">{participant.booking_id}</Badge>
+                      <p className="text-xs text-gray-500 mt-1">{participant.booking_ref}</p>
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="outline">{participant.game_name}</Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={participant.attendance_status === 'present' ? 'default' : 'secondary'}
-                      >
-                        {participant.attendance_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={participant.booking_status === 'confirmed' ? 'default' : 'secondary'}
-                      >
-                        {participant.booking_status}
-                      </Badge>
-                    </TableCell>
+
+
                   </TableRow>
                 )
               })}

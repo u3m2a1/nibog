@@ -75,9 +75,10 @@ export interface GenerateSingleCertificateRequest {
   template_id: number;
   event_id: number;
   game_id?: number;
-  user_id: number;
+  parent_id: number;
   child_id?: number;
   certificate_data: CertificateData;
+  user_id: number; // Required by the API
 }
 
 export interface GenerateBulkCertificatesRequest {
@@ -87,7 +88,7 @@ export interface GenerateBulkCertificatesRequest {
   certificate_type: string;
   include_no_shows?: boolean;
   participants: Array<{
-    user_id: number;
+    parent_id: number;
     child_id?: number;
     participant_name: string;
     additional_data?: Record<string, any>;
@@ -96,22 +97,28 @@ export interface GenerateBulkCertificatesRequest {
 
 // Event Participants Types
 export interface EventParticipant {
-  user_id: number;
-  child_id?: number;
-  user_name: string;
-  user_email: string;
-  child_name?: string;
-  child_age_months?: number;
-  game_id: number;
-  game_name: string;
-  attendance_status: string;
   booking_id: number;
-  booking_status: string;
+  booking_ref: string;
+  parent_id: number;
+  parent_name: string;
+  email: string;
+  additional_phone?: string;
+  child_id: number;
+  child_name: string;
+  date_of_birth?: string;
+  gender?: string;
+  event_title: string;
+  event_date: string;
+  venue_name: string;
+  game_name: string;
+  game_id?: number;
+  attendance_status?: string;
 }
 
 export interface EventParticipantsResponse {
   event_id: number;
   event_name: string;
+  event_title: string;
   event_date: string;
   venue_name: string;
   city_name: string;

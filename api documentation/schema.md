@@ -533,18 +533,6 @@ CREATE TABLE generated_certificates (
     downloaded_at TIMESTAMP
 );
 
---- Certificate Email Log table
-
-CREATE TABLE certificate_email_log (
-    id SERIAL PRIMARY KEY,
-    certificate_id INTEGER NOT NULL REFERENCES generated_certificates(id),
-    recipient_email VARCHAR(255) NOT NULL,
-    subject VARCHAR(255),
-    status VARCHAR(50) NOT NULL CHECK (status IN ('sent', 'failed', 'bounced')),
-    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    error_message TEXT
-);
-
 --- Indexes for performance
 
 -- Indexes for certificate_templates
@@ -556,10 +544,6 @@ CREATE INDEX idx_generated_certificates_event ON generated_certificates(event_id
 CREATE INDEX idx_generated_certificates_user ON generated_certificates(user_id);
 CREATE INDEX idx_generated_certificates_status ON generated_certificates(status);
 CREATE INDEX idx_generated_certificates_template ON generated_certificates(template_id);
-
--- Indexes for certificate_email_log
-CREATE INDEX idx_certificate_email_log_certificate ON certificate_email_log(certificate_id);
-CREATE INDEX idx_certificate_email_log_status ON certificate_email_log(status);
 
 --- Booking Add-ons table
 

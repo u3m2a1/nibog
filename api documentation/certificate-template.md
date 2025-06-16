@@ -267,16 +267,17 @@ Response (200 OK)
 
 ### Generate Single Certificate
 
-**POST** https://ai.alviongs.com/webhook/v1/nibog/certificates/generate-single
+**POST** https://ai.alviongs.com/webhook/v1/nibog/certificate/generate-single
 
 Payload
 
 ```json
 {
-  "template_id": 3,
+  "template_id": 25,
   "event_id": 11,
   "game_id": 2,
-  "user_id": 4,
+  "user_id": 4, // This could be null or omitted if backend does lookup
+  "parent_id": 35, // The parent_id from participants data
   "child_id": 5,
   "certificate_data": {
     "participant_name": "John Doe",
@@ -293,22 +294,25 @@ Response (201 Created)
 ```json
 [
   {
-    "id": 1,
-    "template_id": 2,
-    "event_id": 5,
-    "game_id": 3,
-    "user_id": 10,
-    "child_id": 15,
+    "id": 5,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 5,
     "certificate_data": {
-      "participant_name": "John Doe",
-      "event_name": "Baby Olympics 2025",
-      "date": "2025-06-13",
-      "position": "1st Place",
-      "score": "95"
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750082715606-ITGGYL"
     },
-    "pdf_url": "https://storage.example.com/certificates/cert_1.pdf",
+    "pdf_url": null,
     "status": "generated",
-    "generated_at": "2025-06-13T06:30:00Z"
+    "generated_at": "2025-06-16T08:41:30.702Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com"
   }
 ]
 
@@ -351,48 +355,305 @@ Response (200 OK)
 
 ### Get Event Participants for Certificate Generation
 
-**GET** https://ai.alviongs.com/webhook/v1/nibog/events/{event_id}/participants-for-certificates
-
-**Example**: GET https://ai.alviongs.com/webhook/v1/nibog/events/5/participants-for-certificates
+**GET** https://ai.alviongs.com/webhook/v1/nibog/events/participants?event_id=11
 
 Response (200 OK)
 
 ```json
-{
-  "event_id": 5,
-  "event_name": "Baby Olympics 2025",
-  "participants": [
-    {
-      "user_id": 10,
-      "child_id": 15,
-      "user_name": "Parent Name",
-      "user_email": "parent@example.com",
-      "child_name": "John Doe",
-      "child_age": 24,
-      "game_id": 3,
-      "game_name": "Baby Crawling",
-      "attendance_status": "Attended",
-      "position": null,
-      "score": null
-    },
-    {
-      "user_id": 11,
-      "child_id": 16,
-      "user_name": "Another Parent",
-      "user_email": "parent2@example.com",
-      "child_name": "Jane Smith",
-      "child_age": 26,
-      "game_id": 3,
-      "game_name": "Baby Crawling",
-      "attendance_status": "Attended",
-      "position": null,
-      "score": null
-    }
-  ]
-}
-```
-
-
-
-
-
+[
+  {
+    "event_date": "2025-05-09T18:30:00.000Z",
+    "venue_name": "NIBOG Stadium",
+    "total_participants": 18,
+    "participants": [
+      {
+        "booking_id": 11,
+        "booking_ref": "nibog",
+        "parent_id": 35,
+        "parent_name": "saarah",
+        "email": "sarah@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 35,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 11,
+        "booking_ref": "nibog",
+        "parent_id": 35,
+        "parent_name": "saarah",
+        "email": "sarah@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 35,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Obstacle Course"
+      },
+      {
+        "booking_id": 12,
+        "booking_ref": "nibog",
+        "parent_id": 36,
+        "parent_name": "sneha",
+        "email": "sneha@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 36,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 12,
+        "booking_ref": "nibog",
+        "parent_id": 36,
+        "parent_name": "sneha",
+        "email": "sneha@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 36,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Obstacle Course"
+      },
+      {
+        "booking_id": 13,
+        "booking_ref": "nibog",
+        "parent_id": 38,
+        "parent_name": "uma",
+        "email": "umakallepally6543@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 38,
+        "child_name": "uma",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 14,
+        "booking_ref": "nibog",
+        "parent_id": 39,
+        "parent_name": "uma",
+        "email": "umakallepally6543@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 39,
+        "child_name": "uma",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 15,
+        "booking_ref": "nibog",
+        "parent_id": 40,
+        "parent_name": "uma",
+        "email": "umakallepally6543@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 40,
+        "child_name": "uma",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 16,
+        "booking_ref": "nibog",
+        "parent_id": 41,
+        "parent_name": "uma",
+        "email": "umakallepally6543@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 41,
+        "child_name": "uma",
+        "date_of_birth": "2024-01-09T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 17,
+        "booking_ref": "nibog",
+        "parent_id": 42,
+        "parent_name": "harshitha",
+        "email": "harshitha@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 42,
+        "child_name": "harsh",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 18,
+        "booking_ref": "nibog",
+        "parent_id": 43,
+        "parent_name": "xyz",
+        "email": "xyz@email.com",
+        "additional_phone": "+919346015886",
+        "child_id": 43,
+        "child_name": "uma",
+        "date_of_birth": "2024-01-19T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 19,
+        "booking_ref": "nibog",
+        "parent_id": 44,
+        "parent_name": "harsh",
+        "email": "harsh@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 44,
+        "child_name": "uma",
+        "date_of_birth": "2024-01-01T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 20,
+        "booking_ref": "nibog",
+        "parent_id": 45,
+        "parent_name": "harshitha",
+        "email": "harsh@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 45,
+        "child_name": "harsh",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 21,
+        "booking_ref": "nibog",
+        "parent_id": 46,
+        "parent_name": "harshitha",
+        "email": "harsh@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 46,
+        "child_name": "harsh",
+        "date_of_birth": "2023-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Hurdle Toddle"
+      },
+      {
+        "booking_id": 22,
+        "booking_ref": "nibog",
+        "parent_id": 47,
+        "parent_name": "uma",
+        "email": "umakallepally6543@gmail.com",
+        "additional_phone": "+919346015886",
+        "child_id": 47,
+        "child_name": "umaaa",
+        "date_of_birth": "2024-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 23,
+        "booking_ref": "nibog",
+        "parent_id": 48,
+        "parent_name": "test",
+        "email": "test@gmail.com",
+        "additional_phone": "+919876543210",
+        "child_id": 48,
+        "child_name": "ytdusid",
+        "date_of_birth": "2024-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 24,
+        "booking_ref": "nibog",
+        "parent_id": 49,
+        "parent_name": "test2",
+        "email": "test@gmail.com",
+        "additional_phone": "+919876543210",
+        "child_id": 49,
+        "child_name": "test",
+        "date_of_birth": "2024-12-31T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 25,
+        "booking_ref": "nibog",
+        "parent_id": 50,
+        "parent_name": "sneha",
+        "email": "sneha@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 50,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Baby Crawling"
+      },
+      {
+        "booking_id": 25,
+        "booking_ref": "nibog",
+        "parent_id": 50,
+        "parent_name": "sneha",
+        "email": "sneha@example.com",
+        "additional_phone": "+916303727148",
+        "child_id": 50,
+        "child_name": "dimbuu",
+        "date_of_birth": "2018-05-11T18:30:00.000Z",
+        "gender": "Female",
+        "event_title": "Spring Carnival",
+        "event_date": "2025-05-09T18:30:00.000Z",
+        "venue_name": "NIBOG Stadium",
+        "game_name": "Obstacle Course"
+      }
+    ]
+  }
+]

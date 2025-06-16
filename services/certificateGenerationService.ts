@@ -40,6 +40,7 @@ export async function generateSingleCertificate(
  */
 export async function getEventParticipants(eventId: number): Promise<EventParticipantsResponse> {
   try {
+    console.log('Fetching participants for event ID:', eventId);
     const response = await fetch(`/api/events/participants-for-certificates?event_id=${eventId}`, {
       method: 'GET',
       headers: {
@@ -47,12 +48,16 @@ export async function getEventParticipants(eventId: number): Promise<EventPartic
       },
     });
 
+    console.log('Response status:', response.status);
+
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('API error response:', errorData);
       throw new Error(errorData.error || 'Failed to fetch event participants');
     }
 
     const result: EventParticipantsResponse = await response.json();
+    console.log('Service received data:', result);
     return result;
   } catch (error) {
     console.error('Error fetching participants:', error);
@@ -105,7 +110,7 @@ export async function generateBulkCertificates(
 
   for (let i = 0; i < participants.length; i++) {
     const participant = participants[i];
-    progress.current = participant.child_name || participant.user_name;
+    progress.current = participant.child_name || participant.parent_name;
     
     if (onProgress) {
       onProgress({ ...progress });
@@ -114,7 +119,7 @@ export async function generateBulkCertificates(
     try {
       // Generate certificate data
       const certificateData = {
-        participant_name: participant.child_name || participant.user_name,
+        participant_name: participant.child_name || participant.parent_name,
         event_name: '', // Will be filled by backend
         event_date: '', // Will be filled by backend
         venue_name: '', // Will be filled by backend
@@ -124,14 +129,44 @@ export async function generateBulkCertificates(
         attendance_status: participant.attendance_status
       };
 
+      // Step 1: Extract game information from participant
+      const gameName = participant.game_name;
+      let gameId = participant.game_id;
+      
+      // Step 2: If game_id is a string, convert it to a number
+      if (typeof gameId === 'string') {
+        gameId = parseInt(gameId, 10);
+      }
+      
+      // Step 3: If we have a game_name but no game_id, try to infer game_id from name
+      // This assumes game names could be in format "Game Name (ID)" or contains an ID we can parse
+      if (gameId === undefined && gameName) {
+        // Try to extract a number from the game name if it contains digits
+        const matches = gameName.match(/(\d+)/); // Look for numbers in the game name
+        if (matches && matches[1]) {
+          gameId = parseInt(matches[1], 10);
+          console.log('Extracted game ID from name:', gameId);
+        }
+      }
+      
+      // This will help with debugging the game_id issue
+      console.log('Game ID for certificate:', gameId, 'Type:', typeof gameId);
+      console.log('Game Name:', gameName); 
+      console.log('Participant data:', participant);
+      
+      // Get parent details for certificate generation
+      // Note: Backend workflow will use parent_id to look up the correct user_id if needed
       const request: GenerateSingleCertificateRequest = {
         template_id: templateId,
         event_id: eventId,
-        game_id: gameId,
-        user_id: participant.user_id,
+        game_id: participant.game_id, // Use parsed game_id or null if undefined
+        parent_id: participant.parent_id,
         child_id: participant.child_id,
-        certificate_data: certificateData
+        certificate_data: certificateData,
+        user_id: participant.parent_id // The backend will validate/lookup the correct user_id
       };
+      
+      console.log('Certificate generation request:', request);
 
       const certificate = await generateSingleCertificate(request);
       
@@ -201,7 +236,7 @@ export function generateCertificateDataForParticipant(
   additionalData?: Record<string, any>
 ) {
   return {
-    participant_name: participant.child_name || participant.user_name,
+    participant_name: participant.child_name || participant.parent_name,
     event_name: '', // Will be filled by backend
     event_date: '', // Will be filled by backend
     venue_name: '', // Will be filled by backend
@@ -209,7 +244,7 @@ export function generateCertificateDataForParticipant(
     certificate_number: `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
     game_name: participant.game_name,
     attendance_status: participant.attendance_status,
-    user_email: participant.user_email,
+    email: participant.email,
     ...additionalData
   };
 }
