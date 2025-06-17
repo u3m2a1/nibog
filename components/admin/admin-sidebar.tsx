@@ -21,6 +21,8 @@ import {
   QrCode,
   UserCheck,
   CheckSquare,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -84,9 +86,18 @@ const adminRoutes = [
     icon: <Package className="h-5 w-5" />,
   },
   {
-    href: "/admin/certificate-templates",
     label: "Certificates",
     icon: <FileText className="h-5 w-5" />,
+    children: [
+      {
+        href: "/admin/certificate-templates",
+        label: "Certificate Templates",
+      },
+      {
+        href: "/admin/certificates",
+        label: "Generated Certificates",
+      },
+    ],
   },
   {
     href: "/admin/attendance",
@@ -108,7 +119,15 @@ const adminRoutes = [
 export default function AdminSidebar() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
   const router = useRouter()
+  
+  const toggleSection = (label: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [label]: !prev[label]
+    }))
+  }
 
   const handleLogout = async () => {
     try {
@@ -152,21 +171,66 @@ export default function AdminSidebar() {
             </div>
             <nav className="flex-1 overflow-auto p-2">
               <ul className="space-y-1">
-                {adminRoutes.map((route) => (
-                  <li key={route.href}>
-                    <Link
-                      href={route.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
-                        pathname === route.href ? "bg-muted" : "text-muted-foreground",
-                      )}
-                      onClick={() => setOpen(false)}
-                    >
-                      {route.icon}
-                      {route.label}
-                    </Link>
-                  </li>
-                ))}
+                {adminRoutes.map((route, index) => {
+                  // Check if this is a parent item with children
+                  if ('children' in route && route.children) {
+                    const isExpanded = expandedSections[route.label] || false;
+                    const hasActiveChild = route.children.some(child => child.href && pathname === child.href);
+                    
+                    return (
+                      <li key={`parent-${index}`}>
+                        <button
+                          className={cn(
+                            "w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                            (isExpanded || hasActiveChild) ? "bg-muted" : "text-muted-foreground",
+                          )}
+                          onClick={() => toggleSection(route.label)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {route.icon}
+                            {route.label}
+                          </div>
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                        {isExpanded && (
+                          <ul className="mt-1 ml-6 space-y-1">
+                            {route.children.map((child, childIndex) => (
+                              <li key={`child-${index}-${childIndex}`}>
+                                <Link
+                                  href={child.href || '#'}
+                                  className={cn(
+                                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                                    pathname === child.href ? "bg-muted" : "text-muted-foreground",
+                                  )}
+                                  onClick={() => setOpen(false)}
+                                >
+                                  {child.label}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  }
+                  
+                  // Regular menu item without children
+                  return (
+                    <li key={route.href}>
+                      <Link
+                        href={route.href as string}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                          pathname === route.href ? "bg-muted" : "text-muted-foreground",
+                        )}
+                        onClick={() => setOpen(false)}
+                      >
+                        {route.icon}
+                        {route.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </nav>
             <div className="border-t p-4">
@@ -192,20 +256,64 @@ export default function AdminSidebar() {
           </div>
           <nav className="flex-1 overflow-auto p-2">
             <ul className="space-y-1">
-              {adminRoutes.map((route) => (
-                <li key={route.href}>
-                  <Link
-                    href={route.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
-                      pathname === route.href ? "bg-muted" : "text-muted-foreground",
-                    )}
-                  >
-                    {route.icon}
-                    {route.label}
-                  </Link>
-                </li>
-              ))}
+              {adminRoutes.map((route, index) => {
+                // Check if this is a parent item with children
+                if ('children' in route && route.children) {
+                  const isExpanded = expandedSections[route.label] || false;
+                  const hasActiveChild = route.children.some(child => child.href && pathname === child.href);
+                  
+                  return (
+                    <li key={`parent-${index}`}>
+                      <button
+                        className={cn(
+                          "w-full flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                          (isExpanded || hasActiveChild) ? "bg-muted" : "text-muted-foreground",
+                        )}
+                        onClick={() => toggleSection(route.label)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {route.icon}
+                          {route.label}
+                        </div>
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                      {isExpanded && (
+                        <ul className="mt-1 ml-6 space-y-1">
+                          {route.children.map((child, childIndex) => (
+                            <li key={`child-${index}-${childIndex}`}>
+                              <Link
+                                href={child.href || '#'}
+                                className={cn(
+                                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                                  pathname === child.href ? "bg-muted" : "text-muted-foreground",
+                                )}
+                              >
+                                {child.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                }
+                
+                // Regular menu item without children
+                return (
+                  <li key={route.href}>
+                    <Link
+                      href={route.href as string}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium hover:bg-muted",
+                        pathname === route.href ? "bg-muted" : "text-muted-foreground",
+                      )}
+                    >
+                      {route.icon}
+                      {route.label}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </nav>
           <div className="border-t p-4">

@@ -657,3 +657,427 @@ Response (200 OK)
     ]
   }
 ]
+
+## Get all generated certificates
+
+**GET** https://ai.alviongs.com/webhook/v1/nibog/certificates/get-all
+
+Response (200 OK)
+
+```json
+[
+  {
+    "id": 20,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 8,
+    "child_id": 36,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086985546-CGN763"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:46:25.559Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "sneha",
+    "parent_name": "sneha@example.com",
+    "game_name": "Obstacle Course",
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 19,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 4,
+    "user_id": 8,
+    "child_id": 36,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086985139-C5N4S3"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:46:25.148Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "sneha",
+    "parent_name": "sneha@example.com",
+    "game_name": "Baby Crawling",
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 18,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086984813-R2RQKE"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:46:24.824Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": "Obstacle Course",
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 17,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 4,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086984394-0UAXGB"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:46:24.406Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": "Baby Crawling",
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 16,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 4,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086952266-P9WQXD"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:45:52.279Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": "Baby Crawling",
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 15,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086497426-5PBAYP"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:38:17.435Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 14,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750086321967-YGUC0D"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:35:21.984Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 13,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750085113294-KDSJ8P"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:15:13.307Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 12,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750084718161-1RDHQC"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:08:38.173Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 11,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 8,
+    "child_id": 36,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750084353101-WWVMHT"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:02:33.110Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "sneha",
+    "parent_name": "sneha@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 10,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 8,
+    "child_id": 36,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750084352436-3MN2S8"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:02:32.443Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "sneha",
+    "parent_name": "sneha@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 9,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750084352093-7K0JBA"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:02:32.103Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 8,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750084351756-A1RUN2"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T09:02:31.769Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 7,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750083675623-MVXTGM"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T08:51:15.641Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 6,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": null,
+    "user_id": 4,
+    "child_id": 35,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750083544281-9X8RAF"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T08:49:04.299Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": null,
+    "child_name": "dimbuu"
+  },
+  {
+    "id": 5,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 5,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750082715606-ITGGYL"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T08:41:30.702Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": "saarah",
+    "parent_name": "sarah@example.com",
+    "game_name": "Obstacle Course",
+    "child_name": "Alice Doe"
+  },
+  {
+    "id": 4,
+    "template_id": 25,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 5,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1750082399851-52JLY7"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-16T08:29:59.867Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": null,
+    "parent_name": null,
+    "game_name": "Obstacle Course",
+    "child_name": "Alice Doe"
+  },
+  {
+    "id": 0,
+    "template_id": 3,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 5,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1749806228024-CD3YI7"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-13T03:47:19.983Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": null,
+    "parent_name": null,
+    "game_name": "Obstacle Course",
+    "child_name": "Alice Doe"
+  }
+]

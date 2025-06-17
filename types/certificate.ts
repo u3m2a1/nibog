@@ -175,3 +175,22 @@ export interface BulkGenerationProgress {
     error?: string;
   }>;
 }
+
+// Certificate List Item for display in UI
+export interface CertificateListItem extends GeneratedCertificate {
+  template_name?: string;
+  template_type?: string;
+  event_title?: string;
+  event_date?: string;
+  venue_name?: string;
+  city_name?: string;
+  certificate_number?: string;
+  user_name?: string;
+  user_email?: string;
+  child_id?: number;
+  child_name?: string;
+  game_name?: string;
+  parent_name?: string;
+  parent_email?: string;
+  raw_certificate_data?: any;
+}

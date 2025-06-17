@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 import { downloadCertificateHTML } from './certificateGenerationService';
 import { CertificateDownloadResponse, CertificateTemplate, CertificateData } from '@/types/certificate';
 
@@ -454,23 +455,131 @@ function generateCertificateHTML(
  */
 export async function generateBulkPDFs(
   certificateIds: number[],
+  zipFilename: string = 'certificates.zip',
   onProgress?: (current: number, total: number) => void
 ): Promise<void> {
   try {
+    const zip = new JSZip();
+    let completedCount = 0;
+    
+    // Create a folder inside the zip
+    const certificatesFolder = zip.folder('certificates');
+    
+    if (!certificatesFolder) {
+      throw new Error('Failed to create certificates folder');
+    }
+    
+    // Process certificates in sequence to avoid memory issues
     for (let i = 0; i < certificateIds.length; i++) {
       const certificateId = certificateIds[i];
       
-      if (onProgress) {
-        onProgress(i + 1, certificateIds.length);
+      try {
+        // Get certificate data
+        const certificateData = await downloadCertificateHTML(certificateId);
+        
+        if (!certificateData || !certificateData.html) {
+          console.error(`Failed to get HTML for certificate ID ${certificateId}`);
+          continue;
+        }
+        
+        // Generate PDF from HTML
+        const pdf = await generatePDFFromHTML_ToBlob(certificateData.html);
+        
+        // Add to zip with unique filename
+        const filename = certificateData.filename || `certificate_${certificateId}.pdf`;
+        certificatesFolder.file(filename, pdf);
+        
+        completedCount++;
+        
+        if (onProgress) {
+          onProgress(i + 1, certificateIds.length);
+        }
+      } catch (err) {
+        console.error(`Error processing certificate ID ${certificateId}:`, err);
+        // Continue with other certificates even if one fails
       }
-
-      await generateCertificatePDF(certificateId);
-      
-      // Small delay between downloads
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
+    
+    if (completedCount === 0) {
+      throw new Error('No certificates were successfully processed');
+    }
+    
+    // Generate the zip file
+    const zipBlob = await zip.generateAsync({ 
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 } 
+    }, (metadata: { percent: number }) => {
+      if (onProgress) {
+        // Indicate zip compression progress after all PDFs are created
+        onProgress(certificateIds.length, certificateIds.length);
+      }
+    });
+    
+    // Download the zip file
+    saveAs(zipBlob, zipFilename);
+    
   } catch (error) {
     console.error('Error generating bulk PDFs:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate PDF from HTML and return as Blob (for bulk downloads)
+ */
+async function generatePDFFromHTML_ToBlob(html: string): Promise<Blob> {
+  try {
+    // Create a temporary container
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = html;
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '-9999px';
+    tempContainer.style.width = '1123px'; // A4 landscape width in pixels
+    tempContainer.style.height = '794px'; // A4 landscape height in pixels
+    tempContainer.style.backgroundColor = 'white';
+    
+    // Add to DOM temporarily
+    document.body.appendChild(tempContainer);
+
+    // Wait for images to load
+    await waitForImages(tempContainer);
+
+    // Convert to canvas
+    const canvas = await html2canvas(tempContainer, {
+      scale: 2, // Higher quality
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      width: 1123,
+      height: 794,
+      scrollX: 0,
+      scrollY: 0
+    });
+
+    // Remove temporary container
+    document.body.removeChild(tempContainer);
+
+    // Create PDF
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Calculate dimensions
+    const imgWidth = 297; // A4 landscape width in mm
+    const imgHeight = 210; // A4 landscape height in mm
+
+    // Add image to PDF
+    const imgData = canvas.toDataURL('image/png', 1.0);
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+    // Return as blob
+    return pdf.output('blob');
+  } catch (error) {
+    console.error('Error generating PDF from HTML:', error);
     throw error;
   }
 }

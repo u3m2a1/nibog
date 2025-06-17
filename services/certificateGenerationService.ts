@@ -4,7 +4,8 @@ import {
   EventParticipantsResponse,
   EventParticipant,
   CertificateDownloadResponse,
-  BulkGenerationProgress
+  BulkGenerationProgress,
+  CertificateListItem
 } from '@/types/certificate';
 
 /**
@@ -215,15 +216,76 @@ export async function retryFailedCertificates(
 }
 
 /**
- * Get certificates for an event (if needed for status checking)
+ * Get certificates for an event
  */
-export async function getEventCertificates(eventId: number): Promise<GeneratedCertificate[]> {
+export async function getEventCertificates(eventId: number): Promise<CertificateListItem[]> {
   try {
-    // This would require a new API endpoint, but for now we can skip it
-    // since we're handling bulk generation in frontend
-    return [];
+    const response = await fetch(`/api/certificates/get-all?event_id=${eventId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch event certificates');
+    }
+
+    const result = await response.json();
+    return result;
   } catch (error) {
     console.error('Error fetching event certificates:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all certificates with optional filtering
+ */
+export async function getAllCertificates(
+  filters?: {
+    eventId?: number;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<CertificateListItem[]> {
+  try {
+    // Build query string from filters
+    const params = new URLSearchParams();
+    
+    if (filters?.eventId) {
+      params.append('event_id', filters.eventId.toString());
+    }
+    
+    if (filters?.status) {
+      params.append('status', filters.status);
+    }
+    
+    if (filters?.limit) {
+      params.append('limit', filters.limit.toString());
+    }
+    
+    if (filters?.offset) {
+      params.append('offset', filters.offset.toString());
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const url = `/api/certificates/get-all${queryString}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch certificates: ${response.status}`);
+    }
+    
+    const certificates = await response.json();
+    return certificates as CertificateListItem[];
+  } catch (error) {
+    console.error('Error fetching certificates:', error);
     throw error;
   }
 }

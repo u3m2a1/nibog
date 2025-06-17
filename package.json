@@ -50,6 +50,7 @@
     "framer-motion": "^12.7.4",
     "html2canvas": "^1.4.1",
     "input-otp": "1.4.1",
+    "jszip": "^3.10.1",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.454.0",
