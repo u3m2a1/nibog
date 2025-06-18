@@ -20,7 +20,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import AddOnSelector from "@/components/add-on-selector"
-import { addOns } from "@/data/add-ons"
+import { fetchAllAddOnsFromExternalApi } from "@/services/addOnService"
 import { AddOn } from "@/types"
 import { getAllCities } from "@/services/cityService"
 import { getEventsByCityId, getGamesByAgeAndEvent, EventListItem, EventGameListItem } from "@/services/eventService"
@@ -60,6 +60,9 @@ export default function RegisterEventClientPage() {
   const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState<boolean>(false)
   const [eventError, setEventError] = useState<string | null>(null)
+  const [apiAddOns, setApiAddOns] = useState<AddOn[]>([])
+  const [isLoadingAddOns, setIsLoadingAddOns] = useState<boolean>(false)
+  const [addOnError, setAddOnError] = useState<string | null>(null)
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null)
   const [games, setGames] = useState<Game[]>([])
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
@@ -73,6 +76,26 @@ export default function RegisterEventClientPage() {
 
   // Get authentication state from auth context
   const { isAuthenticated, user } = useAuth()
+  
+  // Fetch add-ons from external API
+  useEffect(() => {
+    async function loadAddOns() {
+      setIsLoadingAddOns(true);
+      setAddOnError(null);
+      try {
+        const addOnData = await fetchAllAddOnsFromExternalApi();
+        console.log('Fetched add-ons from external API:', addOnData);
+        setApiAddOns(addOnData);
+      } catch (error) {
+        console.error('Failed to load add-ons:', error);
+        setAddOnError('Failed to load add-ons. Please try again.');
+      } finally {
+        setIsLoadingAddOns(false);
+      }
+    }
+    
+    loadAddOns();
+  }, [])
 
   // Calculate child's age based on current date
   const calculateAge = (birthDate: Date) => {
@@ -1359,11 +1382,55 @@ export default function RegisterEventClientPage() {
                   Enhance your experience with optional add-ons. You can skip this step and proceed directly to payment if you prefer.
                 </p>
 
-                <AddOnSelector
-                  addOns={addOns}
-                  onAddOnsChange={setSelectedAddOns}
-                  initialSelectedAddOns={selectedAddOns}
-                />
+                <div className="mt-8">
+                  {isLoadingAddOns && (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="ml-2 text-lg">Loading add-ons...</p>
+                    </div>
+                  )}
+                  {addOnError && (
+                    <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                        <p className="text-red-600">{addOnError}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2" 
+                        onClick={() => {
+                          setIsLoadingAddOns(true);
+                          setAddOnError(null);
+                          fetchAllAddOnsFromExternalApi()
+                            .then(data => {
+                              setApiAddOns(data);
+                              setIsLoadingAddOns(false);
+                            })
+                            .catch(error => {
+                              console.error('Failed to load add-ons:', error);
+                              setAddOnError('Failed to load add-ons. Please try again.');
+                              setIsLoadingAddOns(false);
+                            });
+                        }}
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+                  {!isLoadingAddOns && !addOnError && apiAddOns.length > 0 && (
+                    <AddOnSelector
+                      addOns={apiAddOns} 
+                      onAddOnsChange={setSelectedAddOns}
+                      initialSelectedAddOns={selectedAddOns}
+                    />
+                  )}
+                  {!isLoadingAddOns && !addOnError && apiAddOns.length === 0 && (
+                    <div className="p-4 border border-gray-200 rounded-md text-center">
+                      <p className="text-gray-500">No add-ons are currently available.</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Show different messaging based on add-ons selection */}

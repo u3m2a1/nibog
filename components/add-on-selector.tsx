@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Minus, Plus, ShoppingCart, AlertCircle, Package, Tag } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Minus, Plus, ShoppingCart, AlertCircle, Package, Tag, ChevronDown } from "lucide-react"
 import { AddOn, AddOnVariant } from "@/types"
 import { formatPrice } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -127,6 +128,21 @@ export default function AddOnSelector({
     if (!addOn.hasVariants || !addOn.variants) return null
     return addOn.variants.find(v => v.id === variantId) || null
   }
+  
+  // Helper function to safely get price modifier from variant
+  // This handles both API response format (price_modifier) and type definition format (price)
+  const getVariantPriceModifier = (variant: any): number => {
+    // First try the API response format
+    if (typeof variant.price_modifier === 'number') {
+      return variant.price_modifier
+    }
+    // Then try the type definition format (using price - base price)
+    else if (typeof variant.price === 'number' && typeof variant.addOn?.price === 'number') {
+      return variant.price - variant.addOn.price
+    }
+    // Default to 0 if neither is available
+    return 0
+  }
 
   const getStockStatus = (addOn: AddOn) => {
     if (addOn.hasVariants && addOn.variants) {
@@ -194,13 +210,22 @@ export default function AddOnSelector({
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-base">{addOn.name}</CardTitle>
                       {addOn.hasVariants && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30">
                           <Tag className="mr-1 h-3 w-3" />
-                          Variants
+                          {addOn.variants?.length || 0} Variants
                         </Badge>
                       )}
                     </div>
                     <CardDescription className="text-xs">{addOn.description}</CardDescription>
+                    
+                    {/* Show variants count badge */}
+                    {addOn.hasVariants && addOn.variants && addOn.variants.length > 0 && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30">
+                          {addOn.variants.length} {addOn.variants.length === 1 ? 'Variant' : 'Variants'} Available
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-end">
                     {hasDiscount ? (
@@ -241,8 +266,14 @@ export default function AddOnSelector({
                       onCheckedChange={(checked) => handleAddOnToggle(addOn, checked as boolean)}
                       disabled={isOutOfStock}
                     />
-                    <Label htmlFor={`addon-${addOn.id}`} className="text-sm font-medium">
+                    <Label htmlFor={`addon-${addOn.id}`} className="text-sm font-medium flex items-center gap-1">
                       Add to booking
+                      {addOn.hasVariants && addOn.variants && addOn.variants.length > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          <Tag className="mr-1 h-3 w-3" />
+                          {addOn.variants.length} options
+                        </Badge>
+                      )}
                     </Label>
                   </div>
 
@@ -285,10 +316,57 @@ export default function AddOnSelector({
                   </div>
                 )}
 
+                {/* Dropdown variant selector when not selected */}
+                {!isSelected(addOn.id) && addOn.hasVariants && addOn.variants && addOn.variants.length > 0 && (
+                  <div className="mt-2">
+                    <Collapsible className="w-full">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border p-2 text-sm font-medium bg-primary/5 border-primary/20 hover:bg-primary/10 transition-colors">
+                        <div className="flex items-center">
+                          <Tag className="mr-2 h-4 w-4 text-primary" />
+                          <span>View All Variants ({addOn.variants.length})</span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-primary transition-transform duration-200 ui-open:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2 space-y-2">
+                        {addOn.variants.map((variant) => {
+                          const variantStockStatus = variant.stockQuantity <= 0 ? "out-of-stock" : 
+                                                    variant.stockQuantity <= 5 ? "low-stock" : "in-stock";
+                          return (
+                            <div 
+                              key={variant.id}
+                              className="flex justify-between items-center bg-white border rounded p-2 text-sm"
+                            >
+                              <div className="font-medium">{variant.name}</div>
+                              <div className="flex gap-1 items-center">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${variantStockStatus === "out-of-stock" ? "bg-red-50 text-red-500" : 
+                                          variantStockStatus === "low-stock" ? "bg-amber-50 text-amber-500" : 
+                                          "bg-green-50 text-green-500"}`}
+                                >
+                                  {variantStockStatus === "out-of-stock" ? "Out of stock" : 
+                                  variantStockStatus === "low-stock" ? `${variant.stockQuantity} left` : 
+                                  "In stock"}
+                                </Badge>
+                                {getVariantPriceModifier(variant) !== 0 && (
+                                  <Badge className="ml-1">
+                                    {getVariantPriceModifier(variant) > 0 ? '+' : ''}{formatPrice(getVariantPriceModifier(variant))}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )}
+                
+                {/* Enhanced variant selector when add-on is selected */}
                 {isSelected(addOn.id) && addOn.hasVariants && addOn.variants && (
                   <div className="mt-2">
                     <Label htmlFor={`variant-${addOn.id}`} className="text-xs font-medium mb-1 block">
-                      Select Option
+                      Select {addOn.name} Option
                     </Label>
                     <Select
                       value={getSelectedVariant(addOn.id)}
@@ -298,22 +376,77 @@ export default function AddOnSelector({
                         <SelectValue placeholder="Select variant" />
                       </SelectTrigger>
                       <SelectContent>
-                        {addOn.variants.map((variant) => (
-                          <SelectItem
-                            key={variant.id}
-                            value={variant.id}
-                            disabled={variant.stockQuantity <= 0}
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span>{variant.name}</span>
-                              {variant.price !== addOn.price && (
-                                <Badge className="ml-2">{formatPrice(variant.price)}</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {addOn.variants.map((variant) => {
+                          const variantStockStatus = variant.stockQuantity <= 0 ? "out-of-stock" : 
+                                                    variant.stockQuantity <= 5 ? "low-stock" : "in-stock";
+                          const stockLabel = variantStockStatus === "out-of-stock" ? "Out of Stock" : 
+                                         variantStockStatus === "low-stock" ? `${variant.stockQuantity} left` : 
+                                         "In Stock";
+                          return (
+                            <SelectItem
+                              key={variant.id}
+                              value={variant.id}
+                              disabled={variant.stockQuantity <= 0}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-medium">{variant.name}</span>
+                                <div className="flex items-center gap-1">
+                                  <span className={`text-xs ${variantStockStatus === "out-of-stock" ? "text-red-500" : 
+                                                variantStockStatus === "low-stock" ? "text-amber-500" : 
+                                                "text-green-500"}`}>
+                                    {stockLabel}
+                                  </span>
+                                  {getVariantPriceModifier(variant) !== 0 && (
+                                    <Badge className="ml-1">
+                                      {getVariantPriceModifier(variant) > 0 ? '+' : ''}{formatPrice(getVariantPriceModifier(variant))}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
+                    
+                    {/* Variant details section - enhanced */}
+                    {addOn.variants.map(variant => {
+                      if (variant.id === getSelectedVariant(addOn.id)) {
+                        return (
+                          <div key={`detail-${variant.id}`} className="mt-2 text-xs border rounded-md p-2 bg-gray-50">
+                            <div className="flex justify-between">
+                              <div>
+                                <span className="font-medium">{variant.name}</span>
+                                <div className="mt-1 text-muted-foreground">
+                                  SKU: {variant.sku || 'N/A'}
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <Badge>
+                                  {formatPrice(addOn.price + getVariantPriceModifier(variant))}
+                                </Badge>
+                                {getVariantPriceModifier(variant) !== 0 && (
+                                  <span className="text-xs text-muted-foreground mt-1">
+                                    Base + {getVariantPriceModifier(variant) > 0 ? '+' : ''}{formatPrice(getVariantPriceModifier(variant))}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2 flex justify-between items-center border-t pt-2">
+                              <span className="font-medium">Availability:</span>
+                              <span className={`text-xs ${variant.stockQuantity <= 0 ? "text-red-500" : 
+                                              variant.stockQuantity <= 5 ? "text-amber-500" : 
+                                              "text-green-500"}`}>
+                                {variant.stockQuantity <= 0 ? "Out of Stock" : 
+                                 variant.stockQuantity <= 5 ? `Only ${variant.stockQuantity} left in stock!` : 
+                                 `${variant.stockQuantity} in stock`}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return null;
+                    })}
                   </div>
                 )}
               </CardContent>

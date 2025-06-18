@@ -244,3 +244,77 @@ export async function deleteAddOn(addOnId: number): Promise<{ success: boolean }
     throw error;
   }
 }
+
+/**
+ * Get all add-ons from external API
+ * @returns Promise with array of add-ons
+ */
+export async function fetchAllAddOnsFromExternalApi(): Promise<AddOn[]> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/addons/get-all', {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`External API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    // Convert the external API response to match our internal AddOn format
+    const formattedAddOns: AddOn[] = data.map((addon: any) => {
+      // Transform variants to have camelCase property names
+      const transformedVariants = (addon.variants || []).map((variant: any) => ({
+        id: variant.id?.toString(),
+        addon_id: variant.addon_id,
+        name: variant.name,
+        price_modifier: variant.price_modifier,
+        sku: variant.sku,
+        // Transform snake_case to camelCase for frontend components
+        stockQuantity: variant.stock_quantity || 0
+      }));
+
+      return {
+        id: addon.id,
+        name: addon.name,
+        description: addon.description,
+        price: addon.price,
+        category: addon.category as "meal" | "merchandise" | "service" | "other",
+        is_active: addon.is_active,
+        has_variants: addon.has_variants,
+        // Transform snake_case to camelCase for frontend components
+        stockQuantity: addon.stock_quantity || 0,
+        sku: addon.sku,
+        // Transform bundle discount properties
+        bundleDiscount: {
+          minQuantity: addon.bundle_min_quantity || 0,
+          discountPercentage: parseFloat(addon.bundle_discount_percentage || '0')
+        },
+        created_at: "", // These fields might not be available in the external API
+        updated_at: "", // These fields might not be available in the external API
+        images: addon.images || [],
+        variants: transformedVariants
+      };
+    });
+
+    return formattedAddOns;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error("Request timed out. The external server took too long to respond.");
+    }
+    throw error;
+  }
+}
