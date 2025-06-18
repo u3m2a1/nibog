@@ -632,14 +632,9 @@ export function formatEventDataForUpdate(
 }
 
 /**
- * Delete an event by ID
- * @param id Event ID to delete
- * @returns Promise with success status
- */
-/**
- * Get events by city ID
+ * Get upcoming events by city ID
  * @param cityId City ID to retrieve events for
- * @returns Promise with array of events for the specified city
+ * @returns Promise with array of upcoming events for the specified city
  */
 export async function getEventsByCityId(cityId: number): Promise<EventListItem[]> {
   if (!cityId || isNaN(Number(cityId)) || Number(cityId) <= 0) {
@@ -647,8 +642,10 @@ export async function getEventsByCityId(cityId: number): Promise<EventListItem[]
   }
 
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/events/get-by-city', {
+    console.log(`Fetching upcoming events for city ID: ${cityId}`);
+    
+    // Use the upcoming events API endpoint
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/events/upcoming-events-by-cityid', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -657,13 +654,99 @@ export async function getEventsByCityId(cityId: number): Promise<EventListItem[]
     });
 
     if (!response.ok) {
-      throw new Error(`API returned error status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Error response from upcoming events API:', errorText);
+      throw new Error(`Failed to fetch events: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const events = await response.json();
+    
+    if (!Array.isArray(events)) {
+      console.error('Unexpected API response format:', events);
+      throw new Error('Invalid response format: expected an array of events');
+    }
 
-    return data;
+    console.log(`Found ${events.length} upcoming events for city ${cityId}`);
+    
+    // Convert the raw API response to match the expected EventListItem format
+    const formattedEvents: EventListItem[] = events.map((event: any) => ({
+      event_id: event.id,
+      event_title: event.title,
+      event_description: event.description || '',
+      event_date: event.event_date,
+      event_status: event.status || 'Published',
+      event_created_at: event.created_at || new Date().toISOString(),
+      event_updated_at: event.updated_at || new Date().toISOString(),
+      city_id: event.city_id,
+      city_name: '', // Will be filled in if needed by UI
+      state: '',
+      city_is_active: true,
+      city_created_at: new Date().toISOString(),
+      city_updated_at: new Date().toISOString(),
+      venue_id: event.venue_id || 0,
+      venue_name: '', // Will be filled in if needed by UI
+      venue_address: '',
+      venue_capacity: 0,
+      venue_is_active: true,
+      venue_created_at: new Date().toISOString(),
+      venue_updated_at: new Date().toISOString(),
+      games: [] // Initialize with empty games array, will be populated separately if needed
+    }));
+
+    return formattedEvents;
   } catch (error) {
+    console.error('Error in getEventsByCityId:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get games by child's age and event ID
+ * @param eventId The event ID to fetch games for
+ * @param childAge The child's age in months
+ * @returns Promise with array of games suitable for the child's age in the specified event
+ */
+export async function getGamesByAgeAndEvent(eventId: number, childAge: number): Promise<any[]> {
+  if (!eventId || isNaN(Number(eventId)) || Number(eventId) <= 0) {
+    throw new Error("Invalid event ID. ID must be a positive number.");
+  }
+
+  if (childAge === null || childAge === undefined || isNaN(Number(childAge)) || Number(childAge) < 0) {
+    throw new Error("Invalid child age. Age must be a non-negative number.");
+  }
+
+  try {
+    console.log(`Fetching games for event ID: ${eventId} and child age: ${childAge} months`);
+    
+    // Use the games by age and event API endpoint
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/events/get-games-by-ageandevent', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        event_id: Number(eventId),
+        child_age: Number(childAge)
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response from games API:', errorText);
+      throw new Error(`Failed to fetch games: ${response.status} ${response.statusText}`);
+    }
+
+    const games = await response.json();
+    
+    if (!Array.isArray(games)) {
+      console.error('Unexpected API response format:', games);
+      throw new Error('Invalid response format: expected an array of games');
+    }
+
+    console.log(`Found ${games.length} games for event ${eventId} and age ${childAge} months`);
+    return games;
+  } catch (error) {
+    console.error('Error in getGamesByAgeAndEvent:', error);
     throw error;
   }
 }
