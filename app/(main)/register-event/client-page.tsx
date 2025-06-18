@@ -65,7 +65,7 @@ export default function RegisterEventClientPage() {
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
-  const [selectedGame, setSelectedGame] = useState<string>("")
+  const [selectedGames, setSelectedGames] = useState<string[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
@@ -165,7 +165,7 @@ export default function RegisterEventClientPage() {
     setSelectedEvent("") // Reset selected event when city changes
     setEligibleEvents([]) // Reset eligible events
     setEligibleGames([]) // Reset eligible games
-    setSelectedGame("") // Reset selected game
+    setSelectedGames([]) // Reset selected games
 
     // Find city ID from the cities list
     const cityObj = cities.find(c => c.name === city)
@@ -330,13 +330,24 @@ export default function RegisterEventClientPage() {
 
   // Handle game selection
   const handleGameSelection = (gameId: string) => {
-    setSelectedGame(gameId)
-    console.log(`Selected game ID: ${gameId}`)
-
-    // Find the selected game
-    const game = eligibleGames.find(g => g.id.toString() === gameId)
+    // Toggle selection: add if not selected, remove if already selected
+    setSelectedGames(prev => {
+      if (prev.includes(gameId)) {
+        // Remove from selection
+        return prev.filter(id => id !== gameId);
+      } else {
+        // Add to selection
+        return [...prev, gameId];
+      }
+    });
+    
+    // Log selection state for debugging
+    console.log(`Toggled game ID: ${gameId}`);
+    
+    // Find the selected game for additional logging
+    const game = eligibleGames.find(g => g.id.toString() === gameId);
     if (game) {
-      console.log("Selected game:", game)
+      console.log("Toggled game:", game);
     }
   }
 
@@ -368,7 +379,7 @@ export default function RegisterEventClientPage() {
         selectedCity,
         selectedEventType,
         selectedEvent,
-        selectedGame,
+        selectedGames,
         childAgeMonths,
         availableDates: availableDates.map(date => date.toISOString()),
         step: 1, // Current step
@@ -407,7 +418,7 @@ export default function RegisterEventClientPage() {
         selectedCity,
         selectedEventType,
         selectedEvent,
-        selectedGame,
+        selectedGames,
         childAgeMonths,
         availableDates: availableDates.map(date => date.toISOString()),
         step: 3, // Payment step
@@ -451,11 +462,22 @@ export default function RegisterEventClientPage() {
       setIsProcessingPayment(true)
       setPaymentError(null)
 
-      // Get the selected game details
-      const selectedGameObj = eligibleGames.find(game => game.id.toString() === selectedGame)
-      if (!selectedGameObj) {
-        throw new Error("Selected game not found")
+      // Calculate total price
+      const calculateTotalPrice = () => {
+        // Get the total price of all selected games
+        const gamesPrice = selectedGames.reduce((total, gameId) => {
+          const game = eligibleGames.find(g => g.id.toString() === gameId);
+          return total + (game ? (game.custom_price || game.slot_price || 0) : 0);
+        }, 0);
+        
+        // Add the price of selected add-ons
+        const addOnPrice = selectedAddOns.reduce((total, addOn) => total + addOn.price, 0);
+        
+        return gamesPrice + addOnPrice;
       }
+
+      // Get the selected game details
+      const selectedGamesObj = selectedGames.map(gameId => eligibleGames.find(game => game.id.toString() === gameId));
 
       // Get the selected event details
       const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
@@ -480,8 +502,8 @@ export default function RegisterEventClientPage() {
         schoolName,
         gender,
         eventId: selectedApiEvent.event_id,
-        gameId: selectedGameObj.id,
-        gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
+        gameId: selectedGamesObj.id,
+        gamePrice: selectedGamesObj.custom_price || selectedGamesObj.slot_price || 0,
         totalAmount: calculateTotalPrice(),
         paymentMethod: "PhonePe", // Using PhonePe as the payment method
         paymentStatus: "Pending", // Set to pending initially
@@ -618,7 +640,7 @@ export default function RegisterEventClientPage() {
         setSelectedCity(data.selectedCity || cityParam || '')
         setSelectedEventType(data.selectedEventType || '')
         setSelectedEvent(data.selectedEvent || '')
-        setSelectedGame(data.selectedGame || '')
+        setSelectedGames(data.selectedGame || '')
         setChildAgeMonths(data.childAgeMonths || null)
         setTermsAccepted(data.termsAccepted || false)
 
@@ -1083,7 +1105,6 @@ export default function RegisterEventClientPage() {
                   <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
                     <Label className="flex items-center gap-1">
                       <span>Event Details</span>
-                      <span className="text-xs text-primary/70">(Required)</span>
                     </Label>
                     {eligibleEvents.length > 0 ? (
                       <div className="grid gap-3 sm:grid-cols-1">
@@ -1097,14 +1118,6 @@ export default function RegisterEventClientPage() {
                                 {format(new Date(event.date), "PPP")}
                               </div>
                               <p className="text-sm text-muted-foreground">{event.venue}</p>
-                              <div className="flex justify-between items-center mt-2">
-                                <div className="text-sm">
-                                  <span className="font-medium text-primary">₹{event.price}</span> • {event.city}
-                                </div>
-                                <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                  Age: {event.minAgeMonths}-{event.maxAgeMonths} months
-                                </div>
-                              </div>
                             </div>
                           </div>
                         ))}
@@ -1168,15 +1181,19 @@ export default function RegisterEventClientPage() {
                             key={game.id}
                             className={cn(
                               "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 cursor-pointer",
-                              selectedGame === game.id
+                              selectedGames.includes(game.id)
                                 ? "border-primary bg-primary/10 shadow-md"
                                 : "border-muted hover:border-primary/30 hover:bg-primary/5"
                             )}
                             onClick={() => handleGameSelection(game.id)}
                           >
-                            <RadioGroup value={selectedGame} onValueChange={handleGameSelection} className="flex-1">
-                              <div className="flex items-start space-x-3">
-                                <RadioGroupItem value={game.id} id={`game-${game.id}`} className="mt-1" />
+                            <div className="flex items-start space-x-3 flex-1">
+                              <Checkbox 
+                                id={`game-${game.id}`} 
+                                className="mt-1" 
+                                checked={selectedGames.includes(game.id)}
+                                onCheckedChange={() => handleGameSelection(game.id)}
+                              />
                                 <div className="space-y-1 flex-1">
                                   <Label htmlFor={`game-${game.id}`} className="font-medium cursor-pointer">
                                     {game.custom_title || game.game_title}
@@ -1198,7 +1215,6 @@ export default function RegisterEventClientPage() {
                                   </div>
                                 </div>
                               </div>
-                            </RadioGroup>
                           </div>
                         ))}
                       </div>
@@ -1276,13 +1292,13 @@ export default function RegisterEventClientPage() {
               <Button
                 className={cn(
                   "w-full relative overflow-hidden group transition-all duration-300",
-                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGames || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                  (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment)
                     ? "opacity-50"
                     : "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
                 )}
                 onClick={handleRegistration}
-                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGames || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                          (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment}
               >
                 <span className="relative z-10 flex items-center">
