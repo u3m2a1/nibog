@@ -241,6 +241,46 @@ export async function getEventCertificates(eventId: number): Promise<Certificate
 }
 
 /**
+ * Get a single certificate by ID
+ */
+export async function getSingleCertificate(certificateId: number): Promise<CertificateListItem> {
+  try {
+    console.log(`Fetching certificate with ID: ${certificateId}`);
+    
+    const response = await fetch(`/api/certificates/get-single?certificate_id=${certificateId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch certificate details');
+    }
+
+    const result = await response.json();
+    
+    // API returns a certificate object directly with certificate_data nested inside
+    // Ensure we normalize the certificate object to match CertificateListItem structure
+    // Even though the backend should handle this, we do additional normalization here
+    if (result?.certificate_data) {
+      const certData = result.certificate_data;
+      // Merge certificate_data fields into the main object if needed
+      result.event_title = result.event_title || certData.event_name;
+      result.venue_name = result.venue_name || certData.venue_name;
+      result.city_name = result.city_name || certData.city_name;
+      result.certificate_number = result.certificate_number || certData.certificate_number;
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error fetching certificate details:', error);
+    throw error;
+  }
+}
+
+/**
  * Get all certificates with optional filtering
  */
 export async function getAllCertificates(

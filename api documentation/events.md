@@ -152,6 +152,70 @@ response
   }
 ]
 
+## Get Upcoming Events 
+
+GET https://ai.alviongs.com/webhook/v1/nibog/events/upcoming-events
+
+Response (200 OK)
+
+[
+  {
+    "id": 12,
+    "title": "Friday Fun Bonanza",
+    "description": "Hyderabad Biggest event",
+    "city_id": 1,
+    "venue_id": 1,
+    "event_date": "2025-06-29T18:30:00.000Z",
+    "status": "Published",
+    "created_at": "2025-05-31T04:58:02.579Z",
+    "updated_at": "2025-05-31T04:58:02.579Z"
+  },
+  {
+    "id": 21,
+    "title": "Mini Miracles Marathon",
+    "description": "A fun-filled race for babies and toddlers! Whether they crawl or toddle, every little step is a big win. Parents are welcome to cheer or join in. Smiles, giggles, and medals guaranteed!",
+    "city_id": 1,
+    "venue_id": 1,
+    "event_date": "2025-06-29T18:30:00.000Z",
+    "status": "Published",
+    "created_at": "2025-06-09T04:02:40.122Z",
+    "updated_at": "2025-06-09T04:02:40.122Z"
+  },
+  {
+    "id": 24,
+    "title": "Friday Fun Bonanza (Copy)",
+    "description": "Hyderabad Biggest event",
+    "city_id": 1,
+    "venue_id": 1,
+    "event_date": "2025-07-06T18:30:00.000Z",
+    "status": "Published",
+    "created_at": "2025-06-09T05:44:45.103Z",
+    "updated_at": "2025-06-09T05:44:45.103Z"
+  },
+  {
+    "id": 17,
+    "title": "Playtime Fiesta",
+    "description": "A fun-filled games.",
+    "city_id": 2,
+    "venue_id": 2,
+    "event_date": "2025-07-29T18:30:00.000Z",
+    "status": "Published",
+    "created_at": "2025-06-08T02:26:52.731Z",
+    "updated_at": "2025-06-08T02:26:52.731Z"
+  },
+  {
+    "id": 16,
+    "title": "LaughFest Carnival",
+    "description": "A fun-filled games.",
+    "city_id": 2,
+    "venue_id": 2,
+    "event_date": "2025-07-29T18:30:00.000Z",
+    "status": "Published",
+    "created_at": "2025-06-03T06:11:10.804Z",
+    "updated_at": "2025-06-03T06:11:10.804Z"
+  }
+]
+
 
 
 

@@ -1081,3 +1081,45 @@ Response (200 OK)
     "child_name": "Alice Doe"
   }
 ]
+
+## Get all generated certificates
+
+**POST** https://ai.alviongs.com/webhook/v1/nibog/certificates/get
+
+Request Body
+
+```json
+{
+  "id": 0
+}
+```
+
+Response (200 OK)
+
+```json
+[
+  {
+    "id": 0,
+    "template_id": 3,
+    "event_id": 11,
+    "game_id": 2,
+    "user_id": 4,
+    "child_id": 5,
+    "certificate_data": {
+      "city_name": "Hyderabad",
+      "event_name": "Spring Carnival",
+      "venue_name": "NIBOG Stadium",
+      "certificate_number": "CERT-1749806228024-CD3YI7"
+    },
+    "pdf_url": null,
+    "status": "generated",
+    "generated_at": "2025-06-13T03:47:19.983Z",
+    "sent_at": null,
+    "downloaded_at": null,
+    "parent_email": null,
+    "parent_name": null,
+    "game_name": "Obstacle Course",
+    "child_name": "Alice Doe"
+  }
+]
+```

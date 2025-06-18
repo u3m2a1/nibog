@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Download, Mail, FileText, Loader2, Filter, ArrowDown, ArrowUp, Calendar, Search, CheckSquare, Square, MoreHorizontal, Send } from "lucide-react"
+import { Download, Mail, FileText, Loader2, Filter, ArrowDown, ArrowUp, Calendar, Search, CheckSquare, Square, MoreHorizontal, Send, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -44,6 +44,7 @@ import { CertificateListItem } from "@/types/certificate"
 import { getAllCertificates } from "@/services/certificateGenerationService"
 import { generateCertificatePDF, generateBulkPDFs } from "@/services/certificatePdfService"
 import { EmailCertificateModal } from "@/components/email-certificate-modal"
+import { CertificatePreviewModal } from "@/components/certificate-preview-modal"
 
 export default function CertificatesPage() {
   const router = useRouter()
@@ -65,6 +66,8 @@ export default function CertificatesPage() {
   const [downloadProgress, setDownloadProgress] = useState<{current: number, total: number} | null>(null)
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
   const [emailTarget, setEmailTarget] = useState<CertificateListItem[]>([])
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+  const [previewTarget, setPreviewTarget] = useState<CertificateListItem | null>(null)
   const itemsPerPage = 10
 
   // Load certificates
@@ -484,18 +487,11 @@ export default function CertificatesPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {/* Child name (highlighted) */}
                           <div className="font-medium">{certificate.child_name || 'Participant Name Not Available'}</div>
-                          
-                          {/* Game name (muted) */}
                           {certificate.game_name && (
                             <div className="text-xs text-muted-foreground">{certificate.game_name}</div>
                           )}
-                          
-                          {/* Parent name (muted) */}
                           <div className="text-xs text-muted-foreground">{certificate.user_name || 'Parent Name Not Available'}</div>
-                          
-                          {/* Email (muted) */}
                           <div className="text-xs text-muted-foreground">{certificate.user_email || 'Email Not Available'}</div>
                         </TableCell>
                         <TableCell>
@@ -512,6 +508,7 @@ export default function CertificatesPage() {
                               variant="outline" 
                               size="sm"
                               onClick={() => handleDownload(certificate)}
+                              title="Download Certificate"
                             >
                               <Download className="h-4 w-4" />
                             </Button>
@@ -522,13 +519,26 @@ export default function CertificatesPage() {
                                 setEmailTarget([certificate]);
                                 setIsEmailModalOpen(true);
                               }}
+                              title="Email Certificate"
                             >
                               <Mail className="h-4 w-4" />
                             </Button>
                             <Button 
                               variant="outline" 
                               size="sm"
+                              onClick={() => {
+                                setPreviewTarget(certificate);
+                                setIsPreviewModalOpen(true);
+                              }}
+                              title="Preview Certificate Template"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
                               asChild
+                              title="View Certificate Details"
                             >
                               <Link href={`/admin/certificates/${certificate.id}`}>
                                 <FileText className="h-4 w-4" />
@@ -600,6 +610,13 @@ export default function CertificatesPage() {
           // Refresh certificates list to update status
           loadCertificates();
         }}
+      />
+
+      {/* Certificate Preview Modal */}
+      <CertificatePreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        certificate={previewTarget}
       />
     </div>
   )
