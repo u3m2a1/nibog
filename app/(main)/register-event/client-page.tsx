@@ -968,7 +968,22 @@ export default function RegisterEventClientPage() {
               <CalendarIcon className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">Register for NIBOG Event</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                <span className="relative">
+                  <span 
+                    className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-[length:200%_auto] animate-gradient"
+                    style={{
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >
+                    Register for NIBOG Event
+                  </span>
+                  <span className="absolute inset-0 z-0 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-[length:200%_auto] animate-gradient opacity-70 blur-sm">
+                    Register for NIBOG Event
+                  </span>
+                </span>
+              </CardTitle>
               <CardDescription>
                 {selectedCity
                   ? `Register your child for exciting baby games in ${selectedCity}`
