@@ -231,3 +231,21 @@ export type BabyGame = {
   created_at?: string
   updated_at?: string
 }
+
+// Event list item for display in UI components and SWR integration
+export type EventListItem = {
+  id: string
+  title: string
+  description: string
+  minAgeMonths: number
+  maxAgeMonths: number
+  date: string
+  time: string
+  venue: string
+  city: string
+  price: number
+  image: string
+  spotsLeft: number
+  totalSpots: number
+  isOlympics?: boolean
+}

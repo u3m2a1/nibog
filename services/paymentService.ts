@@ -242,9 +242,14 @@ export async function checkPhonePePaymentStatus(merchantTransactionId: string): 
 
 // ============ ADMIN PAYMENT MANAGEMENT FUNCTIONS ============
 
+// Cache for payments data
+const paymentsCache = new Map<string, { data: Payment[], timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 /**
- * Get all payments for admin panel
+ * Get all payments for admin panel with caching
  * @param filters Optional filters for payments
+ * @param forceRefresh Force a cache refresh
  * @returns Array of payments with details
  */
 export async function getAllPayments(filters?: {
@@ -254,8 +259,9 @@ export async function getAllPayments(filters?: {
   city_id?: number;
   event_id?: number;
   search?: string;
-}): Promise<Payment[]> {
+}, forceRefresh: boolean = false): Promise<Payment[]> {
   try {
+    // Build cache key from filters
     const queryParams = new URLSearchParams();
     if (filters?.status) queryParams.append('status', filters.status);
     if (filters?.start_date) queryParams.append('start_date', filters.start_date);
@@ -263,6 +269,16 @@ export async function getAllPayments(filters?: {
     if (filters?.city_id) queryParams.append('city_id', filters.city_id.toString());
     if (filters?.event_id) queryParams.append('event_id', filters.event_id.toString());
     if (filters?.search) queryParams.append('search', filters.search);
+    
+    const cacheKey = queryParams.toString();
+    const now = Date.now();
+
+    // Return cached data if available and not expired
+    const cached = paymentsCache.get(cacheKey);
+    if (!forceRefresh && cached && (now - cached.timestamp < CACHE_TTL)) {
+      console.log('Returning cached payments data');
+      return cached.data;
+    }
 
     const url = `https://ai.alviongs.com/webhook/v1/nibog/payments/get-all${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
 
@@ -271,6 +287,11 @@ export async function getAllPayments(filters?: {
       headers: {
         'Content-Type': 'application/json',
       },
+      // Add cache control headers
+      cache: 'no-store', // Don't cache in the browser
+      next: { 
+        revalidate: 300 // Revalidate every 5 minutes (Next.js data cache)
+      }
     });
 
     if (!response.ok) {
@@ -278,17 +299,22 @@ export async function getAllPayments(filters?: {
     }
 
     const data = await response.json();
-    console.log('Payments API response:', data);
-
-    // Ensure we return an array
+    
+    // Process data for faster rendering
+    let results: Payment[];
     if (Array.isArray(data)) {
-      return data;
+      results = data;
     } else if (data && data.payments && Array.isArray(data.payments)) {
-      return data.payments;
+      results = data.payments;
     } else {
       console.warn('Unexpected payments response format:', data);
-      return [];
+      results = [];
     }
+    
+    // Update cache with new data
+    paymentsCache.set(cacheKey, { data: results, timestamp: now });
+    
+    return results;
   } catch (error) {
     console.error('Error fetching payments:', error);
     throw error;

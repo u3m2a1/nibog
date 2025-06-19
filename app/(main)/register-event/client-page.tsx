@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,10 +17,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format, addMonths, differenceInMonths, differenceInDays } from "date-fns"
 import { cn } from "@/lib/utils"
 import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2, CheckCircle } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import AddOnSelector from "@/components/add-on-selector"
+
+// Lazy load components that aren't needed on initial render
+const AddOnSelector = dynamic(() => import("@/components/add-on-selector"), {
+  loading: () => <div className="p-4 text-center">Loading add-ons...</div>,
+  ssr: false
+})
+
 import { fetchAllAddOnsFromExternalApi } from "@/services/addOnService"
 import { AddOn } from "@/types"
 import { getAllCities } from "@/services/cityService"
@@ -132,12 +139,8 @@ export default function RegisterEventClientPage() {
     return ageInMonths
   }
 
-  // Calculate total price of selected games
-  const calculateGamesTotal = () => {
-    // Debug logging to help diagnose issues
-    console.log('Selected Games:', selectedGames);
-    console.log('Eligible Games:', eligibleGames);
-    
+  // Calculate total price of selected games with memoization to prevent unnecessary recalculations
+  const calculateGamesTotal = useCallback(() => {
     if (!selectedGames || selectedGames.length === 0) {
       return 0;
     }
@@ -152,8 +155,6 @@ export default function RegisterEventClientPage() {
       // Find the game in eligible games by numeric ID
       const game = eligibleGames.find(g => g.id === gameIdNum);
       
-      console.log(`Looking for game with ID ${gameIdNum}:`, game);
-      
       // Get price from the game object
       let gamePrice = 0;
       if (game) {
@@ -165,12 +166,11 @@ export default function RegisterEventClientPage() {
         }
       }
       
-      console.log(`Game ID: ${gameIdNum}, Price: ${gamePrice}`);
       total += gamePrice;
     }
     
     return total;
-  }
+  }, [selectedGames, eligibleGames]); // Recalculate only when these dependencies change
 
   // Calculate total price including add-ons, GST, and promocode discount
   const calculateTotalPrice = () => {

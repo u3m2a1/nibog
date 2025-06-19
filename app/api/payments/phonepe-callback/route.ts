@@ -2,16 +2,25 @@ import { NextResponse } from 'next/server';
 import { BOOKING_API } from '@/config/api';
 import { PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonepe';
 
+// Cache successful transaction IDs to prevent duplicate processing
+let processedTransactions = new Set<string>();
+
+// Clean up old transactions from cache periodically (every hour)
+setInterval(() => {
+  processedTransactions = new Set<string>();
+}, 60 * 60 * 1000);
+
 export async function POST(request: Request) {
   try {
-    // Log headers for debugging
-    const headers: Record<string, string> = {};
-    request.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    console.log("Server API route: Received headers:", JSON.stringify(headers, null, 2));
-    console.log("Server API route: Received PhonePe callback");
-    console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+    // More efficient logging in production
+    if (process.env.NODE_ENV !== 'production') {
+      const headers: Record<string, string> = {};
+      request.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      console.log("Server API route: Received PhonePe callback");
+      console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+    }
 
     // Parse the request body
     const callbackData = await request.json();
@@ -57,33 +66,42 @@ export async function POST(request: Request) {
     const bookingId = bookingIdMatch[1];
     console.log(`Server API route: Extracted booking ID: ${bookingId}`);
 
-    // Update the booking status and create payment record based on the payment state
-    if (paymentState === 'COMPLETED') {
-      // Payment was successful, update the booking status to confirmed
-      console.log(`Server API route: Payment successful for booking ID: ${bookingId}`);
-
-      try {
-        // 1. Update booking status
-        const updateResponse = await fetch(`${BOOKING_API.UPDATE}`, {
+    // Check if we've already processed this transaction to prevent duplicates
+    if (processedTransactions.has(transactionId)) {
+      console.log(`Transaction ${transactionId} already processed, skipping duplicate processing`);
+      return NextResponse.json({ success: true, message: "Transaction already processed" }, { status: 200 });
+    }
+    
+    // Payment status mapping for consistent values
+    const paymentStatusMap = {
+      COMPLETED: { booking: "Paid", payment: "successful" },
+      PENDING: { booking: "Pending", payment: "pending" },
+      FAILED: { booking: "Failed", payment: "failed" },
+      CANCELLED: { booking: "Failed", payment: "failed" },
+    };
+    
+    // Get the appropriate status from the map or fallback to Failed
+    const statusValues = paymentStatusMap[paymentState as keyof typeof paymentStatusMap] || 
+                        { booking: "Failed", payment: "failed" };
+    
+    try {
+      // Process both API calls in parallel for better performance
+      const [updateResponse, paymentResponse] = await Promise.all([
+        // 1. Update booking status API call
+        fetch(`${BOOKING_API.UPDATE}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             booking_id: bookingId,
-            payment_status: "Paid",
+            payment_status: statusValues.booking,
             transaction_id: transactionId,
           }),
-        });
-
-        if (!updateResponse.ok) {
-          console.error(`Server API route: Failed to update booking status. API returned status: ${updateResponse.status}`);
-        } else {
-          console.log(`Server API route: Successfully updated booking status for booking ID: ${bookingId}`);
-        }
-
-        // 2. Create payment record
-        const paymentResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
+        }),
+        
+        // 2. Create payment record API call - run in parallel
+        fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -94,74 +112,39 @@ export async function POST(request: Request) {
             phonepe_transaction_id: merchantTransactionId,
             amount: amount / 100, // Convert from paise to rupees
             payment_method: "PhonePe",
-            payment_status: "successful",
+            payment_status: statusValues.payment,
             payment_date: new Date().toISOString(),
-            gateway_response: callbackData,
-          }),
-        });
+            gateway_response: JSON.stringify(callbackData), // Convert to string to avoid potential circular reference issues
+          })
+          // We can implement retry logic separately if needed
+        })
+      ]);
 
-        if (!paymentResponse.ok) {
-          console.error(`Server API route: Failed to create payment record. API returned status: ${paymentResponse.status}`);
-        } else {
-          console.log(`Server API route: Successfully created payment record for booking ID: ${bookingId}`);
-        }
-      } catch (updateError) {
-        console.error("Server API route: Error updating booking status or creating payment record:", updateError);
+      // Check responses
+      const success = updateResponse.ok && paymentResponse.ok;
+      
+      if (success && paymentState === 'COMPLETED') {
+        // If transaction was successful, add to processed list to prevent duplicates
+        processedTransactions.add(transactionId);
       }
-    } else {
-      // Payment failed or is pending, update the booking status accordingly
-      console.log(`Server API route: Payment not successful for booking ID: ${bookingId}. Status: ${paymentState}`);
-
-      try {
-        // 1. Update booking status
-        const updateResponse = await fetch(`${BOOKING_API.UPDATE}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            booking_id: bookingId,
-            payment_status: paymentState === 'PENDING' ? "Pending" : "Failed",
-            transaction_id: transactionId,
-          }),
-        });
-
+      
+      if (!success) {
+        // Log only on error
         if (!updateResponse.ok) {
-          console.error(`Server API route: Failed to update booking status. API returned status: ${updateResponse.status}`);
-        } else {
-          console.log(`Server API route: Successfully updated booking status for booking ID: ${bookingId}`);
+          console.error(`Failed to update booking status. API returned status: ${updateResponse.status}`);
         }
-
-        // 2. Create payment record for failed/pending payments too
-        const paymentResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            booking_id: parseInt(bookingId),
-            transaction_id: transactionId,
-            phonepe_transaction_id: merchantTransactionId,
-            amount: amount / 100, // Convert from paise to rupees
-            payment_method: "PhonePe",
-            payment_status: paymentState === 'PENDING' ? "pending" : "failed",
-            payment_date: new Date().toISOString(),
-            gateway_response: callbackData,
-          }),
-        });
-
         if (!paymentResponse.ok) {
-          console.error(`Server API route: Failed to create payment record. API returned status: ${paymentResponse.status}`);
-        } else {
-          console.log(`Server API route: Successfully created payment record for booking ID: ${bookingId}`);
+          console.error(`Failed to create payment record. API returned status: ${paymentResponse.status}`);
         }
-      } catch (updateError) {
-        console.error("Server API route: Error updating booking status or creating payment record:", updateError);
+        // If one API failed but another succeeded, we may want to implement retry logic or compensation transaction
       }
+      
+      return NextResponse.json({ success: true }, { status: 200 });
+    } catch (error) {
+      console.error("Error processing payment callbacks:", error);
+      return NextResponse.json({ error: "Failed to process payment callbacks" }, { status: 500 });
     }
 
-    // Return a success response to PhonePe
-    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
     console.error("Server API route: Error processing PhonePe callback:", error);
     return NextResponse.json(

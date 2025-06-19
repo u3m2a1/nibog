@@ -19,13 +19,44 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Enable image optimization for better performance
   images: {
-    unoptimized: true,
+    unoptimized: false,
+    // Add domains you want to allow images from
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+    // Optimize image sizes
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  // Add caching and performance optimizations
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
+    // Add more performance improvements
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      '@tabler/icons-react',
+      'date-fns',
+      'recharts',
+    ],
+  },
+  // Optimize bundle size
+  swcMinify: true,
+  // Add production-specific optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
 }
 

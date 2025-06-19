@@ -175,18 +175,38 @@ export function formatEventDataForAPI(formData: {
   return formattedEvent;
 }
 
+// Cache for events data
+const eventsCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
 /**
- * Get all events
+ * Get all events with caching
+ * @param forceRefresh Force a cache refresh
  * @returns A list of all events
  */
-export async function getAllEvents(): Promise<EventListItem[]> {
+export async function getAllEvents(forceRefresh: boolean = false): Promise<EventListItem[]> {
   try {
+    const cacheKey = 'all-events';
+    const now = Date.now();
+
+    // Return cached data if available and not expired
+    const cached = eventsCache.get(cacheKey);
+    if (!forceRefresh && cached && (now - cached.timestamp < CACHE_TTL)) {
+      console.log('Returning cached events data');
+      return cached.data;
+    }
+    
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/events/get-all', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
       },
+      // Add cache control headers
+      cache: 'no-store',
+      next: { 
+        revalidate: 300 // Revalidate every 5 minutes (Next.js data cache)
+      }
     });
 
     if (!response.ok) {
@@ -194,6 +214,9 @@ export async function getAllEvents(): Promise<EventListItem[]> {
     }
 
     const data = await response.json();
+    
+    // Update cache with new data
+    eventsCache.set(cacheKey, { data, timestamp: now });
 
     return data;
   } catch (error) {

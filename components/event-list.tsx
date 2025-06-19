@@ -1,13 +1,18 @@
+"use client"
+
 import Link from "next/link"
 import Image from "next/image"
+import { memo, useMemo, useState, useCallback, useEffect } from "react"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, MapPin, Heart } from "lucide-react"
 import { formatPrice } from "@/lib/utils"
+import { useSearchParams } from "next/navigation"
+import { useEvents } from "@/lib/swr-hooks"
 
-// Mock data - in a real app, this would come from an API with server-side filtering
-const events = [
+// For backup fallback only in case API fails
+const fallbackEvents = [
   {
     id: "1",
     title: "Baby Crawling",
@@ -154,71 +159,141 @@ const events = [
   },
 ]
 
+// Import EventListItem type for proper typing
+import { EventListItem } from "@/types"
+
+// Memoized EventCard component to prevent unnecessary re-renders
+const EventCard = memo(({ event }: { event: EventListItem }) => {
+  return (
+    <Card className="group overflow-hidden transition-all hover:shadow-md">
+      <div className="relative h-48">
+        <Image 
+          src={event.image || "/placeholder.svg"} 
+          alt={event.title} 
+          fill 
+          className="object-cover" 
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          loading="lazy"
+          placeholder="blur"
+          blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZWVlZWVlIi8+PC9zdmc+"
+        />
+        <div className="absolute right-2 top-2 flex gap-2">
+          {event.isOlympics && <Badge className="bg-yellow-500 hover:bg-yellow-600">NIBOG Olympics</Badge>}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-2 h-8 w-8 rounded-full bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-label="Save event"
+        >
+          <Heart className="h-4 w-4" />
+        </Button>
+      </div>
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          <h3 className="font-semibold group-hover:text-primary">{event.title}</h3>
+          <p className="line-clamp-2 text-sm text-muted-foreground">{event.description}</p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            <span>{event.date}</span>
+            <Clock className="ml-2 h-3 w-3" />
+            <span>{event.time}</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            <span>
+              {event.venue}, {event.city}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <Badge variant="outline">
+              Age: {event.minAgeMonths}-{event.maxAgeMonths} months
+            </Badge>
+            <span className="font-medium">{formatPrice(event.price)}</span>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex items-center justify-between border-t bg-muted/50 p-4">
+        <div className="text-xs text-muted-foreground">
+          <span className={event.spotsLeft <= 3 ? "text-red-500 font-medium" : ""}>
+            {event.spotsLeft} spots left
+          </span>
+          <div className="mt-1 h-1.5 w-16 rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full ${event.spotsLeft <= 3 ? "bg-red-500" : "bg-primary"}`}
+              style={{ width: `${(event.spotsLeft / event.totalSpots) * 100}%` }}
+            />
+          </div>
+        </div>
+        <Button size="sm" asChild>
+          <Link href={`/register-event?city=${event.city}`}>Register Now</Link>
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+});
+
+EventCard.displayName = 'EventCard';
+
 export default function EventList() {
+  const searchParams = useSearchParams();
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
+
+  // Use SWR hook to fetch events data with caching
+  const { events, isLoading, isError } = useEvents(fallbackEvents);
+  
+  // Filter events based on URL params
+  const filteredEvents = useMemo(() => {
+    const city = searchParams.get('city');
+    const minAge = searchParams.get('minAge');
+    const maxAge = searchParams.get('maxAge');
+    const date = searchParams.get('date');
+
+    return events.filter((event) => {
+      if (city && event.city.toLowerCase() !== city.toLowerCase()) return false;
+      if (minAge && event.minAgeMonths < parseInt(minAge)) return false;
+      if (maxAge && event.maxAgeMonths > parseInt(maxAge)) return false;
+      if (date && event.date !== date) return false;
+      return true;
+    });
+  }, [searchParams, events]);
+
+  // Calculate pagination logic
+  const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
+  
+  // Get paginated events based on current page
+  const visibleEvents = useMemo(() => {
+    return filteredEvents.slice(0, page * ITEMS_PER_PAGE);
+  }, [filteredEvents, page]);
+
+  // Handler for load more button
+  const handleLoadMore = useCallback(() => {
+    setPage(prevPage => prevPage + 1);
+  }, []);
+  
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchParams]);
+
   return (
     <div>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {events.map((event) => (
-          <Card key={event.id} className="group overflow-hidden transition-all hover:shadow-md">
-            <div className="relative h-48">
-              <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
-              <div className="absolute right-2 top-2 flex gap-2">
-                {event.isOlympics && <Badge className="bg-yellow-500 hover:bg-yellow-600">NIBOG Olympics</Badge>}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-2 h-8 w-8 rounded-full bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label="Save event"
-              >
-                <Heart className="h-4 w-4" />
-              </Button>
-            </div>
-            <CardContent className="p-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold group-hover:text-primary">{event.title}</h3>
-                <p className="line-clamp-2 text-sm text-muted-foreground">{event.description}</p>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  <span>{event.date}</span>
-                  <Clock className="ml-2 h-3 w-3" />
-                  <span>{event.time}</span>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3" />
-                  <span>
-                    {event.venue}, {event.city}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline">
-                    Age: {event.minAgeMonths}-{event.maxAgeMonths} months
-                  </Badge>
-                  <span className="font-medium">{formatPrice(event.price)}</span>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex items-center justify-between border-t bg-muted/50 p-4">
-              <div className="text-xs text-muted-foreground">
-                <span className={event.spotsLeft <= 3 ? "text-red-500 font-medium" : ""}>
-                  {event.spotsLeft} spots left
-                </span>
-                <div className="mt-1 h-1.5 w-16 rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full ${event.spotsLeft <= 3 ? "bg-red-500" : "bg-primary"}`}
-                    style={{ width: `${(event.spotsLeft / event.totalSpots) * 100}%` }}
-                  />
-                </div>
-              </div>
-              <Button size="sm" asChild>
-                <Link href={`/register-event?city=${event.city}`}>Register Now</Link>
-              </Button>
-            </CardFooter>
-          </Card>
+        {visibleEvents.map((event) => (
+          <EventCard key={event.id} event={event} />
         ))}
       </div>
 
-      {events.length === 0 && (
+      {visibleEvents.length < filteredEvents.length && (
+        <div className="mt-8 flex justify-center">
+          <Button onClick={handleLoadMore} variant="outline">
+            Load More Events
+          </Button>
+        </div>
+      )}
+
+      {filteredEvents.length === 0 && (
         <div className="flex flex-col items-center justify-center py-12">
           <p className="text-muted-foreground">No events found matching your criteria.</p>
           <Button variant="outline" className="mt-4" asChild>
