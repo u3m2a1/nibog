@@ -136,7 +136,12 @@ export default function RegisterEventClientPage() {
       if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
         const variant = item.addOn.variants.find(v => v.id === item.variantId)
         if (variant) {
-          price = variant.price
+          // Use the variant's price if available, otherwise add price modifier to base price
+          if (typeof variant.price === 'number') {
+            price = variant.price
+          } else if (typeof variant.price_modifier === 'number') {
+            price = item.addOn.price + variant.price_modifier
+          }
         }
       }
 

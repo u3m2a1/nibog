@@ -64,12 +64,20 @@ export default function AddOnSelector({
   }
 
   const handleVariantChange = (addOnId: string, variantId: string) => {
-    // Update selected variant
     setSelectedVariants(prev => ({ ...prev, [addOnId]: variantId }))
 
-    // Update selected add-ons with the new variant
+    // Update selected addons array with the new variant
     const updatedAddOns = selectedAddOns.map(item => {
       if (item.addOn.id === addOnId) {
+        // Log the variant selection for debugging
+        const addon = item.addOn;
+        if (addon.hasVariants && addon.variants) {
+          const variant = addon.variants.find(v => v.id === variantId);
+          if (variant) {
+            console.log('Selected variant:', variant.name, 'for addon:', addon.name);
+            console.log('Price modifier:', variant.price_modifier || 0);
+          }
+        }
         return { ...item, variantId }
       }
       return item
@@ -143,6 +151,55 @@ export default function AddOnSelector({
     }
     // Default to 0 if neither is available
     return 0
+  }
+
+  // Get the final price for an addon with variant consideration
+  const getAddonFinalPrice = (addOn: any, variantId?: string): number => {
+    // Ensure price is a number
+    let price = parseFloat(addOn.price) || 0;
+    
+    // If there's a selected variant, add its price modifier
+    if (variantId && addOn.hasVariants && addOn.variants) {
+      const variant = addOn.variants.find((v: any) => v.id === variantId);
+      if (variant) {
+        if (typeof variant.price === 'number') {
+          price = parseFloat(variant.price);
+        } else if (typeof variant.price_modifier === 'number') {
+          price = parseFloat(addOn.price) + parseFloat(variant.price_modifier);
+        }
+      }
+    }
+    
+    return price;
+  }
+  
+  // Debug function to log price calculations
+  const logPriceCalculation = (addOn: any, variantId?: string) => {
+    const basePrice = parseFloat(addOn.price) || 0;
+    let finalPrice = basePrice;
+    let modifier = 0;
+    
+    if (variantId && addOn.hasVariants && addOn.variants) {
+      const variant = addOn.variants.find((v: any) => v.id === variantId);
+      if (variant) {
+        if (typeof variant.price === 'number') {
+          finalPrice = parseFloat(variant.price);
+          modifier = finalPrice - basePrice;
+        } else if (typeof variant.price_modifier === 'number') {
+          modifier = parseFloat(variant.price_modifier);
+          finalPrice = basePrice + modifier;
+        }
+      }
+    }
+    
+    console.log(`Price calculation for ${addOn.name}:`, {
+      basePrice,
+      modifier,
+      finalPrice,
+      variantId
+    });
+    
+    return finalPrice;
   }
 
   const getStockStatus = (addOn: AddOn) => {
@@ -228,23 +285,40 @@ export default function AddOnSelector({
                     </CardDescription>
                   </div>
                   <div className="flex flex-col items-end">
-                    {hasDiscount && (addOn.bundleDiscount?.discountPercentage ?? 0) > 0 ? (
-                      <>
-                        <Badge className="bg-green-500 hover:bg-green-600 mb-1">
-                          {addOn.bundleDiscount?.discountPercentage}% OFF
-                        </Badge>
-                        <div className="flex flex-col items-end">
-                          <span className="text-xs line-through text-muted-foreground">
-                            {formatPrice(addOn.price)}
-                          </span>
-                          <Badge>{formatPrice(discountedPrice)}</Badge>
-                        </div>
-                      </>
-                    ) : hasDiscount && (addOn.bundleDiscount?.discountPercentage ?? 0) === 0 ? (
-                      <Badge>{formatPrice(addOn.price)}</Badge>
-                    ) : (
-                      <Badge>{formatPrice(addOn.price)}</Badge>
-                    )}
+                    {(() => {
+                      // Get the selected variant if any
+                      const selectedVariant = addOn.hasVariants && addOn.variants && selectedVariants[addOn.id]
+                        ? addOn.variants.find(v => v.id === selectedVariants[addOn.id])
+                        : null;
+                      
+                      // Calculate the final price using our helper function
+                      const variantPrice = getAddonFinalPrice(addOn, selectedVariants[addOn.id]);
+                      
+                      // Apply discount if applicable
+                      const finalPrice = hasDiscount 
+                        ? getDiscountedPrice({ ...addOn, price: variantPrice }, quantity)
+                        : variantPrice;
+                      
+                      if (hasDiscount && (addOn.bundleDiscount?.discountPercentage ?? 0) > 0) {
+                        return (
+                          <>
+                            <Badge className="bg-green-500 hover:bg-green-600 mb-1">
+                              {addOn.bundleDiscount?.discountPercentage}% OFF
+                            </Badge>
+                            <div className="flex flex-col items-end">
+                              <span className="text-xs line-through text-muted-foreground">
+                                {formatPrice(variantPrice)}
+                              </span>
+                              <Badge>{formatPrice(finalPrice)}</Badge>
+                            </div>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <Badge>{formatPrice(finalPrice)}</Badge>
+                      );
+                    })()}
                   </div>
                 </div>
               </CardHeader>
@@ -426,6 +500,10 @@ export default function AddOnSelector({
                     {/* Variant details section - enhanced */}
                     {addOn.variants.map(variant => {
                       if (variant.id === getSelectedVariant(addOn.id)) {
+                        // Calculate the correct variant price using our helper function
+                        // Log the calculation for debugging
+                        logPriceCalculation(addOn, variant.id);
+                        const variantPrice = getAddonFinalPrice(addOn, variant.id);
                         return (
                           <div key={`detail-${variant.id}`} className="mt-2 text-xs border rounded-md p-2 bg-gray-50">
                             <div className="flex justify-between">
@@ -436,12 +514,10 @@ export default function AddOnSelector({
                                 </div>
                               </div>
                               <div className="flex flex-col items-end">
-                                <Badge>
-                                  {formatPrice(addOn.price + getVariantPriceModifier(variant))}
-                                </Badge>
+                                
                                 {getVariantPriceModifier(variant) !== 0 && (
                                   <span className="text-xs text-muted-foreground mt-1">
-                                    Base + {getVariantPriceModifier(variant) > 0 ? '+' : ''}{formatPrice(getVariantPriceModifier(variant))}
+                                    Base {formatPrice(addOn.price)} {getVariantPriceModifier(variant) > 0 ? '+' : ''}{formatPrice(getVariantPriceModifier(variant))}
                                   </span>
                                 )}
                               </div>
@@ -498,11 +574,35 @@ export default function AddOnSelector({
                   <div className="text-sm font-medium">
                     {(() => {
                       // Calculate base price with variant modifier if applicable
-                      const basePrice = addOn.hasVariants && addOn.variants ? (() => {
-                        const variantId = getSelectedVariant(addOn.id);
-                        const variant = addOn.variants.find(v => v.id === variantId);
-                        return variant ? (addOn.price + getVariantPriceModifier(variant)) : addOn.price;
-                      })() : addOn.price;
+                      const variantId = getSelectedVariant(addOn.id);
+                      
+                      // Get the selected variant if any
+                      const selectedVariant = addOn.hasVariants && addOn.variants && variantId
+                        ? addOn.variants.find(v => v.id === variantId)
+                        : null;
+                      
+                      // Calculate the base price (including variant modifier if any)
+                      let basePrice = parseFloat(addOn.price) || 0;
+                      let variantPriceModifier = 0;
+                      
+                      if (selectedVariant) {
+                        if (typeof selectedVariant.price === 'number') {
+                          basePrice = parseFloat(selectedVariant.price);
+                          variantPriceModifier = basePrice - parseFloat(addOn.price);
+                        } else if (typeof selectedVariant.price_modifier === 'number') {
+                          variantPriceModifier = parseFloat(selectedVariant.price_modifier);
+                          basePrice = parseFloat(addOn.price) + variantPriceModifier;
+                        }
+                      }
+                      
+                      // Log the calculation for debugging
+                      console.log('Total price calculation:', {
+                        addonName: addOn.name,
+                        basePrice,
+                        variantId,
+                        variantName: selectedVariant?.name,
+                        variantPriceModifier: selectedVariant ? (selectedVariant.price_modifier || 0) : 0
+                      });
                       
                       // Apply discount if applicable
                       const finalUnitPrice = hasDiscount ? basePrice * (1 - (addOn.bundleDiscount?.discountPercentage || 0) / 100) : basePrice;
