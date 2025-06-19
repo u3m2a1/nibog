@@ -29,8 +29,26 @@ import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegi
 import { initiatePhonePePayment } from "@/services/paymentService"
 
 // Helper function to format price.
-const formatPrice = (price: number) => {
-  return `₹${price.toLocaleString('en-IN')}`
+const formatPrice = (price: number | string | undefined) => {
+  // Convert price to a number and handle undefined/NaN cases
+  const numericPrice = typeof price === 'string' ? parseFloat(price) : Number(price || 0);
+  
+  // Check if the result is a valid number
+  if (isNaN(numericPrice)) {
+    console.warn('Invalid price value:', price);
+    return '₹0';
+  }
+  
+  // Round to 2 decimal places and remove trailing zeros
+  const roundedPrice = Math.round(numericPrice * 100) / 100;
+  
+  // If it's a whole number, don't show decimal places
+  if (roundedPrice === Math.floor(roundedPrice)) {
+    return `₹${roundedPrice.toLocaleString('en-IN')}`;
+  }
+  
+  // Otherwise format with exactly 2 decimal places
+  return `₹${roundedPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 // Cities will be fetched from API
@@ -104,55 +122,101 @@ export default function RegisterEventClientPage() {
     return ageInMonths
   }
 
+  // Calculate total price of selected games
+  const calculateGamesTotal = () => {
+    // Debug logging to help diagnose issues
+    console.log('Selected Games:', selectedGames);
+    console.log('Eligible Games:', eligibleGames);
+    
+    if (!selectedGames || selectedGames.length === 0) {
+      return 0;
+    }
+    
+    // Calculate total based on eligible games prices
+    let total = 0;
+    
+    for (const gameId of selectedGames) {
+      // Convert both IDs to numbers for consistent comparison
+      const gameIdNum = Number(gameId);
+      
+      // Find the game in eligible games by numeric ID
+      const game = eligibleGames.find(g => g.id === gameIdNum);
+      
+      console.log(`Looking for game with ID ${gameIdNum}:`, game);
+      
+      // Get price from the game object
+      let gamePrice = 0;
+      if (game) {
+        // Parse price values as numbers since they might be stored as strings
+        if (game.custom_price) {
+          gamePrice = parseFloat(game.custom_price.toString());
+        } else if (game.slot_price) {
+          gamePrice = parseFloat(game.slot_price.toString());
+        }
+      }
+      
+      console.log(`Game ID: ${gameIdNum}, Price: ${gamePrice}`);
+      total += gamePrice;
+    }
+    
+    return total;
+  }
+
   // Calculate total price including add-ons and GST
   const calculateTotalPrice = () => {
-    if (!selectedEventDetails) return 0
-
-    const eventPrice = selectedEventDetails.price
-    const addOnsTotal = selectedAddOns.reduce((total, item) => total + (item.addOn.price * item.quantity), 0)
-    const subtotal = eventPrice + addOnsTotal
-    const gst = Math.round(subtotal * 0.18)
-
-    return subtotal + gst
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+    const gst = parseFloat((subtotal * 0.18).toFixed(2));
+    const total = subtotal + gst;
+    
+    // Ensure final total is rounded to 2 decimal places
+    return parseFloat(total.toFixed(2));
   }
 
   // Calculate GST amount
   const calculateGST = () => {
-    if (!selectedEventDetails) return 0
-
-    const eventPrice = selectedEventDetails.price
-    const addOnsTotal = selectedAddOns.reduce((total, item) => total + (item.addOn.price * item.quantity), 0)
-    const subtotal = eventPrice + addOnsTotal
-
-    return Math.round(subtotal * 0.18)
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+    const gst = subtotal * 0.18;
+    
+    // Round to 2 decimal places
+    return parseFloat(gst.toFixed(2));
   }
 
   // Calculate add-ons subtotal
   const calculateAddOnsTotal = () => {
-    return selectedAddOns.reduce((total, item) => {
-      let price = item.addOn.price
+    const total = selectedAddOns.reduce((sum, item) => {
+      let price = parseFloat(item.addOn.price.toString()) || 0;
 
       // Check if this is a variant with a different price
       if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
-        const variant = item.addOn.variants.find(v => v.id === item.variantId)
+        const variant = item.addOn.variants.find(v => v.id === item.variantId);
         if (variant) {
           // Use the variant's price if available, otherwise add price modifier to base price
-          if (typeof variant.price === 'number') {
-            price = variant.price
-          } else if (typeof variant.price_modifier === 'number') {
-            price = item.addOn.price + variant.price_modifier
+          if (typeof variant.price === 'number' || !isNaN(parseFloat(variant.price?.toString() || ''))) {
+            price = parseFloat(variant.price.toString());
+          } else if (typeof variant.price_modifier === 'number' || !isNaN(parseFloat((variant.price_modifier || 0).toString()))) {
+            const modifier = parseFloat((variant.price_modifier || 0).toString());
+            price = parseFloat(item.addOn.price.toString()) + modifier;
           }
         }
       }
 
       // Apply bundle discount if applicable
       if (item.addOn.bundleDiscount && item.quantity >= item.addOn.bundleDiscount.minQuantity) {
-        const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100)
-        price = price * discountMultiplier
+        const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100);
+        price = price * discountMultiplier;
       }
 
-      return total + (price * item.quantity)
-    }, 0)
+      // Round to 2 decimal places for each item's total
+      const itemTotal = price * item.quantity;
+      return sum + parseFloat(itemTotal.toFixed(2));
+    }, 0);
+    
+    // Round final total to 2 decimal places
+    return parseFloat(total.toFixed(2));
   }
 
   // Handle DOB change
@@ -263,6 +327,7 @@ export default function RegisterEventClientPage() {
     setSelectedEventType(eventType)
     setSelectedEvent("") // Reset selected event when event type changes
     setEligibleGames([]) // Reset games when event type changes
+    setSelectedGames([]) // Reset selected games when event type changes
 
     // Find the selected event from API events
     const selectedApiEvent = apiEvents.find(event => event.event_title === eventType);
@@ -416,7 +481,7 @@ export default function RegisterEventClientPage() {
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
       // Save add-ons to session storage
-      saveAddOnsToSession()
+      saveDataToSession()
 
       // Show user-friendly message about login requirement
       alert("Please log in to continue with your registration. Your progress will be saved.")
@@ -425,7 +490,7 @@ export default function RegisterEventClientPage() {
       router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
     } else {
       // User is authenticated, proceed to add-ons step
-      saveAddOnsToSession()
+      saveDataToSession()
       setStep(2)
     }
   }
@@ -454,8 +519,8 @@ export default function RegisterEventClientPage() {
       }
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
-      // Save add-ons to session storage
-      saveAddOnsToSession()
+      // Save add-ons and game data to session storage
+      saveDataToSession()
 
       // Show user-friendly message about login requirement
       alert("Please log in to proceed with payment. Your registration details will be saved.")
@@ -464,19 +529,24 @@ export default function RegisterEventClientPage() {
       router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
     } else {
       // User is authenticated, proceed to payment step
-      saveAddOnsToSession()
+      saveDataToSession()
       setStep(3)
     }
   }
 
-  // Save add-ons to session storage
-  const saveAddOnsToSession = () => {
+  // Save add-ons and game data to session storage
+  const saveDataToSession = () => {
+    // Save add-ons data
     const addOnsData = selectedAddOns.map(item => ({
       addOnId: item.addOn.id,
       quantity: item.quantity,
       variantId: item.variantId
     }))
     sessionStorage.setItem('selectedAddOns', JSON.stringify(addOnsData))
+    
+    // Save eligible games data to preserve price information
+    sessionStorage.setItem('eligibleGames', JSON.stringify(eligibleGames))
+    console.log('Saved eligible games to session:', eligibleGames)
   }
 
   // Handle continue to payment - now includes authentication check
@@ -490,19 +560,7 @@ export default function RegisterEventClientPage() {
       setIsProcessingPayment(true)
       setPaymentError(null)
 
-      // Calculate total price
-      const calculateTotalPrice = () => {
-        // Get the total price of all selected games
-        const gamesPrice = selectedGames.reduce((total, gameId) => {
-          const game = eligibleGames.find(g => g.id.toString() === gameId);
-          return total + (game ? (game.custom_price || game.slot_price || 0) : 0);
-        }, 0);
-        
-        // Add the price of selected add-ons
-        const addOnPrice = selectedAddOns.reduce((total, addOn) => total + addOn.price, 0);
-        
-        return gamesPrice + addOnPrice;
-      }
+      // We'll use our existing calculateTotalPrice function
 
       // Get the selected game details
       const selectedGamesObj = selectedGames.map(gameId => eligibleGames.find(game => game.id.toString() === gameId));
@@ -668,7 +726,7 @@ export default function RegisterEventClientPage() {
         setSelectedCity(data.selectedCity || cityParam || '')
         setSelectedEventType(data.selectedEventType || '')
         setSelectedEvent(data.selectedEvent || '')
-        setSelectedGames(data.selectedGame || '')
+        setSelectedGames(data.selectedGames || [])
         setChildAgeMonths(data.childAgeMonths || null)
         setTermsAccepted(data.termsAccepted || false)
 
@@ -680,6 +738,28 @@ export default function RegisterEventClientPage() {
         // Load available dates from saved data
         if (data.availableDates && Array.isArray(data.availableDates)) {
           setAvailableDates(data.availableDates.map((dateStr: string) => new Date(dateStr)))
+        }
+        
+        // Load eligible games with price information
+        const savedEligibleGames = sessionStorage.getItem('eligibleGames')
+        if (savedEligibleGames) {
+          try {
+            const eligibleGamesData = JSON.parse(savedEligibleGames)
+            console.log('Restored eligible games from session:', eligibleGamesData)
+            setEligibleGames(eligibleGamesData)
+            
+            // If we have a selected event type and child age, but no eligible games loaded,
+            // try to fetch them again
+            if (data.selectedEventType && data.childAgeMonths && eligibleGamesData.length === 0) {
+              const selectedApiEvent = apiEvents.find(event => event.event_title === data.selectedEventType);
+              if (selectedApiEvent) {
+                console.log('Re-fetching games for event and age')
+                fetchGamesByEventAndAge(selectedApiEvent.event_id, data.childAgeMonths);
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing saved eligible games data:', error)
+          }
         }
 
         // Load saved add-ons if available
@@ -1483,7 +1563,7 @@ export default function RegisterEventClientPage() {
                       <span>{selectedEventDetails.venue}, {selectedEventDetails.city}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Child's Age on Event Date:</span>
+                      <span className="text-muted-foreground">Child's Age:</span>
                       <span>{childAgeMonths} months</span>
                     </div>
                     <div className="flex justify-between">
@@ -1493,19 +1573,35 @@ export default function RegisterEventClientPage() {
                     <Separator />
                     <div className="flex justify-between font-medium">
                       <span>Registration Fee:</span>
-                      <span>₹{selectedEventDetails.price}</span>
+                      <span>₹{calculateGamesTotal()}</span>
                     </div>
                     {selectedAddOns.length > 0 ? (
                     <>
                       {selectedAddOns.map((item) => {
-                        let price = item.addOn.price
+                        // Debug the add-on and variant information
+                        console.log(`Add-on: ${item.addOn.name}`, item);
+                        
+                        // Start with the base add-on price
+                        let price = parseFloat(item.addOn.price || '0')
                         let variantName = ""
 
                         // Check if this is a variant with a different price
                         if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
                           const variant = item.addOn.variants.find(v => v.id === item.variantId)
+                          console.log(`Variant found for ${item.addOn.name}:`, variant);
+                          
                           if (variant) {
-                            price = variant.price
+                            // For variants, we need to use the base price + price_modifier
+                            // If variant has a direct price, use that, otherwise use base price + modifier
+                            if (variant.price) {
+                              price = parseFloat(variant.price || '0');
+                            } else if (variant.price_modifier) {
+                              // Add the price modifier to the base price
+                              const modifier = parseFloat(variant.price_modifier || '0');
+                              price = parseFloat(item.addOn.price || '0') + modifier;
+                            }
+                            
+                            console.log(`Calculated variant price for ${item.addOn.name}: ${price}`);
                             variantName = ` - ${variant.name}`
                           }
                         }
@@ -1514,7 +1610,9 @@ export default function RegisterEventClientPage() {
                         let discountedPrice = price
                         let hasDiscount = false
 
-                        if (item.addOn.bundleDiscount && item.quantity >= item.addOn.bundleDiscount.minQuantity) {
+                        if (item.addOn.bundleDiscount && 
+                            item.quantity >= item.addOn.bundleDiscount.minQuantity && 
+                            item.addOn.bundleDiscount.discountPercentage > 0) { // Only apply if discount > 0%
                           hasDiscount = true
                           const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100)
                           discountedPrice = price * discountMultiplier

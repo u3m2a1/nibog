@@ -177,6 +177,8 @@ export type AddOnVariant = {
   id: string
   name: string
   price: number
+  price_modifier?: number // Additional price to add to base price
+  addon_id?: number // Reference to parent add-on
   attributes: Record<string, string> // e.g., { size: "M", color: "Red" }
   stockQuantity: number
   sku: string

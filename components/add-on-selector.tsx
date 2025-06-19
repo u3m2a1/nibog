@@ -594,16 +594,6 @@ export default function AddOnSelector({
                           basePrice = parseFloat(addOn.price) + variantPriceModifier;
                         }
                       }
-                      
-                      // Log the calculation for debugging
-                      console.log('Total price calculation:', {
-                        addonName: addOn.name,
-                        basePrice,
-                        variantId,
-                        variantName: selectedVariant?.name,
-                        variantPriceModifier: selectedVariant ? (selectedVariant.price_modifier || 0) : 0
-                      });
-                      
                       // Apply discount if applicable
                       const finalUnitPrice = hasDiscount ? basePrice * (1 - (addOn.bundleDiscount?.discountPercentage || 0) / 100) : basePrice;
                       const totalPrice = finalUnitPrice * getQuantity(addOn.id);

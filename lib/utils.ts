@@ -45,12 +45,35 @@ export function isChildEligible(childDob: Date, eventDate: Date, minAgeMonths: n
 }
 
 // Format price in Indian Rupees
-export function formatPrice(price: number): string {
+export function formatPrice(price: number | string | undefined): string {
+  // Convert price to a number and handle undefined/NaN cases
+  const numericPrice = typeof price === 'string' ? parseFloat(price) : Number(price || 0);
+  
+  // Check if the result is a valid number
+  if (isNaN(numericPrice)) {
+    console.warn('Invalid price value:', price);
+    return '₹0';
+  }
+  
+  // Round to 2 decimal places
+  const roundedPrice = Math.round(numericPrice * 100) / 100;
+  
+  // If it's a whole number, don't show decimal places
+  if (roundedPrice === Math.floor(roundedPrice)) {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(roundedPrice);
+  }
+  
+  // Otherwise format with exactly 2 decimal places
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(price)
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(roundedPrice);
 }
 
 // Format date to Indian format
