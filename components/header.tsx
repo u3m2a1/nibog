@@ -69,9 +69,9 @@ export default function Header() {
   ]
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-pink-200 dark:border-purple-800 bg-gradient-to-r from-blue-100/90 via-purple-100/90 to-pink-100/90 dark:from-blue-900/80 dark:via-purple-900/80 dark:to-pink-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-transparent shadow-sm">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(120,190,255,0.15),transparent_70%),radial-gradient(circle_at_85%_30%,rgba(255,182,193,0.15),transparent_70%)]" />
-      <div className="container flex h-20 items-center justify-between relative z-10">
+    <header className="sticky top-0 z-50 w-full border-b border-pink-200/50 dark:border-purple-800/50 bg-gradient-to-r from-blue-100/90 via-purple-100/90 to-pink-100/90 dark:from-blue-900/90 dark:via-purple-900/90 dark:to-pink-900/90 backdrop-blur-lg supports-[backdrop-filter]:bg-transparent shadow-lg transition-all duration-300 hover:shadow-xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(120,190,255,0.2),transparent_70%),radial-gradient(circle_at_85%_30%,rgba(255,182,193,0.2),transparent_70%)] animate-gradient-shift" />
+      <div className="container flex h-20 md:h-24 items-center justify-between relative z-10">
         <div className="flex items-center gap-6 md:gap-10">
           <Link href="/" className="flex items-center h-full py-2">
             <NibogLogo className="h-full w-auto" />
@@ -82,16 +82,33 @@ export default function Header() {
                 key={route.href}
                 href={route.href}
                 className={cn(
-                  "relative px-3 py-2 text-sm font-medium rounded-full transition-all duration-300",
-                  "hover:bg-white/30 dark:hover:bg-white/10 hover:scale-105 hover:shadow-sm",
+                  "relative px-5 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 group overflow-hidden",
+                  "hover:bg-white/30 dark:hover:bg-white/10 hover:scale-105 hover:shadow-lg hover:shadow-purple-200/40 dark:hover:shadow-purple-800/30",
                   route.active 
-                    ? "text-purple-700 dark:text-purple-300 font-semibold bg-white/20 dark:bg-white/5" 
-                    : "text-blue-700 dark:text-blue-300",
+                    ? [
+                        "text-white font-semibold shadow-lg",
+                        "bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600",
+                        "bg-[length:200%_auto] animate-gradient",
+                        "shadow-purple-400/40 dark:shadow-purple-600/40",
+                        "before:absolute before:inset-0 before:bg-gradient-to-r before:from-white/20 before:via-white/0 before:to-white/20 before:animate-shine"
+                      ].join(' ')
+                    : "text-blue-700 dark:text-blue-300 hover:text-purple-700 dark:hover:text-purple-300",
                 )}
               >
-                <span className="relative z-10">{route.label}</span>
-                {route.active && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 rounded-full"></span>
+                <span className="relative z-10 flex items-center gap-2">
+                  {route.label}
+                  {route.active && (
+                    <span className="absolute -right-1 -top-1 flex items-center justify-center">
+                      <span className="absolute h-2 w-2 animate-ping rounded-full bg-white/90"></span>
+                      <span className="relative h-1.5 w-1.5 rounded-full bg-white"></span>
+                    </span>
+                  )}
+                </span>
+                {!route.active && (
+                  <span className={cn(
+                    "absolute inset-0 rounded-xl bg-gradient-to-r from-purple-500/0 via-purple-500/15 to-purple-500/0",
+                    "opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  )}></span>
                 )}
               </Link>
             ))}
@@ -132,10 +149,10 @@ export default function Header() {
             <SheetTrigger asChild>
               <Button 
                 variant="ghost" 
-                className="px-2 md:hidden rounded-full hover:bg-white/30 dark:hover:bg-white/10 transition-all duration-300" 
+                className="px-3 py-2 md:hidden rounded-xl hover:bg-white/30 dark:hover:bg-white/10 transition-all duration-300 group" 
                 aria-label="Toggle Menu"
               >
-                <Menu className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+                <Menu className="h-5 w-5 text-blue-700 dark:text-blue-300 group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors" />
               </Button>
             </SheetTrigger>
             <SheetContent 
