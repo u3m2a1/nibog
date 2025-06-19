@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { checkPhonePePaymentStatus } from "@/services/paymentService"
+import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 
 export default function PaymentCallbackPage() {
   const router = useRouter()
@@ -16,54 +17,93 @@ export default function PaymentCallbackPage() {
   const [error, setError] = useState<string | null>(null)
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState<string | null>(null)
+  const [processingBooking, setProcessingBooking] = useState(false)
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
       try {
         setIsLoading(true)
 
-        // Get the transaction ID and booking ID from the URL
+        // Get the transaction ID from the URL
+        // In the new workflow, bookingId in URL is actually a temp transaction ID
         const txnId = searchParams.get('transactionId')
-        const bkgId = searchParams.get('bookingId')
+        const tempId = searchParams.get('bookingId') // This is the temp ID we passed
 
-        if (!txnId || !bkgId) {
-          throw new Error("Missing transaction ID or booking ID")
+        if (!txnId || !tempId) {
+          throw new Error("Missing transaction ID or temporary ID")
         }
 
         setTransactionId(txnId)
-        setBookingId(bkgId)
-
+        
         // Check the payment status
         const status = await checkPhonePePaymentStatus(txnId)
         setPaymentStatus(status)
 
-        // If payment was successful, redirect to the booking confirmation page after a delay
+        // If payment was successful, create the booking and update payment status
         if (status === 'SUCCESS') {
-          // Update the booking status to paid via API call
+          setProcessingBooking(true)
+          
           try {
+            // Get the pending booking data from session storage
+            const pendingBookingDataStr = sessionStorage.getItem('pendingBookingData')
+            
+            if (!pendingBookingDataStr) {
+              throw new Error("Booking data not found. Please try registering again.")
+            }
+            
+            const pendingBookingData = JSON.parse(pendingBookingDataStr)
+            
+            // Format booking data for the API
+            const formattedBookingData = formatBookingDataForAPI({
+              ...pendingBookingData,
+              paymentStatus: 'Paid', // Mark as paid since payment successful
+              transactionId: txnId // Add the actual transaction ID
+            })
+            
+            console.log("Creating booking after successful payment:", formattedBookingData)
+            
+            // Register the booking now that payment is successful
+            const bookingResponse = await registerBooking(formattedBookingData)
+            console.log("Booking response:", bookingResponse)
+            
+            if (!bookingResponse || bookingResponse.length === 0) {
+              throw new Error("Failed to create booking after payment. Please contact support.")
+            }
+            
+            const newBookingId = bookingResponse[0].booking_id.toString()
+            setBookingId(newBookingId)
+            
+            // Update the booking with payment info
             const updateResponse = await fetch('/api/bookings/update-status', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                bookingId: bkgId,
+                bookingId: newBookingId,
                 transactionId: txnId,
                 status: 'Paid'
               }),
-            });
+            })
 
             if (!updateResponse.ok) {
-              console.error('Failed to update booking status');
+              console.error('Failed to update booking status')
             }
-          } catch (updateError) {
-            console.error('Error updating booking status:', updateError);
+            
+            // Clear the pending booking data now that it's been processed
+            sessionStorage.removeItem('pendingBookingData')
+            sessionStorage.removeItem('registrationData')
+            sessionStorage.removeItem('selectedAddOns')
+            
+            // Redirect to booking confirmation page
+            setTimeout(() => {
+              router.push(`/booking-confirmation?ref=${newBookingId}`)
+            }, 3000)
+          } catch (bookingError: any) {
+            console.error("Error creating booking after payment:", bookingError)
+            setError(bookingError.message || "Failed to create booking after payment")
+            setProcessingBooking(false)
           }
-
-          // Redirect to booking confirmation page
-          setTimeout(() => {
-            router.push(`/booking-confirmation?ref=${bkgId}`)
-          }, 3000)
         }
       } catch (error: any) {
         console.error("Error checking payment status:", error)
@@ -94,8 +134,14 @@ export default function PaymentCallbackPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
-              {paymentStatus === 'SUCCESS' && (
+              {paymentStatus === 'SUCCESS' && !processingBooking && (
                 <CheckCircle className="h-16 w-16 text-green-500" />
+              )}
+              {paymentStatus === 'SUCCESS' && processingBooking && (
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="h-16 w-16 text-green-500 animate-spin" />
+                  <p className="text-muted-foreground">Processing your booking...</p>
+                </div>
               )}
               {paymentStatus === 'FAILED' && (
                 <XCircle className="h-16 w-16 text-red-500" />
@@ -167,9 +213,13 @@ export default function PaymentCallbackPage() {
   }
 
   function getStatusDescription() {
+    if (error) return error;
+    
     switch (paymentStatus) {
       case 'SUCCESS':
-        return "Your payment was successful. You will be redirected to the booking confirmation page."
+        return processingBooking 
+          ? "Payment successful! We're finalizing your booking..." 
+          : "Your payment was successful. You will be redirected to the booking confirmation page."
       case 'FAILED':
         return "Your payment was not successful. Please try again."
       case 'PENDING':

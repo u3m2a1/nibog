@@ -4,6 +4,12 @@ import { PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonepe';
 
 export async function POST(request: Request) {
   try {
+    // Log headers for debugging
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    console.log("Server API route: Received headers:", JSON.stringify(headers, null, 2));
     console.log("Server API route: Received PhonePe callback");
     console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
 

@@ -692,16 +692,17 @@ export default function RegisterEventClientPage() {
     setPromocodeError(null);
   };
   
-  // Handle payment and booking registration
+  // Handle payment initiation - redirect to PhonePe first, booking will be created after successful payment
   const handlePayment = async () => {
     try {
       setIsProcessingPayment(true)
       setPaymentError(null)
 
-      // We'll use our existing calculateTotalPrice function
-
       // Get the selected game details
-      const selectedGamesObj = selectedGames.map(gameId => eligibleGames.find(game => game.id.toString() === gameId));
+      // Filter out any undefined games to prevent errors
+      const selectedGamesObj = selectedGames
+        .map(gameId => eligibleGames.find(game => game.id.toString() === gameId))
+        .filter(game => game !== undefined);
 
       // Get the selected event details
       const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
@@ -715,40 +716,40 @@ export default function RegisterEventClientPage() {
         throw new Error("User ID not found. Please log in again.")
       }
 
-      // Format the booking data for the API
-      const bookingData = formatBookingDataForAPI({
+      // Prepare booking data and save it to session storage for use after payment
+      const bookingData = {
         userId,
         parentName,
         email,
         phone,
         childName,
-        childDob: dob!,
+        childDob: dob!.toISOString(),
         schoolName,
         gender,
         eventId: selectedApiEvent.event_id,
-        gameId: selectedGamesObj.id,
-        gamePrice: selectedGamesObj.custom_price || selectedGamesObj.slot_price || 0,
+        gameId: selectedGamesObj.map(game => game?.id).filter(Boolean),
+        gamePrice: selectedGamesObj.map(game => game?.custom_price || game?.slot_price || 0),
         totalAmount: calculateTotalPrice(),
-        paymentMethod: "PhonePe", // Using PhonePe as the payment method
-        paymentStatus: "Pending", // Set to pending initially
-        termsAccepted
-      })
-
-      console.log("Formatted booking data:", bookingData)
-
-      // Register the booking
-      const response = await registerBooking(bookingData)
-      console.log("Booking registration response:", response)
-
-      if (!response || response.length === 0) {
-        throw new Error("Failed to create booking. Please try again.")
+        paymentMethod: "PhonePe",
+        paymentStatus: "Pending",
+        termsAccepted,
+        addOns: selectedAddOns.map(item => ({
+          addOnId: item.addOn.id,
+          quantity: item.quantity,
+          variantId: item.variantId
+        }))
       }
 
-      const bookingId = response[0].booking_id.toString()
-      setBookingReference(bookingId)
+      console.log("Prepared booking data for payment:", bookingData)
+      
+      // Save booking data to session storage for use after payment
+      sessionStorage.setItem('pendingBookingData', JSON.stringify(bookingData))
+      
+      // Generate a unique transaction ID for this payment attempt
+      const tempTransactionId = `NIBOG_TEMP_${userId}_${Date.now()}`
 
       console.log("=== PHONEPE PAYMENT INITIATION ===")
-      console.log("Booking ID:", bookingId)
+      console.log("Temp Transaction ID:", tempTransactionId)
       console.log("User ID:", userId)
       console.log("Phone:", phone)
 
@@ -756,10 +757,10 @@ export default function RegisterEventClientPage() {
       const totalAmount = calculateTotalPrice()
       console.log("Total Amount (₹):", totalAmount)
 
-      // Initiate the payment
+      // Initiate the payment directly without creating a booking first
       console.log("🚀 Calling initiatePhonePePayment...")
       const paymentUrl = await initiatePhonePePayment(
-        bookingId,
+        tempTransactionId, // Use temporary ID as we don't have a booking ID yet
         userId,
         totalAmount,
         phone
@@ -768,9 +769,8 @@ export default function RegisterEventClientPage() {
       console.log("✅ PhonePe payment URL received:", paymentUrl)
       console.log("🔄 Redirecting to PhonePe payment page...")
 
-      // Clear saved registration data since we're proceeding to payment
-      sessionStorage.removeItem('registrationData')
-      sessionStorage.removeItem('selectedAddOns')
+      // Don't remove registration data yet as we might need it if payment fails
+      // We'll clear it after successful payment completion
 
       // Redirect to the PhonePe payment page
       window.location.href = paymentUrl

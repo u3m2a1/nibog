@@ -83,10 +83,21 @@ export function base64Encode(str: string): string {
   }
 }
 
-// Generate a unique transaction ID
+// Generate a unique transaction ID (max 38 chars as required by PhonePe)
 export function generateTransactionId(bookingId: string | number): string {
   const timestamp = new Date().getTime();
-  return `NIBOG_${bookingId}_${timestamp}`;
+  const prefix = 'NIBOG_';
+  const fullId = `${prefix}${bookingId}_${timestamp}`;
+  
+  // Check if the ID exceeds 38 characters and truncate if necessary
+  if (fullId.length <= 38) {
+    return fullId;
+  }
+  
+  // If too long, use a shortened version
+  // Keep the prefix, use last 6 chars of bookingId, and use full timestamp
+  const shortBookingId = String(bookingId).slice(-6);
+  return `${prefix}${shortBookingId}_${timestamp}`;
 }
 
 // Payment status types

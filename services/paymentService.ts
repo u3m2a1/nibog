@@ -136,9 +136,11 @@ export async function initiatePhonePePayment(
       merchantTransactionId: merchantTransactionId,
       merchantUserId: userId.toString(),
       amount: amount * 100, // Convert to paise
-      redirectUrl: `${PHONEPE_CONFIG.APP_URL}/payment-callback?bookingId=${bookingId}&transactionId=${merchantTransactionId}`,
+      // Ensure APP_URL doesn't have trailing slash and parameters are properly encoded
+      redirectUrl: `${PHONEPE_CONFIG.APP_URL.replace(/\/+$/, '')}/payment-callback?bookingId=${encodeURIComponent(String(bookingId))}&transactionId=${encodeURIComponent(merchantTransactionId)}`,
       redirectMode: 'REDIRECT',
-      callbackUrl: `${PHONEPE_CONFIG.APP_URL}/api/payments/phonepe-callback`,
+      // Ensure callback URL is absolute and properly formatted (required by PhonePe)
+      callbackUrl: `${PHONEPE_CONFIG.APP_URL.replace(/\/+$/, '')}/api/payments/phonepe-callback`,
       mobileNumber: mobileNumber.replace(/\D/g, ''), // Remove non-numeric characters
       paymentInstrument: {
         type: 'PAY_PAGE'
