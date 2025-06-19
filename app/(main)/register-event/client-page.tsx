@@ -27,6 +27,7 @@ import { getEventsByCityId, getGamesByAgeAndEvent, EventListItem, EventGameListI
 import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 import { initiatePhonePePayment } from "@/services/paymentService"
+import { getPromoCodesByEventAndGames, validatePromoCodePreview } from "@/services/promoCodeService"
 
 // Helper function to format price.
 const formatPrice = (price: number | string | undefined) => {
@@ -91,6 +92,15 @@ export default function RegisterEventClientPage() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
   const [bookingReference, setBookingReference] = useState<string | null>(null)
+  
+  // Promocode related states
+  const [availablePromocodes, setAvailablePromocodes] = useState<any[]>([])
+  const [isLoadingPromocodes, setIsLoadingPromocodes] = useState<boolean>(false)
+  const [promocodeError, setPromocodeError] = useState<string | null>(null)
+  const [promoCode, setPromoCode] = useState<string>('')
+  const [appliedPromoCode, setAppliedPromoCode] = useState<any | null>(null)
+  const [discountAmount, setDiscountAmount] = useState<number>(0)
+  const [isApplyingPromocode, setIsApplyingPromocode] = useState<boolean>(false)
 
   // Get authentication state from auth context
   const { isAuthenticated, user } = useAuth()
@@ -162,13 +172,20 @@ export default function RegisterEventClientPage() {
     return total;
   }
 
-  // Calculate total price including add-ons and GST
+  // Calculate total price including add-ons, GST, and promocode discount
   const calculateTotalPrice = () => {
     const gamesTotal = calculateGamesTotal();
     const addOnsTotal = calculateAddOnsTotal();
     const subtotal = gamesTotal + addOnsTotal;
-    const gst = parseFloat((subtotal * 0.18).toFixed(2));
-    const total = subtotal + gst;
+    
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+    
+    const gst = parseFloat((discountedSubtotal * 0.18).toFixed(2));
+    const total = discountedSubtotal + gst;
     
     // Ensure final total is rounded to 2 decimal places
     return parseFloat(total.toFixed(2));
@@ -179,7 +196,14 @@ export default function RegisterEventClientPage() {
     const gamesTotal = calculateGamesTotal();
     const addOnsTotal = calculateAddOnsTotal();
     const subtotal = gamesTotal + addOnsTotal;
-    const gst = subtotal * 0.18;
+    
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+    
+    const gst = discountedSubtotal * 0.18;
     
     // Round to 2 decimal places
     return parseFloat(gst.toFixed(2));
@@ -328,6 +352,12 @@ export default function RegisterEventClientPage() {
     setSelectedEvent("") // Reset selected event when event type changes
     setEligibleGames([]) // Reset games when event type changes
     setSelectedGames([]) // Reset selected games when event type changes
+    
+    // Reset promocode when event changes
+    setPromoCode('')
+    setAppliedPromoCode(null)
+    setDiscountAmount(0)
+    setAvailablePromocodes([])
 
     // Find the selected event from API events
     const selectedApiEvent = apiEvents.find(event => event.event_title === eventType);
@@ -425,13 +455,26 @@ export default function RegisterEventClientPage() {
   const handleGameSelection = (gameId: string) => {
     // Toggle selection: add if not selected, remove if already selected
     setSelectedGames(prev => {
-      if (prev.includes(gameId)) {
-        // Remove from selection
-        return prev.filter(id => id !== gameId);
+      const newSelectedGames = prev.includes(gameId)
+        ? prev.filter(id => id !== gameId) // Remove from selection
+        : [...prev, gameId]; // Add to selection
+      
+      // Reset promocode when games change
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+      
+      // Fetch applicable promocodes for the new game selection
+      if (newSelectedGames.length > 0 && selectedEventType) {
+        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+        if (selectedApiEvent) {
+          fetchApplicablePromocodes(selectedApiEvent.event_id, newSelectedGames.map(id => Number(id)));
+        }
       } else {
-        // Add to selection
-        return [...prev, gameId];
+        setAvailablePromocodes([]);
       }
+      
+      return newSelectedGames;
     });
     
     // Log selection state for debugging
@@ -554,6 +597,101 @@ export default function RegisterEventClientPage() {
     handleProceedToPayment()
   }
 
+  // Fetch applicable promocodes for selected event and games
+  const fetchApplicablePromocodes = async (eventId: number, gameIds: number[]) => {
+    if (!eventId || !gameIds.length) return;
+    
+    try {
+      setIsLoadingPromocodes(true);
+      setPromocodeError(null);
+      
+      console.log(`Fetching promocodes for event ID: ${eventId} and game IDs: ${gameIds.join(', ')}`);
+      const promocodes = await getPromoCodesByEventAndGames(eventId, gameIds);
+      
+      console.log('Available promocodes:', promocodes);
+      setAvailablePromocodes(promocodes);
+      
+      // Reset any applied promocode when fetching new ones
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+    } catch (error) {
+      console.error('Error fetching promocodes:', error);
+      setPromocodeError('Failed to load promocodes');
+      setAvailablePromocodes([]);
+    } finally {
+      setIsLoadingPromocodes(false);
+    }
+  };
+  
+  // Handle applying a promocode
+  const handleApplyPromoCode = async () => {
+    if (!promoCode) return;
+    
+    try {
+      setIsApplyingPromocode(true);
+      setPromocodeError(null);
+      
+      // Get the selected event ID
+      const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+      if (!selectedApiEvent) {
+        throw new Error('Selected event not found');
+      }
+      
+      // Get the total amount before discount
+      const gamesTotal = calculateGamesTotal();
+      const addOnsTotal = calculateAddOnsTotal();
+      const subtotal = gamesTotal + addOnsTotal;
+      
+      // Validate the promocode
+      const result = await validatePromoCodePreview(
+        promoCode,
+        selectedApiEvent.event_id,
+        selectedGames.map(id => Number(id)),
+        subtotal
+      );
+      
+      console.log('Promocode validation result:', result);
+      
+      if (result.isValid) {
+        // Find the promocode details from available promocodes
+        const promocodeDetails = availablePromocodes.find(code => code.promo_code === promoCode);
+        
+        if (promocodeDetails) {
+          setAppliedPromoCode(promocodeDetails);
+          setDiscountAmount(result.discountAmount);
+        } else {
+          // If promocode details not found in available promocodes, create a basic object
+          setAppliedPromoCode({
+            promo_code: promoCode,
+            type: result.discountAmount === subtotal * (parseInt(promoCode.split('%')[0]) / 100) ? 'percentage' : 'fixed',
+            value: result.discountAmount === subtotal * (parseInt(promoCode.split('%')[0]) / 100) ? parseInt(promoCode.split('%')[0]) : result.discountAmount
+          });
+          setDiscountAmount(result.discountAmount);
+        }
+      } else {
+        setPromocodeError(result.message || 'Invalid promocode');
+        setAppliedPromoCode(null);
+        setDiscountAmount(0);
+      }
+    } catch (error: any) {
+      console.error('Error applying promocode:', error);
+      setPromocodeError(error.message || 'Failed to apply promocode');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+    } finally {
+      setIsApplyingPromocode(false);
+    }
+  };
+  
+  // Handle removing an applied promocode
+  const handleRemovePromoCode = () => {
+    setPromoCode('');
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setPromocodeError(null);
+  };
+  
   // Handle payment and booking registration
   const handlePayment = async () => {
     try {
@@ -1572,7 +1710,7 @@ export default function RegisterEventClientPage() {
                     </div>
                     <Separator />
                     <div className="flex justify-between font-medium">
-                      <span>Registration Fee:</span>
+                      <span>Games Subtotal:</span>
                       <span>₹{calculateGamesTotal()}</span>
                     </div>
                     {selectedAddOns.length > 0 ? (
@@ -1654,6 +1792,12 @@ export default function RegisterEventClientPage() {
                       <span>None selected</span>
                     </div>
                   )}
+                  {appliedPromoCode && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promocode Discount:</span>
+                      <span>- ₹{discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-medium">
                     <span>GST (18%):</span>
                     <span>₹{calculateGST()}</span>
@@ -1669,9 +1813,87 @@ export default function RegisterEventClientPage() {
                 <div className="space-y-2 mt-6">
                   <Label htmlFor="promo">Promo Code</Label>
                   <div className="flex space-x-2">
-                    <Input id="promo" placeholder="Enter promo code" />
-                    <Button variant="outline">Apply</Button>
+                    <Input 
+                      id="promo" 
+                      placeholder="Enter promo code" 
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      disabled={isApplyingPromocode || !selectedGames.length}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleApplyPromoCode}
+                      disabled={isApplyingPromocode || !promoCode || !selectedGames.length}
+                    >
+                      {isApplyingPromocode ? (
+                        <>
+                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                          Applying...
+                        </>
+                      ) : appliedPromoCode ? 'Change' : 'Apply'}
+                    </Button>
                   </div>
+                  
+                  {/* Available promocodes dropdown */}
+                  {availablePromocodes.length > 0 && !appliedPromoCode && (
+                    <div className="mt-2">
+                      <Label htmlFor="available-promocodes" className="text-xs text-muted-foreground">Available Promocodes</Label>
+                      <Select onValueChange={(value) => setPromoCode(value)}>
+                        <SelectTrigger className="w-full mt-1 text-sm">
+                          <SelectValue placeholder="Select a promocode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePromocodes.map((code) => (
+                            <SelectItem key={code.id} value={code.promo_code} className="text-sm">
+                              <div className="flex justify-between items-center w-full">
+                                <span className="font-medium">{code.promo_code}</span>
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  {code.type === 'percentage' ? `${code.value}% OFF` : `₹${code.value} OFF`}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">{code.description}</div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  {/* Applied promocode */}
+                  {appliedPromoCode && (
+                    <div className="mt-2 p-2 rounded-md border border-green-200 bg-green-50">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-medium text-green-700">{appliedPromoCode.promo_code}</span>
+                          <span className="text-xs text-green-600 ml-2">Applied Successfully</span>
+                        </div>
+                        <Badge className="bg-green-500 hover:bg-green-600">
+                          {appliedPromoCode.type === 'percentage' ? `${appliedPromoCode.value}% OFF` : `₹${appliedPromoCode.value} OFF`}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        Discount: ₹{discountAmount.toFixed(2)}
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-0 h-auto mt-1"
+                        onClick={handleRemovePromoCode}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Promocode error */}
+                  {promocodeError && (
+                    <div className="mt-2 p-2 rounded-md border border-red-200 bg-red-50">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
+                        <span className="text-xs text-red-600">{promocodeError}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {paymentError && (
