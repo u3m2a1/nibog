@@ -30,6 +30,7 @@ export default function AddOnSelector({
     initialSelectedAddOns
   )
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
+  const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: string]: boolean }>({})
 
   const handleAddOnToggle = (addOn: AddOn, isChecked: boolean) => {
     let updatedAddOns = [...selectedAddOns]
@@ -196,7 +197,9 @@ export default function AddOnSelector({
           const isOutOfStock = stockStatus.status === "out-of-stock"
           const isLowStock = stockStatus.status === "low-stock"
           const quantity = getQuantity(addOn.id)
-          const hasDiscount = addOn.bundleDiscount && quantity >= addOn.bundleDiscount.minQuantity
+          const hasDiscount = addOn.bundleDiscount && 
+                           addOn.bundleDiscount.discountPercentage > 0 && 
+                           quantity >= addOn.bundleDiscount.minQuantity
           const discountedPrice = hasDiscount ? getDiscountedPrice(addOn, quantity) : addOn.price
 
           return (
@@ -209,26 +212,23 @@ export default function AddOnSelector({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <CardTitle className="text-base">{addOn.name}</CardTitle>
-                      {addOn.hasVariants && (
-                        <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30">
-                          <Tag className="mr-1 h-3 w-3" />
-                          {addOn.variants?.length || 0} Variants
-                        </Badge>
-                      )}
                     </div>
-                    <CardDescription className="text-xs">{addOn.description}</CardDescription>
-                    
-                    {/* Show variants count badge */}
-                    {addOn.hasVariants && addOn.variants && addOn.variants.length > 0 && (
-                      <div className="mt-2">
-                        <Badge variant="outline" className="text-xs bg-primary/10 border-primary/30">
-                          {addOn.variants.length} {addOn.variants.length === 1 ? 'Variant' : 'Variants'} Available
-                        </Badge>
-                      </div>
-                    )}
+                    <CardDescription 
+                      className={`text-xs text-left cursor-pointer transition-all duration-200 ${
+                        expandedDescriptions[addOn.id] 
+                          ? 'line-clamp-none' 
+                          : 'line-clamp-2 text-ellipsis overflow-hidden'
+                      }`}
+                      onClick={() => setExpandedDescriptions(prev => ({
+                        ...prev,
+                        [addOn.id]: !prev[addOn.id]
+                      }))}
+                    >
+                      {addOn.description}
+                    </CardDescription>
                   </div>
                   <div className="flex flex-col items-end">
-                    {hasDiscount ? (
+                    {hasDiscount && (addOn.bundleDiscount?.discountPercentage ?? 0) > 0 ? (
                       <>
                         <Badge className="bg-green-500 hover:bg-green-600 mb-1">
                           {addOn.bundleDiscount?.discountPercentage}% OFF
@@ -240,6 +240,8 @@ export default function AddOnSelector({
                           <Badge>{formatPrice(discountedPrice)}</Badge>
                         </div>
                       </>
+                    ) : hasDiscount && (addOn.bundleDiscount?.discountPercentage ?? 0) === 0 ? (
+                      <Badge>{formatPrice(addOn.price)}</Badge>
                     ) : (
                       <Badge>{formatPrice(addOn.price)}</Badge>
                     )}
@@ -247,16 +249,34 @@ export default function AddOnSelector({
                 </div>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                {addOn.images && addOn.images.length > 0 && (
-                  <div className="relative mb-3 h-32 w-full overflow-hidden rounded-md">
+                <div className="relative mb-3 h-32 w-full overflow-hidden rounded-md bg-gray-100 flex items-center justify-center">
+                  {addOn.images && addOn.images.length > 0 ? (
                     <Image
                       src={addOn.images[0]}
                       alt={addOn.name}
                       fill
                       className="object-cover"
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex flex-col items-center text-gray-400">
+                      <svg 
+                        className="w-12 h-12 mb-2"
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24" 
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth="1.5" 
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span className="text-xs">No image available</span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
@@ -266,51 +286,45 @@ export default function AddOnSelector({
                       onCheckedChange={(checked) => handleAddOnToggle(addOn, checked as boolean)}
                       disabled={isOutOfStock}
                     />
-                    <Label htmlFor={`addon-${addOn.id}`} className="text-sm font-medium flex items-center gap-1">
+                    <Label htmlFor={`addon-${addOn.id}`} className="text-sm font-medium">
                       Add to booking
-                      {addOn.hasVariants && addOn.variants && addOn.variants.length > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          <Tag className="mr-1 h-3 w-3" />
-                          {addOn.variants.length} options
-                        </Badge>
-                      )}
                     </Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div>
+                            {isOutOfStock ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-500">
+                                <AlertCircle className="mr-1 h-3 w-3" />
+                                Out of Stock
+                              </Badge>
+                            ) : isLowStock ? (
+                              <Badge variant="outline" className="bg-amber-50 text-amber-500">
+                                <Package className="mr-1 h-3 w-3" />
+                                Low Stock: {stockStatus.quantity}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-500">
+                                <Package className="mr-1 h-3 w-3" />
+                                In Stock
+                              </Badge>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {isOutOfStock
+                            ? "This item is currently out of stock"
+                            : isLowStock
+                            ? `Only ${stockStatus.quantity} units left in stock`
+                            : `${stockStatus.quantity} units available`}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div>
-                          {isOutOfStock ? (
-                            <Badge variant="outline" className="bg-red-50 text-red-500">
-                              <AlertCircle className="mr-1 h-3 w-3" />
-                              Out of Stock
-                            </Badge>
-                          ) : isLowStock ? (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-500">
-                              <Package className="mr-1 h-3 w-3" />
-                              Low Stock: {stockStatus.quantity}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-green-50 text-green-500">
-                              <Package className="mr-1 h-3 w-3" />
-                              In Stock
-                            </Badge>
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isOutOfStock
-                          ? "This item is currently out of stock"
-                          : isLowStock
-                          ? `Only ${stockStatus.quantity} units left in stock`
-                          : `${stockStatus.quantity} units available`}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                 </div>
 
-                {addOn.bundleDiscount && (
+                {addOn.bundleDiscount && addOn.bundleDiscount.discountPercentage > 0 && (
                   <div className="text-xs text-muted-foreground mb-2">
                     Buy {addOn.bundleDiscount.minQuantity}+ for {addOn.bundleDiscount.discountPercentage}% off
                   </div>
@@ -482,23 +496,37 @@ export default function AddOnSelector({
                     </Button>
                   </div>
                   <div className="text-sm font-medium">
-                    {hasDiscount ? (
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs line-through text-muted-foreground">
-                          {formatPrice(addOn.price * getQuantity(addOn.id))}
-                        </span>
-                        <span>{formatPrice(discountedPrice * getQuantity(addOn.id))}</span>
-                      </div>
-                    ) : (
-                      formatPrice(addOn.price * getQuantity(addOn.id))
-                    )}
+                    {(() => {
+                      // Calculate base price with variant modifier if applicable
+                      const basePrice = addOn.hasVariants && addOn.variants ? (() => {
+                        const variantId = getSelectedVariant(addOn.id);
+                        const variant = addOn.variants.find(v => v.id === variantId);
+                        return variant ? (addOn.price + getVariantPriceModifier(variant)) : addOn.price;
+                      })() : addOn.price;
+                      
+                      // Apply discount if applicable
+                      const finalUnitPrice = hasDiscount ? basePrice * (1 - (addOn.bundleDiscount?.discountPercentage || 0) / 100) : basePrice;
+                      const totalPrice = finalUnitPrice * getQuantity(addOn.id);
+                      const originalTotalPrice = basePrice * getQuantity(addOn.id);
+                      
+                      return hasDiscount ? (
+                        <>
+                          <span className="text-muted-foreground line-through mr-2">
+                            {formatPrice(originalTotalPrice)}
+                          </span>
+                          <span>{formatPrice(totalPrice)}</span>
+                        </>
+                      ) : (
+                        <span>{formatPrice(totalPrice)}</span>
+                      );
+                    })()}
                   </div>
                 </CardFooter>
               )}
             </Card>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

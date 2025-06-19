@@ -294,7 +294,9 @@ export async function fetchAllAddOnsFromExternalApi(): Promise<AddOn[]> {
         price: addon.price,
         category: addon.category as "meal" | "merchandise" | "service" | "other",
         is_active: addon.is_active,
-        has_variants: addon.has_variants,
+        // Ensure has_variants is properly assigned and recognized
+        has_variants: Boolean(addon.has_variants),
+        hasVariants: Boolean(addon.has_variants), // Add camelCase version too for compatibility
         // Transform snake_case to camelCase for frontend components
         stockQuantity: addon.stock_quantity || 0,
         sku: addon.sku,
@@ -306,7 +308,12 @@ export async function fetchAllAddOnsFromExternalApi(): Promise<AddOn[]> {
         created_at: "", // These fields might not be available in the external API
         updated_at: "", // These fields might not be available in the external API
         images: addon.images || [],
-        variants: transformedVariants
+        // Ensure variants are only included when has_variants is true
+        variants: addon.has_variants ? transformedVariants : [],
+        // Preserving original properties to satisfy type constraints
+        stock_quantity: addon.stock_quantity || 0,
+        bundle_min_quantity: addon.bundle_min_quantity || 0,
+        bundle_discount_percentage: addon.bundle_discount_percentage || '0.00'
       };
     });
 
