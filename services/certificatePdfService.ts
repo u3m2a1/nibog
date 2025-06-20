@@ -154,8 +154,8 @@ export function previewCertificateHTML(html: string): void {
   modal.style.cssText = `
     background: white;
     border-radius: 8px;
-    max-width: 90%;
-    max-height: 90%;
+    max-width: 95%;
+    max-height: 95%;
     overflow: auto;
     position: relative;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
@@ -184,8 +184,8 @@ export function previewCertificateHTML(html: string): void {
   // Create iframe for preview
   const iframe = document.createElement('iframe');
   iframe.style.cssText = `
-    width: 800px;
-    height: 600px;
+    width: 1000px;
+    height: 750px;
     border: none;
     border-radius: 8px;
   `;
@@ -252,6 +252,57 @@ export async function generateCertificatePreview(
 }
 
 /**
+ * Parse variables in text and replace them with actual certificate data
+ */
+function parseVariables(text: string, data: CertificateData, template?: CertificateTemplate, positionOverride?: string, achievementOverride?: string): string {
+  if (!text) return text;
+
+  // Get achievement from template options or fallback to certificate data
+  let achievement = achievementOverride || data.achievement || 'Outstanding Performance';
+  if (template?.achievement_options && template.achievement_options.length > 0) {
+    // Use the first achievement option as default, or find matching one
+    achievement = template.achievement_options.find(option =>
+      option.toLowerCase() === achievement.toLowerCase()
+    ) || template.achievement_options[0];
+  }
+
+  // Get position from template options or fallback to certificate data
+  let position = positionOverride || data.position || '1st Place';
+  if (template?.position_options && template.position_options.length > 0) {
+    // Use the first position option as default, or find matching one
+    position = template.position_options.find(option =>
+      option.toLowerCase() === position.toLowerCase()
+    ) || template.position_options[0];
+  }
+
+  // Define variable mappings
+  const variables: Record<string, string> = {
+    'participant_name': data.participant_name || 'John Doe',
+    'event_name': data.event_name || 'Baby Crawling Championship 2024',
+    'game_name': data.game_name || '',
+    'venue_name': data.venue_name || 'Sports Arena',
+    'city_name': data.city_name || 'New York',
+    'certificate_number': data.certificate_number || 'CERT-001',
+    'event_date': data.event_date || new Date().toLocaleDateString(),
+    'date': data.event_date || new Date().toLocaleDateString(),
+    'position': position,
+    'score': data.score || '',
+    'achievement': achievement,
+    'instructor': data.instructor || '',
+    'organization': data.organization || 'Nibog Events',
+  };
+
+  // Replace variables in the format {variable_name}
+  let parsedText = text;
+  Object.entries(variables).forEach(([key, value]) => {
+    const regex = new RegExp(`\\{${key}\\}`, 'gi');
+    parsedText = parsedText.replace(regex, value);
+  });
+
+  return parsedText;
+}
+
+/**
  * Generate HTML for certificate from template and data
  */
 function generateCertificateHTML(
@@ -262,17 +313,57 @@ function generateCertificateHTML(
     ? template.background_image
     : `http://localhost:3000${template.background_image}`;
 
-  // Initialize variables to track which fields will be displayed as separate items vs included in appreciation text
-  const fieldsToSkipInMain: string[] = [];
-  let appreciationText = '';
-  
-  // Extract data values that will be displayed in the appreciation text
+  // Extract data values
   const participantName = data.participant_name || 'John Doe';
-  const eventName = data.event_name || 'Baby Crawling Championship 2024';
-  const achievement = data.achievement || 'Outstanding Performance';
-  const position = data.position || '1st Place';
-  
-  // Get default text based on template type first - exclude participant name from text but include event and achievement
+
+  // Generate certificate title - check for title field in template fields first
+  let certificateTitle = '';
+  let titleText = '';
+
+  // First, look for a "Certificate Title" field in the template fields
+  const titleField = template.fields.find((field: any) =>
+    field.name.toLowerCase().includes('certificate') && field.name.toLowerCase().includes('title')
+  );
+
+  if (titleField) {
+    // Use the title from the field, but don't render it as a regular field (we'll skip it later)
+    titleText = titleField.name === 'Certificate Title'
+      ? `Certificate of ${template.type === 'participation' ? 'Participation' : (template.type === 'winner' ? 'Achievement' : 'Excellence')}`
+      : titleField.name;
+  } else if (template.certificate_title) {
+    // Fallback to template.certificate_title if it exists
+    titleText = template.certificate_title;
+  } else {
+    // Default title based on template type
+    titleText = `Certificate of ${template.type === 'participation' ? 'Participation' : (template.type === 'winner' ? 'Achievement' : 'Excellence')}`;
+  }
+
+  if (titleText) {
+    // Check if title field has underline styling
+    const titleFieldUnderline = titleField?.underline || false;
+
+    certificateTitle = `
+      <div class="certificate-title" style="
+        position: absolute;
+        left: 50%;
+        top: 15%;
+        transform: translateX(-50%);
+        text-align: center;
+        width: 90%;
+        font-family: Arial, sans-serif;
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        ${titleFieldUnderline ? 'text-decoration: underline;' : ''}
+      ">
+        ${parseVariables(titleText, data, template)}
+      </div>
+    `;
+  }
+
+  // Get default appreciation text based on template type
   let defaultAppreciationText = '';
   if (template.type === 'participation') {
     defaultAppreciationText = `In recognition of enthusiastic participation in {event_name}.\nYour involvement, energy, and commitment at NIBOG are truly appreciated.\nThank you for being a valued part of the NIBOG community!`;
@@ -280,24 +371,90 @@ function generateCertificateHTML(
     defaultAppreciationText = `For achieving {achievement} in {event_name}.\nYour dedication, talent, and outstanding performance at NIBOG have distinguished you among the best.\nCongratulations on this remarkable achievement from the entire NIBOG team!`;
   }
 
+  // Get position from template fields or options
+  let positionText = '';
+  const positionField = template.fields.find((field: any) =>
+    field.name.toLowerCase().includes('position') || field.name.toLowerCase().includes('rank')
+  );
+
+  if (positionField) {
+    // Use position from certificate data first, then fallback to template options
+    positionText = data.position || '';
+    if (!positionText && template.position_options && template.position_options.length > 0) {
+      positionText = template.position_options[0]; // Use first position option as fallback
+    }
+    if (!positionText) {
+      positionText = '1st Place'; // Final fallback
+    }
+  }
+
+  // Generate position field HTML if position field exists
+  const positionHTML = positionField ? `
+    <div class="position-field" style="
+      position: absolute;
+      left: ${positionField.x}%;
+      top: ${positionField.y}%;
+      transform: translate(-50%, -50%);
+      font-size: ${positionField.font_size || 18}px;
+      font-weight: bold;
+      color: ${positionField.color || '#333333'};
+      font-family: '${positionField.font_family || 'Arial'}', sans-serif;
+      text-align: ${positionField.alignment || 'center'};
+      ${positionField.underline ? 'text-decoration: underline;' : ''}
+    ">
+      ${positionText}
+    </div>
+  ` : '';
+
+  // Get achievement from template fields or options
+  let achievementText = '';
+  const achievementField = template.fields.find((field: any) =>
+    field.name.toLowerCase().includes('achievement') || field.name.toLowerCase().includes('award')
+  );
+
+  if (achievementField) {
+    // Use achievement from certificate data first, then fallback to template options
+    achievementText = data.achievement || '';
+    if (!achievementText && template.achievement_options && template.achievement_options.length > 0) {
+      achievementText = template.achievement_options[0]; // Use first achievement option as fallback
+    }
+    if (!achievementText) {
+      achievementText = 'Outstanding Performance'; // Final fallback
+    }
+  }
+
+  // Generate achievement field HTML if achievement field exists
+  const achievementHTML = achievementField ? `
+    <div class="achievement-field" style="
+      position: absolute;
+      left: ${achievementField.x}%;
+      top: ${achievementField.y}%;
+      transform: translate(-50%, -50%);
+      font-size: ${achievementField.font_size || 20}px;
+      font-weight: bold;
+      color: ${achievementField.color || '#333333'};
+      font-family: '${achievementField.font_family || 'Arial'}', sans-serif;
+      text-align: ${achievementField.alignment || 'center'};
+      ${achievementField.underline ? 'text-decoration: underline;' : ''}
+    ">
+      ${achievementText}
+    </div>
+  ` : '';
+
   // Use custom appreciation text if available, otherwise use default text
   let appreciationContent = template.appreciation_text || defaultAppreciationText;
-  
-  // Replace placeholders in the appreciation text with actual values
-  appreciationContent = appreciationContent
-    .replace(/\{participant_name\}/g, participantName)
-    .replace(/\{event_name\}/g, eventName)
-    .replace(/\{achievement\}/g, achievement)
-    .replace(/\{position\}/g, position);
-  
+
+  // Parse variables in the appreciation text using position and achievement from template
+  appreciationContent = parseVariables(appreciationContent, data, template, positionText, achievementText);
+
   // Format the text with line breaks converted to <br> tags
   const formattedText = appreciationContent.replace(/\n/g, '<br>');
-  
+
   // Find the participant name field to use its styling properties
-  let participantNameField = template.fields.find((field: any) => 
+  let participantNameField = template.fields.find((field: any) =>
     field.name.toLowerCase().includes('participant') && field.name.toLowerCase().includes('name')
   );
-  
+
   // Set default position and styling if field doesn't exist
   const nameFieldStyle = participantNameField || {
     x: 50,
@@ -307,7 +464,7 @@ function generateCertificateHTML(
     color: '#333333',
     alignment: 'center'
   };
-  
+
   // Create the participant name element separately above the appreciation text with custom styling
   const participantNameHTML = `
     <div class="participant-name" style="
@@ -321,46 +478,53 @@ function generateCertificateHTML(
       font-family: '${nameFieldStyle.font_family || 'Arial'}', sans-serif;
       text-align: ${nameFieldStyle.alignment || 'center'};
       width: 90%;
+      ${participantNameField && (participantNameField as any).underline ? 'text-decoration: underline;' : ''}
     ">
       ${participantName}
     </div>
   `;
 
   // Add the appreciation text below the participant name
-  appreciationText = `
+  // Position it dynamically based on participant name field position
+  const appreciationTopPosition = participantNameField ? participantNameField.y + 20 : 65;
+
+  const appreciationTextHTML = `
     <div class="appreciation-text" style="
       position: absolute;
       left: 50%;
-      top: 55%;
+      top: ${appreciationTopPosition}%;
       transform: translate(-50%, -50%);
       font-size: 16px;
       color: #333333;
       font-family: Arial, sans-serif;
       text-align: center;
       width: 80%;
-      line-height: 1.7;
+      line-height: 1.6;
+      white-space: pre-line;
     ">
       <div style="margin-top: 15px; margin-bottom: 20px;">
         ${formattedText}
       </div>
     </div>
   `;
-  
-  // Combine the participant name and appreciation text
-  appreciationText = participantNameHTML + appreciationText;
+
+  // Combine the certificate title, participant name, achievement, position and appreciation text
+  const combinedContent = certificateTitle + participantNameHTML + achievementHTML + positionHTML + appreciationTextHTML;
 
   let fieldsHTML = '';
 
   // Process each field in the template
   template.fields.forEach((field: any) => {
-    // Skip fields that are already included in the appreciation text
+    // Skip fields that are already handled separately
     const fieldName = field.name.toLowerCase();
-    if (fieldName.includes('achievement') || fieldName.includes('position') || 
-        (fieldName.includes('event') && fieldName.includes('name'))) {
-      // Skip these fields as they're already included in the appreciation text
+    if (fieldName.includes('achievement') || fieldName.includes('position') ||
+        (fieldName.includes('event') && fieldName.includes('name')) ||
+        (fieldName.includes('certificate') && fieldName.includes('title')) ||
+        fieldName.includes('participant') || (fieldName.includes('name') && !fieldName.includes('event') && !fieldName.includes('venue') && !fieldName.includes('city'))) {
+      // Skip these fields as they're already included elsewhere
       return;
     }
-    
+
     // Map field names to data keys
     let value = '';
 
@@ -372,14 +536,9 @@ function generateCertificateHTML(
       value = data.city_name || 'New York';
     } else if (fieldName.includes('certificate') && fieldName.includes('number')) {
       value = data.certificate_number || 'CERT-001';
-    } else if (fieldName.includes('title')) { 
-      value = 'Certificate of ' + (template.type === 'participation' ? 'Participation' : (template.type === 'winner' ? 'Achievement' : 'Excellence'));
-    } else if (fieldName.includes('participant') || (fieldName.includes('name') && !fieldName.includes('event') && !fieldName.includes('venue') && !fieldName.includes('city'))) {
-      // Skip participant name field as it's handled separately
-      return;
     } else {
       // For other fields, try to get value from data object or use field name
-      value = (data as any)[fieldName] || 
+      value = (data as any)[fieldName] ||
               (data as any)[field.name.toLowerCase().replace(/\s+/g, '_')] ||
               (data as any)[field.name] ||
               field.name;
@@ -396,11 +555,41 @@ function generateCertificateHTML(
         font-weight: bold;
         text-align: ${field.alignment || 'center'};
         transform: translate(-50%, -50%);
+        ${field.underline ? 'text-decoration: underline;' : ''}
       ">
         ${value}
       </div>
     `;
   });
+
+  // Calculate container dimensions based on paper size and orientation
+  let containerWidth, containerHeight;
+
+  if (template.paper_size === 'a4') {
+    if (template.orientation === 'landscape') {
+      containerWidth = '297mm';
+      containerHeight = '210mm';
+    } else {
+      containerWidth = '210mm';
+      containerHeight = '297mm';
+    }
+  } else if (template.paper_size === 'a3') {
+    if (template.orientation === 'landscape') {
+      containerWidth = '420mm';
+      containerHeight = '297mm';
+    } else {
+      containerWidth = '297mm';
+      containerHeight = '420mm';
+    }
+  } else if (template.paper_size === 'letter') {
+    if (template.orientation === 'landscape') {
+      containerWidth = '11in';
+      containerHeight = '8.5in';
+    } else {
+      containerWidth = '8.5in';
+      containerHeight = '11in';
+    }
+  }
 
   return `
 <!DOCTYPE html>
@@ -416,19 +605,34 @@ function generateCertificateHTML(
       font-family: Arial;
       width: 100%;
       height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f5f5f5;
     }
     .certificate-container {
-      width: 100%;
-      height: 100vh;
+      width: ${containerWidth};
+      height: ${containerHeight};
       background-image: url('${backgroundImageUrl}');
-      background-size: cover;
+      background-size: contain;
       background-position: center;
       background-repeat: no-repeat;
       position: relative;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .field {
       position: absolute;
       text-align: center;
+    }
+    .certificate-title {
+      position: absolute;
+      text-align: center;
+      width: 90%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 2px;
     }
     .appreciation-text {
       position: absolute;
@@ -437,13 +641,14 @@ function generateCertificateHTML(
       left: 50%;
       transform: translateX(-50%);
       line-height: 1.5;
+      white-space: pre-line;
     }
   </style>
 </head>
 <body>
   <div class="certificate-container">
     ${fieldsHTML}
-    ${appreciationText}
+    ${combinedContent}
   </div>
 </body>
 </html>
@@ -509,7 +714,7 @@ export async function generateBulkPDFs(
       type: 'blob',
       compression: 'DEFLATE',
       compressionOptions: { level: 6 } 
-    }, (metadata: { percent: number }) => {
+    }, (_metadata: { percent: number }) => {
       if (onProgress) {
         // Indicate zip compression progress after all PDFs are created
         onProgress(certificateIds.length, certificateIds.length);

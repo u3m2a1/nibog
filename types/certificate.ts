@@ -2,7 +2,7 @@
 export interface CertificateField {
   id: string;
   name: string;
-  type: 'text' | 'date' | 'image';
+  type: 'text' | 'date' | 'image' | 'signature';
   required: boolean;
   x: number; // Position percentage
   y: number; // Position percentage
@@ -12,6 +12,8 @@ export interface CertificateField {
   width?: number;
   height?: number;
   alignment?: 'left' | 'center' | 'right';
+  underline?: boolean; // For text fields, adds underline styling
+  signature_type?: 'text' | 'image'; // For signature fields
 }
 
 export interface CertificateTemplate {
@@ -19,7 +21,11 @@ export interface CertificateTemplate {
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
-  appreciation_text?: string; // Custom appreciation text
+  certificate_title?: string; // Certificate title that appears on the certificate
+  appreciation_text?: string; // Custom appreciation text with variable support
+  achievement_options?: string[]; // Predefined achievement options for this template
+  position_options?: string[]; // Predefined position options for this template
+  signature_image?: string; // E-signature image URL
   background_image: string; // File path URL
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
@@ -33,7 +39,11 @@ export interface CreateCertificateTemplateRequest {
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
-  appreciation_text?: string; // Custom appreciation text
+  certificate_title?: string; // Certificate title that appears on the certificate
+  appreciation_text?: string; // Custom appreciation text with variable support
+  achievement_options?: string[]; // Predefined achievement options for this template
+  position_options?: string[]; // Predefined position options for this template
+  signature_image?: string; // E-signature image URL
   background_image: string;
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
@@ -156,6 +166,11 @@ export interface CertificateTemplateFormData {
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
+  certificate_title?: string;
+  appreciation_text?: string;
+  achievement_options?: string[];
+  position_options?: string[];
+  signature_image?: string;
   background_image: string;
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';

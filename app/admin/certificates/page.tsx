@@ -92,8 +92,17 @@ export default function CertificatesPage() {
         filters.status = statusFilter
       }
       
+      console.log('Loading certificates with filters:', filters);
+
       const data = await getAllCertificates(filters)
-      
+
+      // Validate data
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log(`Successfully loaded ${data.length} certificates`);
+
       // Sort certificates
       const sortedData = [...data].sort((a, b) => {
         const aValue = a[sortField as keyof CertificateListItem]
@@ -114,11 +123,19 @@ export default function CertificatesPage() {
       setTotalPages(Math.ceil(data.length / itemsPerPage))
     } catch (error) {
       console.error('Error loading certificates:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
       toast({
-        title: "Error",
-        description: "Failed to load certificates",
+        title: "Error Loading Certificates",
+        description: errorMessage.includes('Failed to fetch')
+          ? "Network error. Please check your connection and try again."
+          : errorMessage,
         variant: "destructive"
       })
+
+      // Set empty state on error
+      setCertificates([]);
+      setTotalPages(1);
     } finally {
       setLoading(false)
     }

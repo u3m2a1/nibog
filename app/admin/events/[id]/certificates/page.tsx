@@ -36,6 +36,7 @@ import {
 import { getEventParticipants, generateBulkCertificates } from "@/services/certificateGenerationService"
 import { getAllCertificateTemplates } from "@/services/certificateTemplateService"
 import { generateCertificatePDF } from "@/services/certificatePdfService"
+import { ACHIEVEMENT_OPTIONS, POSITION_OPTIONS } from "@/constants/certificateOptions"
 
 export default function EventCertificatesPage() {
   const params = useParams()
@@ -47,6 +48,8 @@ export default function EventCertificatesPage() {
   const [eventData, setEventData] = useState<EventParticipantsResponse | null>(null)
   const [templates, setTemplates] = useState<CertificateTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null)
+  const [selectedAchievement, setSelectedAchievement] = useState<string>("")
+  const [selectedPosition, setSelectedPosition] = useState<string>("")
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState("")
   const [gameFilter, setGameFilter] = useState<string>("all")
@@ -240,14 +243,16 @@ export default function EventCertificatesPage() {
         game_id: p.game_id || gameNameToIdMap[p.game_name] || null
       }));
       
-      console.log('Enhanced participants with game IDs:', enhancedParticipants);
+
 
       const progress = await generateBulkCertificates(
         selectedTemplate,
         eventId,
         enhancedParticipants,
         undefined, // No longer needed as each participant has game_id
-        (progress) => setBulkProgress(progress)
+        (progress) => setBulkProgress(progress),
+        selectedAchievement,
+        selectedPosition
       )
 
       toast({
@@ -410,6 +415,55 @@ export default function EventCertificatesPage() {
               </Button>
             </div>
           </div>
+
+          {/* Achievement and Position Selection - Frontend Only */}
+          {selectedTemplate && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Achievement</Label>
+                  <Select
+                    value={selectedAchievement || ""}
+                    onValueChange={setSelectedAchievement}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select achievement" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ACHIEVEMENT_OPTIONS.map((option, index) => (
+                        <SelectItem key={index} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Position</Label>
+                  <Select
+                    value={selectedPosition || ""}
+                    onValueChange={setSelectedPosition}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select position" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {POSITION_OPTIONS.map((option, index) => (
+                        <SelectItem key={index} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+
+            </div>
+          )}
+
+
 
           {/* Bulk Generation Progress */}
           {bulkProgress && (

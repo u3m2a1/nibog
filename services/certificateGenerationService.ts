@@ -99,7 +99,9 @@ export async function generateBulkCertificates(
   eventId: number,
   participants: EventParticipant[],
   gameId?: number,
-  onProgress?: (progress: BulkGenerationProgress) => void
+  onProgress?: (progress: BulkGenerationProgress) => void,
+  achievement?: string,
+  position?: string
 ): Promise<BulkGenerationProgress> {
   const progress: BulkGenerationProgress = {
     total: participants.length,
@@ -127,8 +129,12 @@ export async function generateBulkCertificates(
         city_name: '', // Will be filled by backend
         certificate_number: `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         game_name: participant.game_name,
-        attendance_status: participant.attendance_status
+        attendance_status: participant.attendance_status,
+        achievement: achievement || '',
+        position: position || ''
       };
+
+
 
       // Step 1: Extract game information from participant
       const gameName = participant.game_name;
@@ -206,13 +212,15 @@ export async function retryFailedCertificates(
   eventId: number,
   failedResults: BulkGenerationProgress['results'],
   gameId?: number,
-  onProgress?: (progress: BulkGenerationProgress) => void
+  onProgress?: (progress: BulkGenerationProgress) => void,
+  achievement?: string,
+  position?: string
 ): Promise<BulkGenerationProgress> {
   const failedParticipants = failedResults
     .filter(result => !result.success)
     .map(result => result.participant);
 
-  return generateBulkCertificates(templateId, eventId, failedParticipants, gameId, onProgress);
+  return generateBulkCertificates(templateId, eventId, failedParticipants, gameId, onProgress, achievement, position);
 }
 
 /**
@@ -291,43 +299,85 @@ export async function getAllCertificates(
     offset?: number;
   }
 ): Promise<CertificateListItem[]> {
-  try {
-    // Build query string from filters
-    const params = new URLSearchParams();
-    
-    if (filters?.eventId) {
-      params.append('event_id', filters.eventId.toString());
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Build query string from filters
+      const params = new URLSearchParams();
+
+      if (filters?.eventId) {
+        params.append('event_id', filters.eventId.toString());
+      }
+
+      if (filters?.status) {
+        params.append('status', filters.status);
+      }
+
+      if (filters?.limit) {
+        params.append('limit', filters.limit.toString());
+      }
+
+      if (filters?.offset) {
+        params.append('offset', filters.offset.toString());
+      }
+
+      const queryString = params.toString() ? `?${params.toString()}` : '';
+      const url = `/api/certificates/get-all${queryString}`;
+
+      console.log(`Attempting to fetch certificates (attempt ${attempt}/${maxRetries}):`, url);
+
+      // Add timeout and better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        cache: 'no-cache', // Prevent caching issues
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const certificates = await response.json();
+
+      // Validate response
+      if (!Array.isArray(certificates)) {
+        console.warn('Unexpected response format, wrapping in array:', certificates);
+        return [];
+      }
+
+      console.log(`Successfully fetched ${certificates.length} certificates`);
+      return certificates as CertificateListItem[];
+
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`Attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        break;
+      }
+
+      // Wait before retrying (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    
-    if (filters?.status) {
-      params.append('status', filters.status);
-    }
-    
-    if (filters?.limit) {
-      params.append('limit', filters.limit.toString());
-    }
-    
-    if (filters?.offset) {
-      params.append('offset', filters.offset.toString());
-    }
-    
-    const queryString = params.toString() ? `?${params.toString()}` : '';
-    const url = `/api/certificates/get-all${queryString}`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch certificates: ${response.status}`);
-    }
-    
-    const certificates = await response.json();
-    return certificates as CertificateListItem[];
-  } catch (error) {
-    console.error('Error fetching certificates:', error);
-    throw error;
   }
+
+  // If we get here, all attempts failed
+  console.error('All attempts to fetch certificates failed:', lastError);
+  throw new Error(`Failed to fetch certificates after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
 }
 
 /**

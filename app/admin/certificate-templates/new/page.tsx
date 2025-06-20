@@ -31,7 +31,11 @@ export default function NewCertificateTemplatePage() {
   const [templateName, setTemplateName] = useState("")
   const [templateDescription, setTemplateDescription] = useState("")
   const [templateType, setTemplateType] = useState<"participation" | "winner">("participation")
-  const [appreciationText, setAppreciationText] = useState<string>("") 
+  const [certificateTitle, setCertificateTitle] = useState<string>("")
+  const [appreciationText, setAppreciationText] = useState<string>("")
+
+  const [signatureImage, setSignatureImage] = useState<File | null>(null)
+  const [signatureImageUrl, setSignatureImageUrl] = useState("")
   const [backgroundImage, setBackgroundImage] = useState<File | null>(null)
   const [backgroundImageUrl, setBackgroundImageUrl] = useState("")
   const [paperSize, setPaperSize] = useState<"a4" | "letter" | "a3">("a4")
@@ -77,40 +81,128 @@ export default function NewCertificateTemplatePage() {
   const getSmartPosition = (fieldCount: number, fieldName: string = "New Field") => {
     const name = fieldName.toLowerCase();
 
-    // Define common certificate layout positions - adjusted to avoid overlap with appreciation text
-    const positions = {
-      // Title area (top)
-      title: { x: 50, y: 15, font_size: 32 },  // Certificate Title at top
-      subtitle: { x: 50, y: 25, font_size: 20 },
+    // Define positions based on paper size and orientation
+    const getPositionsForSize = () => {
+      const basePositions = {
+        a4: {
+          landscape: {
+            title: { x: 50, y: 15, font_size: 32 },
+            subtitle: { x: 50, y: 25, font_size: 20 },
+            participant_name: { x: 50, y: 35, font_size: 28 },
+            event_name: { x: 50, y: 45, font_size: 18 },
+            achievement: { x: 50, y: 55, font_size: 20 },
+            position: { x: 50, y: 60, font_size: 18 },
+            venue: { x: 25, y: 75, font_size: 16 },
+            city: { x: 75, y: 75, font_size: 16 },
+            score: { x: 50, y: 70, font_size: 16 },
+            organization: { x: 50, y: 80, font_size: 16 },
+            instructor: { x: 25, y: 90, font_size: 14 },
+            date: { x: 25, y: 85, font_size: 16 },
+            signature: { x: 75, y: 85, font_size: 16 },
+            certificate_number: { x: 50, y: 92, font_size: 14 }
+          },
+          portrait: {
+            title: { x: 50, y: 12, font_size: 32 },
+            subtitle: { x: 50, y: 20, font_size: 20 },
+            participant_name: { x: 50, y: 25, font_size: 28 },
+            event_name: { x: 50, y: 32, font_size: 18 },
+            achievement: { x: 50, y: 38, font_size: 20 },
+            position: { x: 50, y: 43, font_size: 18 },
+            venue: { x: 25, y: 65, font_size: 16 },
+            city: { x: 75, y: 65, font_size: 16 },
+            score: { x: 50, y: 48, font_size: 16 },
+            organization: { x: 50, y: 70, font_size: 16 },
+            instructor: { x: 25, y: 88, font_size: 14 },
+            date: { x: 25, y: 85, font_size: 16 },
+            signature: { x: 75, y: 85, font_size: 16 },
+            certificate_number: { x: 50, y: 90, font_size: 14 }
+          }
+        },
+        a3: {
+          landscape: {
+            title: { x: 50, y: 18, font_size: 36 },
+            subtitle: { x: 50, y: 28, font_size: 24 },
+            participant_name: { x: 50, y: 38, font_size: 32 },
+            event_name: { x: 50, y: 48, font_size: 22 },
+            achievement: { x: 50, y: 58, font_size: 24 },
+            position: { x: 50, y: 63, font_size: 22 },
+            venue: { x: 20, y: 78, font_size: 18 },
+            city: { x: 80, y: 78, font_size: 18 },
+            score: { x: 50, y: 68, font_size: 18 },
+            organization: { x: 50, y: 83, font_size: 18 },
+            instructor: { x: 20, y: 92, font_size: 16 },
+            date: { x: 20, y: 88, font_size: 18 },
+            signature: { x: 80, y: 88, font_size: 18 },
+            certificate_number: { x: 50, y: 94, font_size: 16 }
+          },
+          portrait: {
+            title: { x: 50, y: 10, font_size: 36 },
+            subtitle: { x: 50, y: 18, font_size: 24 },
+            participant_name: { x: 50, y: 22, font_size: 32 },
+            event_name: { x: 50, y: 28, font_size: 22 },
+            achievement: { x: 50, y: 34, font_size: 24 },
+            position: { x: 50, y: 38, font_size: 22 },
+            venue: { x: 25, y: 60, font_size: 18 },
+            city: { x: 75, y: 60, font_size: 18 },
+            score: { x: 50, y: 42, font_size: 18 },
+            organization: { x: 50, y: 65, font_size: 18 },
+            instructor: { x: 25, y: 90, font_size: 16 },
+            date: { x: 25, y: 88, font_size: 18 },
+            signature: { x: 75, y: 88, font_size: 18 },
+            certificate_number: { x: 50, y: 92, font_size: 16 }
+          }
+        },
+        letter: {
+          landscape: {
+            title: { x: 50, y: 16, font_size: 32 },
+            subtitle: { x: 50, y: 26, font_size: 20 },
+            participant_name: { x: 50, y: 36, font_size: 28 },
+            event_name: { x: 50, y: 46, font_size: 18 },
+            achievement: { x: 50, y: 56, font_size: 20 },
+            position: { x: 50, y: 61, font_size: 18 },
+            venue: { x: 22, y: 76, font_size: 16 },
+            city: { x: 78, y: 76, font_size: 16 },
+            score: { x: 50, y: 66, font_size: 16 },
+            organization: { x: 50, y: 81, font_size: 16 },
+            instructor: { x: 22, y: 91, font_size: 14 },
+            date: { x: 22, y: 86, font_size: 16 },
+            signature: { x: 78, y: 86, font_size: 16 },
+            certificate_number: { x: 50, y: 92, font_size: 14 }
+          },
+          portrait: {
+            title: { x: 50, y: 13, font_size: 32 },
+            subtitle: { x: 50, y: 21, font_size: 20 },
+            participant_name: { x: 50, y: 26, font_size: 28 },
+            event_name: { x: 50, y: 33, font_size: 18 },
+            achievement: { x: 50, y: 39, font_size: 20 },
+            position: { x: 50, y: 44, font_size: 18 },
+            venue: { x: 25, y: 66, font_size: 16 },
+            city: { x: 75, y: 66, font_size: 16 },
+            score: { x: 50, y: 49, font_size: 16 },
+            organization: { x: 50, y: 71, font_size: 16 },
+            instructor: { x: 25, y: 89, font_size: 14 },
+            date: { x: 25, y: 86, font_size: 16 },
+            signature: { x: 75, y: 86, font_size: 16 },
+            certificate_number: { x: 50, y: 91, font_size: 14 }
+          }
+        }
+      };
 
-      // Bottom area - positioned to not overlap with central appreciation text
-      date: { x: 25, y: 85, font_size: 16 },       // Bottom left
-      signature: { x: 75, y: 85, font_size: 16 },  // Bottom right
-      certificate_number: { x: 50, y: 92, font_size: 14 }, // Bottom center
+      // Get current paper size and orientation from state
+      const currentSize = paperSize as keyof typeof basePositions;
+      const currentOrientation = orientation as keyof typeof basePositions.a4;
 
-      // These fields are now part of the appreciation text
-      // and are included here only for backward compatibility
-      participant_name: { x: 50, y: 45, font_size: 28 }, 
-      event_name: { x: 50, y: 65, font_size: 24 },
-      achievement: { x: 50, y: 55, font_size: 20 },
-
-      // Side areas
-      venue: { x: 25, y: 75, font_size: 16 },
-      city: { x: 75, y: 75, font_size: 16 },
-      position: { x: 50, y: 35, font_size: 22 },
-      score: { x: 50, y: 75, font_size: 18 },
-
-      // Organization info
-      organization: { x: 50, y: 80, font_size: 16 },
-      instructor: { x: 25, y: 90, font_size: 14 }
+      return basePositions[currentSize]?.[currentOrientation] || basePositions.a4.landscape;
     };
 
+    const positions = getPositionsForSize();
+
     // Smart field name detection and positioning
-    if (name.includes('participant') || name.includes('name') && !name.includes('event')) {
+    if (name.includes('participant') || (name.includes('name') && !name.includes('event'))) {
       return positions.participant_name;
-    } else if (name.includes('certificate') && name.includes('title')) {
+    } else if ((name.includes('certificate') && name.includes('title')) || name.toLowerCase() === 'certificate title') {
       return positions.title;
-    } else if (name.includes('certificate') && name.includes('number')) {
+    } else if ((name.includes('certificate') && name.includes('number')) || name.toLowerCase() === 'certificate number') {
       return positions.certificate_number;
     } else if (name.includes('event') && !name.includes('date')) {
       return positions.event_name;
@@ -175,42 +267,71 @@ export default function NewCertificateTemplatePage() {
   const addCommonFields = () => {
     // Save current fields
     const currentFields = [...fields]
-    
-    // Only include fields that should be positioned separately (not in appreciation text)
-    const commonFields = [
-      "Certificate Title",
-      "Participant Name",
-      "Date", 
-      "Signature",
-      "Certificate Number"
+
+    // Define common fields with their specific configurations
+    const commonFieldsConfig = [
+      {
+        name: "Certificate Title",
+        type: 'text' as 'text' | 'date' | 'image' | 'signature',
+        underline: true, // Certificate title should have underline by default
+        font_size: 32,
+        y: 20
+      },
+      {
+        name: "Participant Name",
+        type: 'text' as 'text' | 'date' | 'image' | 'signature',
+        font_size: 28,
+        y: 40
+      },
+      {
+        name: "Date",
+        type: 'date' as 'text' | 'date' | 'image' | 'signature',
+        font_size: 16,
+        y: 85
+      },
+      {
+        name: "Signature",
+        type: 'signature' as 'text' | 'date' | 'image' | 'signature',
+        signature_type: 'text' as 'text' | 'image',
+        font_size: 16,
+        y: 85
+      },
+      {
+        name: "Certificate Number",
+        type: 'text' as 'text' | 'date' | 'image' | 'signature',
+        font_size: 12,
+        y: 90
+      }
     ]
-    
+
     // Add each common field with smart positioning
-    const newFields: CertificateField[] = commonFields.map(fieldName => {
-      // Use customized addField function to get proper positioning
-      const position = getSmartPosition(0, fieldName)
-      
+    const newFields: CertificateField[] = commonFieldsConfig.map((fieldConfig, index) => {
+      // Use customized positioning based on field type
+      const position = getSmartPosition(index, fieldConfig.name)
+
       const newField: CertificateField = {
-        id: `field-${Date.now()}-${fieldName.replace(/\s+/g, '-').toLowerCase()}`,
-        name: fieldName,
-        type: 'text' as 'text' | 'date' | 'image',
+        id: `field-${Date.now()}-${fieldConfig.name.replace(/\s+/g, '-').toLowerCase()}-${index}`,
+        name: fieldConfig.name,
+        type: fieldConfig.type,
         required: true,
         x: position.x,
-        y: position.y,
-        font_size: position.font_size || 16,
+        y: fieldConfig.y || position.y,
+        font_size: fieldConfig.font_size || position.font_size || 16,
         font_family: defaultFontFamily,
         color: defaultFontColor,
         width: 200,
         height: 30,
-        alignment: "center" as 'left' | 'center' | 'right'
+        alignment: "center" as 'left' | 'center' | 'right',
+        underline: fieldConfig.underline || false,
+        signature_type: fieldConfig.signature_type
       }
-      
+
       return newField
     })
-    
+
     // Update fields state with new fields added to existing ones
     setFields([...currentFields, ...newFields])
-    
+
     toast({
       title: "Success",
       description: `Added ${newFields.length} common certificate fields`
@@ -280,16 +401,18 @@ export default function NewCertificateTemplatePage() {
     setIsSubmitting(true)
     
     try {
-      // Include appreciation_text directly now that backend supports it
+      // Include all new fields
       const templateData: CreateCertificateTemplateRequest = {
         name: templateName,
         description: templateDescription,
         type: templateType as 'participation' | 'winner' | 'event_specific',
+        certificate_title: certificateTitle,
+        appreciation_text: appreciationText,
+        signature_image: signatureImageUrl,
         background_image: backgroundImageUrl,
         paper_size: paperSize as 'a4' | 'letter' | 'a3',
         orientation: orientation as 'landscape' | 'portrait',
-        fields: fields,
-        appreciation_text: appreciationText
+        fields: fields
       }
       
       const result = await createCertificateTemplate(templateData)
@@ -351,14 +474,16 @@ export default function NewCertificateTemplatePage() {
 
             <div className="space-y-2">
               <Label htmlFor="type">Certificate Type *</Label>
-              <Select 
-                value={templateType} 
+              <Select
+                value={templateType}
                 onValueChange={(value: any) => {
                   setTemplateType(value);
-                  // Update default appreciation text based on type - participant name is separate, event and achievement embedded
+                  // Update default certificate title and appreciation text based on type
                   if (value === "participation") {
+                    setCertificateTitle("Certificate of Participation");
                     setAppreciationText("In recognition of enthusiastic participation in {event_name}.\nYour involvement, energy, and commitment at NIBOG are truly appreciated.\nThank you for being a valued part of the NIBOG community!");
                   } else if (value === "winner") {
+                    setCertificateTitle("Certificate of Achievement");
                     setAppreciationText("For achieving {achievement} in {event_name}.\nYour dedication, talent, and outstanding performance at NIBOG have distinguished you among the best.\nCongratulations on this remarkable achievement from the entire NIBOG team!");
                   }
                 }}
@@ -373,6 +498,19 @@ export default function NewCertificateTemplatePage() {
               </Select>
               <p className="text-sm text-gray-500 mt-1">
                 {templateType === "participation" ? "Includes appreciation text for participation." : "Includes achievement recognition text."}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="certificateTitle">Certificate Title</Label>
+              <Input
+                id="certificateTitle"
+                value={certificateTitle}
+                onChange={(e) => setCertificateTitle(e.target.value)}
+                placeholder="e.g., Certificate of Participation, Certificate of Achievement"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                This title will appear prominently at the top of the certificate. You can use variables like <code>{`{event_name}`}</code> here.
               </p>
             </div>
           </div>
@@ -492,30 +630,137 @@ export default function NewCertificateTemplatePage() {
               </div>
             </div>
             
-            {/* Appreciation Text */}
+            {/* Certificate Title and Appreciation Text */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-md">Appreciation Text</CardTitle>
-                <CardDescription>This text will appear below the participant name</CardDescription>
+                <CardTitle className="text-md">Certificate Title & Appreciation Text</CardTitle>
+                <CardDescription>Configure the title and appreciation message for your certificate</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Textarea
-                    id="appreciationText"
-                    value={appreciationText}
-                    onChange={(e) => setAppreciationText(e.target.value)}
-                    placeholder="Enter appreciation text that will appear on the certificate"
-                    rows={5}
-                    required
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    You can use these placeholders in your text: <code>{`{event_name}`}</code>, <code>{`{achievement}`}</code>, and <code>{`{position}`}</code>.
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="certificateTitle">Certificate Title</Label>
+                    <Input
+                      id="certificateTitle"
+                      value={certificateTitle}
+                      onChange={(e) => setCertificateTitle(e.target.value)}
+                      placeholder="e.g., Certificate of Participation, Certificate of Achievement"
+                    />
+                    <p className="text-sm text-gray-500">
+                      This title appears at the top of the certificate. Variables: <code>{`{event_name}`}</code>, <code>{`{participant_name}`}</code>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="appreciationText">Appreciation Text</Label>
+                    <Textarea
+                      id="appreciationText"
+                      value={appreciationText}
+                      onChange={(e) => setAppreciationText(e.target.value)}
+                      placeholder="Enter appreciation text that will appear on the certificate"
+                      rows={5}
+                      required
+                    />
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">
+                        <span className="font-medium">Available Variables:</span> <code>{`{participant_name}`}</code>, <code>{`{event_name}`}</code>, <code>{`{achievement}`}</code>, <code>{`{position}`}</code>, <code>{`{game_name}`}</code>, <code>{`{venue_name}`}</code>, <code>{`{organization}`}</code>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">Tip:</span> Variables will be automatically replaced with actual data when certificates are generated.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Note about Achievement and Position Options */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-md">Achievement & Position Options</CardTitle>
+                <CardDescription>Frontend-only selection during certificate generation</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Achievement and Position options are now handled during certificate generation.</strong>
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Note: The participant name will appear separately above this appreciation text, so you don't need to include it here.
+                  <p className="text-sm text-blue-700 mt-2">
+                    When generating certificates, you'll be able to select from a comprehensive list of predefined achievements
+                    (Winner, Excellence, Outstanding Performance, etc.) and positions (1st Place, 2nd Place, Champion, etc.)
+                    without needing to configure them in the template.
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Tip:</span> Keep these fields out of your certificate template: <code>Event Name</code> and <code>Achievement</code>. Use the placeholders above instead.
+                  <p className="text-sm text-blue-700 mt-2">
+                    You can still use <code>{`{achievement}`}</code> and <code>{`{position}`}</code> variables in your field names -
+                    they will be populated with the selected values during generation.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* E-Signature Upload */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-md">E-Signature (Optional)</CardTitle>
+                <CardDescription>Upload an e-signature image that can be used in signature fields</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {signatureImageUrl ? (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <img
+                          src={signatureImageUrl.startsWith('http') ? signatureImageUrl : `http://localhost:3001${signatureImageUrl}`}
+                          alt="E-signature preview"
+                          className="max-w-full h-24 object-contain mx-auto border rounded"
+                          onError={(e) => {
+                            console.error('Signature image failed to load:', e.currentTarget.src);
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-center">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSignatureImage(null);
+                            setSignatureImageUrl("");
+                          }}
+                        >
+                          Remove E-Signature
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <div className="space-y-2">
+                        <Label htmlFor="signature-upload" className="cursor-pointer">
+                          <span className="block text-sm font-medium text-gray-900">
+                            Upload E-Signature
+                          </span>
+                          <span className="block text-sm text-gray-500">
+                            PNG, JPG up to 2MB (transparent background recommended)
+                          </span>
+                        </Label>
+                        <Input
+                          id="signature-upload"
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSignatureImage(file);
+                              // For now, create a local URL for preview
+                              const url = URL.createObjectURL(file);
+                              setSignatureImageUrl(url);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-500">
+                    This signature will be available for use in signature fields. You can add signature fields in the field configuration section.
                   </p>
                 </div>
               </CardContent>
@@ -617,6 +862,7 @@ export default function NewCertificateTemplatePage() {
                               <SelectItem value="text">Text</SelectItem>
                               <SelectItem value="date">Date</SelectItem>
                               <SelectItem value="image">Image</SelectItem>
+                              <SelectItem value="signature">Signature</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -721,6 +967,48 @@ export default function NewCertificateTemplatePage() {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* Underline option for text fields */}
+                        {field.type === 'text' && (
+                          <div className="space-y-2">
+                            <Label>Text Style</Label>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`underline-${field.id}`}
+                                checked={field.underline || false}
+                                onChange={(e) => updateField(field.id, { underline: e.target.checked })}
+                                className="rounded"
+                              />
+                              <Label htmlFor={`underline-${field.id}`}>Underline</Label>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Signature type option for signature fields */}
+                        {field.type === 'signature' && (
+                          <div className="space-y-2">
+                            <Label>Signature Type</Label>
+                            <Select
+                              value={field.signature_type || 'text'}
+                              onValueChange={(value: any) => updateField(field.id, { signature_type: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="text">Text Signature</SelectItem>
+                                <SelectItem value="image">E-Signature Image</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-sm text-gray-500">
+                              {field.signature_type === 'image'
+                                ? 'Will use the uploaded e-signature image'
+                                : 'Will display signature as text (e.g., "Authorized Signature")'
+                              }
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-end mt-4">
                         <Button

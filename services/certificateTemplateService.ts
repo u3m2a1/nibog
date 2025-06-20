@@ -210,18 +210,28 @@ export async function duplicateCertificateTemplate(
   try {
     // First get the template
     const originalTemplate = await getCertificateTemplateById(id);
-    
+
+    // Create new field IDs while preserving all other properties including positions
+    const duplicatedFields = originalTemplate.fields.map((field, index) => ({
+      ...field,
+      id: `field-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 8)}`
+    }));
+
     // Create a new template with modified name
     const duplicateData: CreateCertificateTemplateRequest = {
       name: newName,
       description: `Copy of ${originalTemplate.description}`,
       type: originalTemplate.type,
+      certificate_title: originalTemplate.certificate_title,
+      appreciation_text: originalTemplate.appreciation_text,
+      signature_image: originalTemplate.signature_image,
       background_image: originalTemplate.background_image,
       paper_size: originalTemplate.paper_size,
       orientation: originalTemplate.orientation,
-      fields: originalTemplate.fields,
+      fields: duplicatedFields,
     };
 
+    console.log('Duplicating template with data:', duplicateData);
     return await createCertificateTemplate(duplicateData);
   } catch (error) {
     console.error('Error duplicating template:', error);
