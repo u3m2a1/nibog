@@ -127,7 +127,7 @@ function generateCertificateHTML(
         const backgroundImageUrl = imageUrl.startsWith('http')
           ? imageUrl
           : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-        backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat;`;
+        backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`;
       }
     } else if (template.background_style.type === 'solid' && template.background_style.solid_color) {
       backgroundStyle = `background-color: ${template.background_style.solid_color};`;
@@ -140,7 +140,7 @@ function generateCertificateHTML(
     const backgroundImageUrl = template.background_image.startsWith('http')
       ? template.background_image
       : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${template.background_image.startsWith('/') ? '' : '/'}${template.background_image}`;
-    backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat;`;
+    backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: cover; background-position: center; background-repeat: no-repeat;`;
   }
 
   console.log('Final background style:', backgroundStyle);

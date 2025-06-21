@@ -42,7 +42,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { CertificateListItem } from "@/types/certificate"
 import { getAllCertificates } from "@/services/certificateGenerationService"
-import { generateCertificatePDF, generateBulkPDFs } from "@/services/certificatePdfService"
+import { generateCertificatePDF, generateCertificatePDFFrontend, generateBulkPDFs, generateBulkPDFsFrontend } from "@/services/certificatePdfService"
 import { EmailCertificateModal } from "@/components/email-certificate-modal"
 import { CertificatePreviewModal } from "@/components/certificate-preview-modal"
 
@@ -166,10 +166,14 @@ export default function CertificatesPage() {
            venueName.includes(searchTermLower)
   })
 
-  // Download individual certificate
+  // Download individual certificate (Frontend-only)
   const handleDownload = async (certificate: CertificateListItem) => {
     try {
-      await generateCertificatePDF(certificate.id)
+      // Generate filename based on participant name and certificate ID
+      const participantName = certificate.child_name || certificate.user_name || certificate.parent_name || 'Participant';
+      const filename = `${participantName.replace(/[^a-zA-Z0-9]/g, '_')}_Certificate_${certificate.id}.pdf`;
+
+      await generateCertificatePDFFrontend(certificate, filename)
       toast({
         title: "Success",
         description: "Certificate downloaded successfully",
@@ -178,13 +182,13 @@ export default function CertificatesPage() {
       console.error('Error downloading certificate:', error)
       toast({
         title: "Error",
-        description: "Failed to download certificate",
+        description: "Failed to download certificate. Please try again.",
         variant: "destructive"
       })
     }
   }
 
-  // Download selected certificates as ZIP
+  // Download selected certificates as ZIP (Frontend-only)
   const handleBulkDownload = async () => {
     if (selectedCertificates.size === 0) {
       toast({
@@ -197,29 +201,31 @@ export default function CertificatesPage() {
 
     try {
       setDownloadProgress({ current: 0, total: selectedCertificates.size })
-      
+
       // Generate ZIP filename based on date
       const date = new Date().toISOString().split('T')[0]
       const zipFilename = `certificates_${date}.zip`
-      
-      // Convert Set to Array of certificate IDs
-      const certificateIds = Array.from(selectedCertificates)
-      
-      await generateBulkPDFs(
-        certificateIds,
+
+      // Get the selected certificate objects
+      const selectedCerts = filteredCertificates.filter(cert =>
+        selectedCertificates.has(cert.id)
+      );
+
+      await generateBulkPDFsFrontend(
+        selectedCerts,
         zipFilename,
         (current, total) => setDownloadProgress({ current, total })
       )
-      
+
       toast({
         title: "Success",
-        description: `${certificateIds.length} certificates downloaded as ZIP`,
+        description: `${selectedCerts.length} certificates downloaded as ZIP`,
       })
     } catch (error) {
       console.error('Error downloading certificates as ZIP:', error)
       toast({
         title: "Error",
-        description: "Failed to download certificates as ZIP",
+        description: "Failed to download certificates as ZIP. Please try again.",
         variant: "destructive"
       })
     } finally {
