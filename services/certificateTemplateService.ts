@@ -98,7 +98,16 @@ export async function getAllCertificateTemplates(): Promise<CertificateTemplate[
  */
 export async function getCertificateTemplateById(id: number): Promise<CertificateTemplate> {
   try {
-    const response = await fetch('/api/certificate-templates/get', {
+    // Determine if we're running on server-side or client-side
+    const isServerSide = typeof window === 'undefined';
+    const baseUrl = isServerSide
+      ? (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000')
+      : '';
+
+    const url = `${baseUrl}/api/certificate-templates/get`;
+    console.log('Fetching template from URL:', url);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

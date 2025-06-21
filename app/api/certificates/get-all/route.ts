@@ -91,6 +91,10 @@ export async function GET(request: NextRequest) {
             child_id: cert.child_id || null,
             child_name: cert.child_name || 'Participant Name Not Available',
             game_name: cert.game_name || 'Game Not Available',
+
+            // Include parent fields (now correctly mapped in database)
+            parent_name: cert.parent_name || null,
+            parent_email: cert.parent_email || null,
             
             template_id: cert.template_id || null,
             certificate_url: cert.certificate_url || cert.pdf_url || null,

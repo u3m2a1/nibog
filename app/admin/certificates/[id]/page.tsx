@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { getSingleCertificate } from "@/services/certificateGenerationService"
 import { generateCertificatePDF } from "@/services/certificatePdfService"
 import { CertificateListItem } from "@/types/certificate"
-import { EmailCertificateModal } from "@/components/email-certificate-modal"
+import { sendCertificateEmail } from "@/services/certificateEmailService"
 import { useToast } from "@/hooks/use-toast"
 
 export default function CertificateDetailsPage() {
@@ -20,7 +20,7 @@ export default function CertificateDetailsPage() {
   const [certificate, setCertificate] = useState<CertificateListItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
+  const [emailing, setEmailing] = useState(false)
 
   useEffect(() => {
     const fetchCertificate = async () => {
@@ -86,9 +86,46 @@ export default function CertificateDetailsPage() {
     }
   }
 
-  const handleEmailOpen = () => {
+  const handleEmailCertificate = async () => {
     if (!certificate) return
-    setIsEmailModalOpen(true)
+
+    const recipientEmail = certificate.parent_email || certificate.user_email
+    if (!recipientEmail) {
+      toast({
+        title: "Error",
+        description: "No email address found for this certificate",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setEmailing(true)
+
+    try {
+      const result = await sendCertificateEmail(certificate)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Certificate sent successfully to ${recipientEmail}`
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to send certificate: ${result.message}`,
+          variant: "destructive"
+        })
+      }
+    } catch (error: any) {
+      console.error("Error sending certificate email:", error)
+      toast({
+        title: "Error",
+        description: `Failed to send certificate: ${error.message || 'Unknown error'}`,
+        variant: "destructive"
+      })
+    } finally {
+      setEmailing(false)
+    }
   }
 
   const handleBackToList = () => {
@@ -224,11 +261,20 @@ export default function CertificateDetailsPage() {
           </CardContent>
           <CardFooter>
             <div className="flex space-x-2 w-full justify-end">
-              <Button 
+              <Button
                 variant="outline"
-                onClick={handleEmailOpen}
+                onClick={handleEmailCertificate}
+                disabled={emailing}
               >
-                <Mail className="mr-2 h-4 w-4" /> Email Certificate
+                {emailing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-2 h-4 w-4" /> Email Certificate
+                  </>
+                )}
               </Button>
               <Button
                 onClick={handleDownload}
@@ -248,21 +294,7 @@ export default function CertificateDetailsPage() {
           </CardFooter>
         </Card>
       </div>
-      
-      {/* Email Modal */}
-      {certificate && (
-        <EmailCertificateModal 
-          isOpen={isEmailModalOpen} 
-          onClose={() => setIsEmailModalOpen(false)}
-          certificates={[certificate]}
-          onSuccess={() => {
-            toast({
-              title: "Success",
-              description: "Certificate sent successfully",
-            })
-          }}
-        />
-      )}
+
     </div>
   )
 }

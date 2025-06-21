@@ -43,6 +43,7 @@ import { useToast } from "@/hooks/use-toast"
 import { CertificateListItem } from "@/types/certificate"
 import { getAllCertificates } from "@/services/certificateGenerationService"
 import { generateCertificatePDF, generateCertificatePDFFrontend, generateBulkPDFs, generateBulkPDFsFrontend } from "@/services/certificatePdfService"
+import { sendCertificateEmail } from "@/services/certificateEmailService"
 import { EmailCertificateModal } from "@/components/email-certificate-modal"
 import { CertificatePreviewModal } from "@/components/certificate-preview-modal"
 
@@ -68,6 +69,7 @@ export default function CertificatesPage() {
   const [emailTarget, setEmailTarget] = useState<CertificateListItem[]>([])
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   const [previewTarget, setPreviewTarget] = useState<CertificateListItem | null>(null)
+  const [emailingCertificates, setEmailingCertificates] = useState<Set<number>>(new Set())
   const itemsPerPage = 10
 
   // Load certificates
@@ -184,6 +186,51 @@ export default function CertificatesPage() {
         title: "Error",
         description: "Failed to download certificate. Please try again.",
         variant: "destructive"
+      })
+    }
+  }
+
+  // Email individual certificate
+  const handleEmailCertificate = async (certificate: CertificateListItem) => {
+    const recipientEmail = certificate.parent_email || certificate.user_email
+    if (!recipientEmail) {
+      toast({
+        title: "Error",
+        description: "No email address found for this certificate",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setEmailingCertificates(prev => new Set(prev).add(certificate.id))
+
+    try {
+      const result = await sendCertificateEmail(certificate)
+
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Certificate sent successfully to ${recipientEmail}`
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to send certificate: ${result.message}`,
+          variant: "destructive"
+        })
+      }
+    } catch (error: any) {
+      console.error("Error sending certificate email:", error)
+      toast({
+        title: "Error",
+        description: `Failed to send certificate: ${error.message || 'Unknown error'}`,
+        variant: "destructive"
+      })
+    } finally {
+      setEmailingCertificates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(certificate.id)
+        return newSet
       })
     }
   }
@@ -535,16 +582,18 @@ export default function CertificatesPage() {
                             >
                               <Download className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setEmailTarget([certificate]);
-                                setIsEmailModalOpen(true);
-                              }}
+                              onClick={() => handleEmailCertificate(certificate)}
+                              disabled={emailingCertificates.has(certificate.id)}
                               title="Email Certificate"
                             >
-                              <Mail className="h-4 w-4" />
+                              {emailingCertificates.has(certificate.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
                             </Button>
                             <Button 
                               variant="outline" 

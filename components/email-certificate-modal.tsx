@@ -37,13 +37,12 @@ export function EmailCertificateModal({
   // State
   const [customMessage, setCustomMessage] = useState("")
   const [replyTo, setReplyTo] = useState("")
-  const [includeLink, setIncludeLink] = useState(true)
   const [includePdf, setIncludePdf] = useState(true)
   const [sending, setSending] = useState(false)
 
   // Get recipient details for summary
   const recipientCount = certificates.length
-  const recipientEmails = [...new Set(certificates.map(cert => cert.user_email))].filter(Boolean)
+  const recipientEmails = [...new Set(certificates.map(cert => cert.parent_email || cert.user_email))].filter(Boolean)
   const uniqueEmailCount = recipientEmails.length
 
   // Handle send
@@ -63,7 +62,7 @@ export function EmailCertificateModal({
       const result = await sendCertificatesViaEmail({
         certificateIds: certificates.map(cert => cert.id),
         customMessage: customMessage.trim(),
-        includeLink,
+        includeLink: false, // Always false since we're only using PDF attachments
         includePdf,
         replyTo: replyTo.trim()
       })
@@ -77,7 +76,6 @@ export function EmailCertificateModal({
       // Reset form
       setCustomMessage("")
       setReplyTo("")
-      setIncludeLink(true)
       setIncludePdf(true)
 
       // Close modal and trigger success callback
@@ -153,23 +151,18 @@ export function EmailCertificateModal({
           {/* Options */}
           <div className="space-y-3">
             <div className="text-sm font-medium">Options</div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="includeLink" 
-                checked={includeLink}
-                onCheckedChange={(checked) => setIncludeLink(checked as boolean)}
-              />
-              <Label htmlFor="includeLink">Include link to certificate</Label>
-            </div>
 
             <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="includePdf" 
+              <Checkbox
+                id="includePdf"
                 checked={includePdf}
                 onCheckedChange={(checked) => setIncludePdf(checked as boolean)}
               />
               <Label htmlFor="includePdf">Include certificate as PDF attachment</Label>
+            </div>
+
+            <div className="text-xs text-gray-500 mt-2">
+              Certificates will be sent as PDF attachments for easy download and printing.
             </div>
           </div>
         </div>

@@ -113,7 +113,7 @@ export async function generateBulkPDFsFrontend(
         const html = generateCertificateHTMLFromPreview(template, certificate);
 
         // Generate PDF blob
-        const pdfBlob = await generatePDFBlob(html);
+        const pdfBlob = await generatePDFFromHTML_ToBlob(html);
 
         // Add to ZIP
         const participantName = certificate.child_name || certificate.user_name || certificate.parent_name || 'Participant';
@@ -1337,6 +1337,25 @@ export async function generateBulkPDFs(
     
   } catch (error) {
     console.error('Error generating bulk PDFs:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate PDF blob from template and certificate data (for email attachments)
+ */
+export async function generateCertificatePDFBlob(
+  template: CertificateTemplate,
+  certificate: CertificateListItem
+): Promise<Blob> {
+  try {
+    // Generate HTML using the same logic as the preview modal
+    const html = generateCertificateHTMLFromPreview(template, certificate);
+
+    // Generate PDF from HTML and return as blob
+    return await generatePDFFromHTML_ToBlob(html);
+  } catch (error) {
+    console.error('Error generating certificate PDF blob:', error);
     throw error;
   }
 }
