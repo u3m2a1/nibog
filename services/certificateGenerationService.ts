@@ -99,9 +99,7 @@ export async function generateBulkCertificates(
   eventId: number,
   participants: EventParticipant[],
   gameId?: number,
-  onProgress?: (progress: BulkGenerationProgress) => void,
-  achievement?: string,
-  position?: string
+  onProgress?: (progress: BulkGenerationProgress) => void
 ): Promise<BulkGenerationProgress> {
   const progress: BulkGenerationProgress = {
     total: participants.length,
@@ -129,9 +127,7 @@ export async function generateBulkCertificates(
         city_name: '', // Will be filled by backend
         certificate_number: `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         game_name: participant.game_name,
-        attendance_status: participant.attendance_status,
-        achievement: achievement || '',
-        position: position || ''
+        attendance_status: participant.attendance_status
       };
 
 
@@ -204,6 +200,7 @@ export async function generateBulkCertificates(
   return progress;
 }
 
+
 /**
  * Retry failed certificate generations
  */
@@ -212,15 +209,13 @@ export async function retryFailedCertificates(
   eventId: number,
   failedResults: BulkGenerationProgress['results'],
   gameId?: number,
-  onProgress?: (progress: BulkGenerationProgress) => void,
-  achievement?: string,
-  position?: string
+  onProgress?: (progress: BulkGenerationProgress) => void
 ): Promise<BulkGenerationProgress> {
   const failedParticipants = failedResults
     .filter(result => !result.success)
     .map(result => result.participant);
 
-  return generateBulkCertificates(templateId, eventId, failedParticipants, gameId, onProgress, achievement, position);
+  return generateBulkCertificates(templateId, eventId, failedParticipants, gameId, onProgress);
 }
 
 /**

@@ -296,19 +296,63 @@ export default function CertificateTemplatesPage() {
                 <TableRow key={template.id}>
                   <TableCell>
                     <div className="relative h-16 w-24 overflow-hidden rounded-md border">
-                      {template.background_image ? (
-                        <img
-                          src={template.background_image.startsWith('http') ? template.background_image : `http://localhost:3000${template.background_image}`}
-                          alt={template.name}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            target.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <div className={`absolute inset-0 flex items-center justify-center bg-muted ${template.background_image ? 'hidden' : ''}`}>
+                      {(() => {
+                        // Handle new background_style options
+                        if (template.background_style?.type === 'image') {
+                          const imageUrl = template.background_style.image_url || template.background_image;
+                          if (imageUrl) {
+                            return (
+                              <img
+                                src={imageUrl.startsWith('http') ? imageUrl : `${window.location.origin}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`}
+                                alt={template.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            );
+                          }
+                        } else if (template.background_style?.type === 'solid' && template.background_style.solid_color) {
+                          return (
+                            <div
+                              className="h-full w-full"
+                              style={{ backgroundColor: template.background_style.solid_color }}
+                            />
+                          );
+                        } else if (template.background_style?.type === 'gradient' && template.background_style.gradient_colors?.length === 2) {
+                          return (
+                            <div
+                              className="h-full w-full"
+                              style={{
+                                background: `linear-gradient(135deg, ${template.background_style.gradient_colors[0]}, ${template.background_style.gradient_colors[1]})`
+                              }}
+                            />
+                          );
+                        } else if (template.background_image) {
+                          // Legacy background image support
+                          return (
+                            <img
+                              src={template.background_image.startsWith('http') ? template.background_image : `${window.location.origin}${template.background_image.startsWith('/') ? '' : '/'}${template.background_image}`}
+                              alt={template.name}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          );
+                        }
+                        return null;
+                      })()}
+                      <div className={`absolute inset-0 flex items-center justify-center bg-muted ${
+                        (template.background_style?.type === 'image' && (template.background_style.image_url || template.background_image)) ||
+                        template.background_style?.type === 'solid' ||
+                        template.background_style?.type === 'gradient' ||
+                        template.background_image ? 'hidden' : ''
+                      }`}>
                         <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                     </div>

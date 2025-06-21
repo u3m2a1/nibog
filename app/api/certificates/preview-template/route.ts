@@ -5,28 +5,10 @@ import { CertificateTemplate, CertificateField } from '@/types/certificate';
 /**
  * Parse variables in text and replace them with actual certificate data
  */
-function parseVariables(text: string, certificate: any, template?: CertificateTemplate, positionOverride?: string, achievementOverride?: string): string {
+function parseVariables(text: string, certificate: any): string {
   if (!text) return text;
 
   const certData = certificate.certificate_data || {};
-
-  // Get achievement from template options or fallback to certificate data
-  let achievement = achievementOverride || certData.achievement || certData.award || 'Outstanding Performance';
-  if (template?.achievement_options && template.achievement_options.length > 0) {
-    // Use the first achievement option as default, or find matching one
-    achievement = template.achievement_options.find(option =>
-      option.toLowerCase() === achievement.toLowerCase()
-    ) || template.achievement_options[0];
-  }
-
-  // Get position from template options or fallback to certificate data
-  let position = positionOverride || certData.position || certData.rank || '1st Place';
-  if (template?.position_options && template.position_options.length > 0) {
-    // Use the first position option as default, or find matching one
-    position = template.position_options.find(option =>
-      option.toLowerCase() === position.toLowerCase()
-    ) || template.position_options[0];
-  }
 
   // Define variable mappings
   const variables: Record<string, string> = {
@@ -38,9 +20,9 @@ function parseVariables(text: string, certificate: any, template?: CertificateTe
     'certificate_number': certData.certificate_number || certificate.certificate_number || '',
     'event_date': certificate.event_date || certData.event_date || new Date().toLocaleDateString(),
     'date': certificate.generated_at ? new Date(certificate.generated_at).toLocaleDateString() : new Date().toLocaleDateString(),
-    'position': position,
+    'position': certData.position || certData.rank || '1st Place',
     'score': certData.score || certData.points || '',
-    'achievement': achievement,
+    'achievement': certData.achievement || certData.award || 'Outstanding Performance',
     'instructor': certData.instructor || certData.teacher || '',
     'organization': certData.organization || 'Nibog Events',
   };
@@ -132,9 +114,36 @@ function generateCertificateHTML(
   template: CertificateTemplate,
   certificate: any
 ): string {
-  const backgroundImageUrl = template.background_image.startsWith('http')
-    ? template.background_image
-    : `http://localhost:3000${template.background_image}`;
+  // Handle background styling - support both legacy and new background options
+  let backgroundStyle = '';
+
+  // Check if we have new background_style or need to use legacy background_image
+  if (template.background_style && template.background_style.type) {
+    console.log('Using new background style:', template.background_style);
+
+    if (template.background_style.type === 'image') {
+      const imageUrl = template.background_style.image_url || template.background_image;
+      if (imageUrl && imageUrl !== 'null' && imageUrl !== null) {
+        const backgroundImageUrl = imageUrl.startsWith('http')
+          ? imageUrl
+          : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat;`;
+      }
+    } else if (template.background_style.type === 'solid' && template.background_style.solid_color) {
+      backgroundStyle = `background-color: ${template.background_style.solid_color};`;
+    } else if (template.background_style.type === 'gradient' && template.background_style.gradient_colors?.length === 2) {
+      backgroundStyle = `background: linear-gradient(135deg, ${template.background_style.gradient_colors[0]}, ${template.background_style.gradient_colors[1]});`;
+    }
+  } else if (template.background_image && template.background_image !== 'null' && template.background_image !== null) {
+    console.log('Using legacy background image:', template.background_image);
+    // Legacy background image support
+    const backgroundImageUrl = template.background_image.startsWith('http')
+      ? template.background_image
+      : `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}${template.background_image.startsWith('/') ? '' : '/'}${template.background_image}`;
+    backgroundStyle = `background-image: url('${backgroundImageUrl}'); background-size: contain; background-position: center; background-repeat: no-repeat;`;
+  }
+
+  console.log('Final background style:', backgroundStyle);
 
   // Extract data values
   const participantName = certificate.child_name || certificate.certificate_data?.participant_name || 'Participant';
@@ -181,80 +190,14 @@ function generateCertificateHTML(
         letter-spacing: 2px;
         ${titleFieldUnderline ? 'text-decoration: underline;' : ''}
       ">
-        ${parseVariables(titleText, certificate, template)}
+        ${parseVariables(titleText, certificate)}
       </div>
     `;
   }
 
-  // Get position from template fields or options
-  let positionText = '';
-  const positionField = template.fields.find((field: any) =>
-    field.name.toLowerCase().includes('position') || field.name.toLowerCase().includes('rank')
-  );
 
-  if (positionField) {
-    // Use position from certificate data first, then fallback to template options
-    positionText = certificate.certificate_data?.position || '';
-    if (!positionText && template.position_options && template.position_options.length > 0) {
-      positionText = template.position_options[0]; // Use first position option as fallback
-    }
-    if (!positionText) {
-      positionText = '1st Place'; // Final fallback
-    }
-  }
 
-  // Get achievement from template fields or options
-  let achievementText = '';
-  const achievementField = template.fields.find((field: any) =>
-    field.name.toLowerCase().includes('achievement') || field.name.toLowerCase().includes('award')
-  );
 
-  if (achievementField) {
-    // Use achievement from certificate data first, then fallback to template options
-    achievementText = certificate.certificate_data?.achievement || '';
-    if (!achievementText && template.achievement_options && template.achievement_options.length > 0) {
-      achievementText = template.achievement_options[0]; // Use first achievement option as fallback
-    }
-    if (!achievementText) {
-      achievementText = 'Outstanding Performance'; // Final fallback
-    }
-  }
-
-  // Generate achievement field HTML if achievement field exists
-  const achievementHTML = achievementField ? `
-    <div class="achievement-field" style="
-      position: absolute;
-      left: ${achievementField.x}%;
-      top: ${achievementField.y}%;
-      transform: translate(-50%, -50%);
-      font-size: ${achievementField.font_size || 20}px;
-      font-weight: bold;
-      color: ${achievementField.color || '#333333'};
-      font-family: '${achievementField.font_family || 'Arial'}', sans-serif;
-      text-align: ${achievementField.alignment || 'center'};
-      ${achievementField.underline ? 'text-decoration: underline;' : ''}
-    ">
-      ${achievementText}
-    </div>
-  ` : '';
-
-  // Generate position field HTML if position field exists
-  const positionHTML = positionField ? `
-    <div class="position-field" style="
-      position: absolute;
-      left: ${positionField.x}%;
-      top: ${positionField.y}%;
-      transform: translate(-50%, -50%);
-      font-size: ${positionField.font_size || 18}px;
-      font-weight: bold;
-      color: ${positionField.color || '#333333'};
-      font-family: '${positionField.font_family || 'Arial'}', sans-serif;
-      text-align: ${positionField.alignment || 'center'};
-      ${positionField.underline ? 'text-decoration: underline;' : ''}
-    ">
-      ${positionText}
-    </div>
-  ` : '';
 
   // Get default appreciation text based on template type
   let defaultAppreciationText = '';
@@ -267,8 +210,8 @@ function generateCertificateHTML(
   // Use custom appreciation text if available, otherwise use default text
   let appreciationContent = template.appreciation_text || defaultAppreciationText;
 
-  // Parse variables in the appreciation text using position and achievement from template
-  appreciationContent = parseVariables(appreciationContent, certificate, template, positionText, achievementText);
+  // Parse variables in the appreciation text
+  appreciationContent = parseVariables(appreciationContent, certificate);
 
   // Format the text with line breaks converted to <br> tags
   const formattedText = appreciationContent.replace(/\n/g, '<br>');
@@ -331,8 +274,8 @@ function generateCertificateHTML(
     </div>
   `;
 
-  // Combine the certificate title, participant name, achievement, position and appreciation text
-  const combinedContent = certificateTitle + participantNameHTML + achievementHTML + positionHTML + appreciationTextHTML;
+  // Combine the certificate title, participant name and appreciation text
+  const combinedContent = certificateTitle + participantNameHTML + appreciationTextHTML;
 
   let fieldsHTML = '';
 
@@ -439,12 +382,21 @@ function generateCertificateHTML(
     .certificate-container {
       width: ${containerWidth};
       height: ${containerHeight};
-      background-image: url('${backgroundImageUrl}');
-      background-size: contain;
-      background-position: center;
-      background-repeat: no-repeat;
+      ${backgroundStyle}
       position: relative;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .certificate-container::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      ${template.background_style?.border_enabled ? `
+        border: ${template.background_style.border_width || 2}px ${template.background_style.border_style || 'solid'} ${template.background_style.border_color || '#000000'};
+      ` : ''}
+      pointer-events: none;
     }
     .field {
       position: absolute;

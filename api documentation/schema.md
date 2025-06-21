@@ -506,11 +506,15 @@ CREATE TABLE certificate_templates (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     type VARCHAR(50) NOT NULL CHECK (type IN ('participation', 'winner', 'event_specific')),
-    background_image VARCHAR(500), -- File path URL (e.g., '/images/certificatetemplates/template_1_bg.jpg')
+    certificate_title VARCHAR(255), -- Certificate title that appears on the certificate
+    background_image VARCHAR(500), -- File path URL (e.g., '/images/certificatetemplates/template_1_bg.jpg') - Legacy field
+    background_style JSONB, -- New: Structured background options (type, colors, borders, etc.)
     paper_size VARCHAR(20) DEFAULT 'a4' CHECK (paper_size IN ('a4', 'letter', 'a3')),
     orientation VARCHAR(20) DEFAULT 'landscape' CHECK (orientation IN ('landscape', 'portrait')),
     fields JSONB NOT NULL, -- Store field configurations as JSON
-    appreciation_text TEXT, -- New: Dynamic appreciation message with placeholders
+    appreciation_text TEXT, -- Legacy: Dynamic appreciation message with placeholders
+    appreciation_text_style JSONB, -- New: Structured appreciation text with positioning and styling
+    signature_image VARCHAR(500), -- E-signature image URL
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

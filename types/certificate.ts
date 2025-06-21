@@ -16,17 +16,42 @@ export interface CertificateField {
   signature_type?: 'text' | 'image'; // For signature fields
 }
 
+// Background style options
+export interface BackgroundStyle {
+  type: 'image' | 'solid' | 'gradient';
+  image_url?: string; // For image type
+  solid_color?: string; // For solid type
+  gradient_colors?: string[]; // For gradient type
+  border_enabled?: boolean;
+  border_color?: string;
+  border_width?: number;
+  border_style?: 'solid' | 'dashed' | 'dotted';
+}
+
+// Appreciation text positioning
+export interface AppreciationTextStyle {
+  text: string;
+  x: number; // Position percentage
+  y: number; // Position percentage
+  font_size?: number;
+  font_family?: string;
+  color?: string;
+  alignment?: 'left' | 'center' | 'right';
+  line_height?: number;
+  max_width?: number; // Maximum width percentage
+}
+
 export interface CertificateTemplate {
   id: number;
   name: string;
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
   certificate_title?: string; // Certificate title that appears on the certificate
-  appreciation_text?: string; // Custom appreciation text with variable support
-  achievement_options?: string[]; // Predefined achievement options for this template
-  position_options?: string[]; // Predefined position options for this template
+  appreciation_text?: string; // Custom appreciation text with variable support (legacy)
+  appreciation_text_style?: AppreciationTextStyle; // New structured appreciation text with positioning
   signature_image?: string; // E-signature image URL
-  background_image: string; // File path URL
+  background_image?: string; // File path URL (legacy)
+  background_style?: BackgroundStyle; // New structured background options
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
   fields: CertificateField[];
@@ -40,11 +65,11 @@ export interface CreateCertificateTemplateRequest {
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
   certificate_title?: string; // Certificate title that appears on the certificate
-  appreciation_text?: string; // Custom appreciation text with variable support
-  achievement_options?: string[]; // Predefined achievement options for this template
-  position_options?: string[]; // Predefined position options for this template
+  appreciation_text?: string; // Custom appreciation text with variable support (legacy)
+  appreciation_text_style?: AppreciationTextStyle; // New structured appreciation text with positioning
   signature_image?: string; // E-signature image URL
-  background_image: string;
+  background_image?: string; // Legacy background image
+  background_style?: BackgroundStyle; // New structured background options
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
   fields: CertificateField[];
@@ -167,11 +192,11 @@ export interface CertificateTemplateFormData {
   description: string;
   type: 'participation' | 'winner' | 'event_specific';
   certificate_title?: string;
-  appreciation_text?: string;
-  achievement_options?: string[];
-  position_options?: string[];
+  appreciation_text?: string; // Legacy field
+  appreciation_text_style?: AppreciationTextStyle; // New structured appreciation text
   signature_image?: string;
-  background_image: string;
+  background_image?: string; // Legacy field
+  background_style?: BackgroundStyle; // New structured background
   paper_size: 'a4' | 'letter' | 'a3';
   orientation: 'landscape' | 'portrait';
   fields: CertificateField[];

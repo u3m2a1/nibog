@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Upload, Plus, Trash2, Loader2, ChevronLeft, ChevronRight, Zap } from "lucide-react"
+import { ArrowLeft, Upload, Plus, Trash2, Loader2, ChevronLeft, ChevronRight, Zap, Palette, Image } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,12 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
+import { ColorPicker } from "@/components/ui/color-picker"
 import { useToast } from "@/hooks/use-toast"
-import { CertificateField, CertificateTemplate, UpdateCertificateTemplateRequest } from "@/types/certificate"
-import { 
-  getCertificateTemplateById, 
-  updateCertificateTemplate, 
-  uploadCertificateBackground 
+import { CertificateField, CertificateTemplate, UpdateCertificateTemplateRequest, BackgroundStyle, AppreciationTextStyle } from "@/types/certificate"
+import {
+  getCertificateTemplateById,
+  updateCertificateTemplate,
+  uploadCertificateBackground
 } from "@/services/certificateTemplateService"
 
 export default function EditCertificateTemplatePage() {
@@ -43,8 +44,29 @@ export default function EditCertificateTemplatePage() {
   const [fields, setFields] = useState<CertificateField[]>([])
   const [certificateTitle, setCertificateTitle] = useState("")
   const [appreciationText, setAppreciationText] = useState("")
-  const [achievementOptions, setAchievementOptions] = useState<string[]>([])
-  const [positionOptions, setPositionOptions] = useState<string[]>([])
+
+  // New appreciation text positioning
+  const [appreciationTextStyle, setAppreciationTextStyle] = useState<AppreciationTextStyle>({
+    text: "",
+    x: 50,
+    y: 55,
+    font_size: 16,
+    font_family: "Arial",
+    color: "#000000",
+    alignment: "center",
+    line_height: 1.5,
+    max_width: 80
+  })
+
+  // Background style options
+  const [backgroundStyle, setBackgroundStyle] = useState<BackgroundStyle>({
+    type: "image",
+    border_enabled: false,
+    border_color: "#000000",
+    border_width: 2,
+    border_style: "solid"
+  })
+
   const [signatureImageUrl, setSignatureImageUrl] = useState("")
   const [defaultFontFamily, setDefaultFontFamily] = useState<string>("Arial")
   const [defaultFontColor, setDefaultFontColor] = useState<string>("#000000")
@@ -100,32 +122,34 @@ export default function EditCertificateTemplatePage() {
         if (templateData.type === "participation") {
           setAppreciationText("In recognition of enthusiastic participation in {event_name}.\nYour involvement, energy, and commitment at NIBOG are truly appreciated.\nThank you for being a valued part of the NIBOG community!")
         } else if (templateData.type === "winner") {
-          setAppreciationText("For achieving {achievement} in {event_name}.\nYour dedication, talent, and outstanding performance at NIBOG have distinguished you among the best.\nCongratulations on this remarkable achievement from the entire NIBOG team!")
+          setAppreciationText("For outstanding performance in {event_name}.\nYour dedication, talent, and exceptional skills at NIBOG have distinguished you among the best.\nCongratulations on this remarkable achievement from the entire NIBOG team!")
         }
       }
 
-      // Load achievement and position options
-      if (templateData.achievement_options) {
-        setAchievementOptions(templateData.achievement_options)
+      // Load appreciation text style if available
+      if (templateData.appreciation_text_style) {
+        setAppreciationTextStyle(templateData.appreciation_text_style)
       } else {
-        // Set default options based on template type
-        if (templateData.type === "participation") {
-          setAchievementOptions(["Participation", "Active Participation", "Enthusiastic Participation"])
-        } else if (templateData.type === "winner") {
-          setAchievementOptions(["Winner", "Champion", "Outstanding Performance", "Excellence", "First Prize", "Second Prize", "Third Prize"])
-        }
+        // Initialize with current appreciation text
+        setAppreciationTextStyle(prev => ({
+          ...prev,
+          text: templateData.appreciation_text || prev.text
+        }))
       }
 
-      if (templateData.position_options) {
-        setPositionOptions(templateData.position_options)
+      // Load background style if available
+      if (templateData.background_style) {
+        setBackgroundStyle(templateData.background_style)
       } else {
-        // Set default options based on template type
-        if (templateData.type === "participation") {
-          setPositionOptions(["Participant"])
-        } else if (templateData.type === "winner") {
-          setPositionOptions(["1st Place", "2nd Place", "3rd Place", "Winner", "Runner-up", "Finalist"])
-        }
+        // Initialize with current background image
+        setBackgroundStyle(prev => ({
+          ...prev,
+          type: "image",
+          image_url: templateData.background_image
+        }))
       }
+
+
 
       // Load signature image
       if (templateData.signature_image) {
@@ -153,6 +177,7 @@ export default function EditCertificateTemplatePage() {
       const imageUrl = await uploadCertificateBackground(file)
       setBackgroundImage(file)
       setBackgroundImageUrl(imageUrl)
+      setBackgroundStyle(prev => ({ ...prev, image_url: imageUrl }))
 
       toast({
         title: "Success",
@@ -459,7 +484,15 @@ export default function EditCertificateTemplatePage() {
       case 1:
         return !!(templateName && templateDescription && templateType)
       case 2:
-        return !!(backgroundImageUrl && paperSize && orientation)
+        // Check if background is configured based on type
+        if (backgroundStyle.type === "image") {
+          return !!(backgroundImageUrl && paperSize && orientation)
+        } else if (backgroundStyle.type === "solid") {
+          return !!(backgroundStyle.solid_color && paperSize && orientation)
+        } else if (backgroundStyle.type === "gradient") {
+          return !!(backgroundStyle.gradient_colors?.length === 2 && paperSize && orientation)
+        }
+        return !!(paperSize && orientation)
       case 3:
         return fields.length > 0
       default:
@@ -501,11 +534,11 @@ export default function EditCertificateTemplatePage() {
         description: templateDescription,
         type: templateType,
         certificate_title: certificateTitle,
-        appreciation_text: appreciationText,
-        achievement_options: achievementOptions.filter(option => option.trim() !== ''),
-        position_options: positionOptions.filter(option => option.trim() !== ''),
+        appreciation_text: appreciationText, // Keep for backward compatibility
+        appreciation_text_style: appreciationTextStyle, // New structured appreciation text
         signature_image: signatureImageUrl,
-        background_image: backgroundImageUrl,
+        background_image: backgroundImageUrl, // Keep for backward compatibility
+        background_style: backgroundStyle, // New structured background options
         paper_size: paperSize,
         orientation: orientation,
         fields: fields
@@ -640,159 +673,218 @@ export default function EditCertificateTemplatePage() {
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <Label>Achievement Options</Label>
-                <p className="text-sm text-gray-500 mb-2">
-                  Define the achievement options that can be selected when generating certificates
-                </p>
-                <div className="space-y-2">
-                  {achievementOptions.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...achievementOptions]
-                          newOptions[index] = e.target.value
-                          setAchievementOptions(newOptions)
-                        }}
-                        placeholder="Achievement option"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newOptions = achievementOptions.filter((_, i) => i !== index)
-                          setAchievementOptions(newOptions)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAchievementOptions([...achievementOptions, ''])}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Achievement Option
-                  </Button>
-                </div>
-              </div>
 
-              <div>
-                <Label>Position Options</Label>
-                <p className="text-sm text-gray-500 mb-2">
-                  Define the position options that can be selected when generating certificates
-                </p>
-                <div className="space-y-2">
-                  {positionOptions.map((option, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Input
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...positionOptions]
-                          newOptions[index] = e.target.value
-                          setPositionOptions(newOptions)
-                        }}
-                        placeholder="Position option"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newOptions = positionOptions.filter((_, i) => i !== index)
-                          setPositionOptions(newOptions)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPositionOptions([...positionOptions, ''])}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Position Option
-                  </Button>
-                </div>
-              </div>
-            </div>
           </div>
         )
 
       case 2:
         return (
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label>Background Image *</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                {backgroundImageUrl ? (
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <img
-                        src={backgroundImageUrl.startsWith('http') ? backgroundImageUrl : `http://localhost:3000${backgroundImageUrl}`}
-                        alt="Background preview"
-                        className="max-w-full h-48 object-contain mx-auto rounded"
-                      />
-                    </div>
-                    <div className="flex justify-center gap-2">
-                      <Label htmlFor="background-upload" className="cursor-pointer">
-                        <Button variant="outline" asChild>
-                          <span>
-                            <Upload className="mr-2 h-4 w-4" />
-                            Replace Image
-                          </span>
-                        </Button>
-                      </Label>
-                      <Input
-                        id="background-upload"
-                        type="file"
-                        className="hidden"
-                        accept="image/*,.pdf"
-                        onChange={handleBackgroundUpload}
-                        disabled={isUploadingBackground}
-                      />
-                    </div>
+            {/* Background Style Options */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-md">Background Style</CardTitle>
+                <CardDescription>Choose how you want to style the certificate background</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Background Type Selection */}
+                  <div className="space-y-2">
+                    <Label>Background Type *</Label>
+                    <Select
+                      value={backgroundStyle.type}
+                      onValueChange={(value: "image" | "solid" | "gradient") => {
+                        setBackgroundStyle(prev => ({ ...prev, type: value }));
+                        // Reset background image if switching away from image
+                        if (value !== "image") {
+                          setBackgroundImage(null);
+                          setBackgroundImageUrl("");
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="image">
+                          <div className="flex items-center gap-2">
+                            <Image className="h-4 w-4" />
+                            Background Image
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="solid">
+                          <div className="flex items-center gap-2">
+                            <Palette className="h-4 w-4" />
+                            Solid Color
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="gradient">
+                          <div className="flex items-center gap-2">
+                            <Palette className="h-4 w-4" />
+                            Gradient
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <div className="text-center">
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="mt-4">
-                      <Label htmlFor="background-upload" className="cursor-pointer">
-                        <span className="mt-2 block text-sm font-medium text-gray-900">
-                          Upload background image
-                        </span>
-                        <span className="mt-1 block text-sm text-gray-500">
-                          PNG, JPG, PDF up to 5MB
-                        </span>
-                      </Label>
-                      <Input
-                        id="background-upload"
-                        type="file"
-                        className="hidden"
-                        accept="image/*,.pdf"
-                        onChange={handleBackgroundUpload}
-                        disabled={isUploadingBackground}
+
+                  {/* Background Image Upload */}
+                  {backgroundStyle.type === "image" && (
+                    <div className="space-y-2">
+                      <Label>Background Image *</Label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                        {backgroundImageUrl ? (
+                          <div className="space-y-4">
+                            <div className="relative">
+                              <img
+                                src={backgroundImageUrl.startsWith('http') ? backgroundImageUrl : `http://localhost:3000${backgroundImageUrl}`}
+                                alt="Background preview"
+                                className="max-w-full h-48 object-contain mx-auto rounded"
+                              />
+                            </div>
+                            <div className="flex justify-center gap-2">
+                              <Label htmlFor="background-upload" className="cursor-pointer">
+                                <Button variant="outline" asChild>
+                                  <span>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Replace Image
+                                  </span>
+                                </Button>
+                              </Label>
+                              <Input
+                                id="background-upload"
+                                type="file"
+                                className="hidden"
+                                accept="image/*,.pdf"
+                                onChange={handleBackgroundUpload}
+                                disabled={isUploadingBackground}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                            <div className="mt-4">
+                              <Label htmlFor="background-upload" className="cursor-pointer">
+                                <span className="mt-2 block text-sm font-medium text-gray-900">
+                                  Upload background image
+                                </span>
+                                <span className="mt-1 block text-sm text-gray-500">
+                                  PNG, JPG, PDF up to 5MB
+                                </span>
+                              </Label>
+                              <Input
+                                id="background-upload"
+                                type="file"
+                                className="hidden"
+                                accept="image/*,.pdf"
+                                onChange={handleBackgroundUpload}
+                                disabled={isUploadingBackground}
+                              />
+                            </div>
+                            {isUploadingBackground && (
+                              <div className="mt-4">
+                                <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                                <p className="text-sm text-gray-500 mt-2">Uploading...</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Solid Color Background */}
+                  {backgroundStyle.type === "solid" && (
+                    <div className="space-y-2">
+                      <ColorPicker
+                        label="Background Color *"
+                        value={backgroundStyle.solid_color || "#FFFFFF"}
+                        onChange={(color) => setBackgroundStyle(prev => ({ ...prev, solid_color: color }))}
                       />
                     </div>
-                    {isUploadingBackground && (
-                      <div className="mt-4">
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                        <p className="text-sm text-gray-500 mt-2">Uploading...</p>
+                  )}
+
+                  {/* Gradient Background */}
+                  {backgroundStyle.type === "gradient" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <ColorPicker
+                          label="Start Color *"
+                          value={backgroundStyle.gradient_colors?.[0] || "#FFFFFF"}
+                          onChange={(color) => {
+                            const colors = backgroundStyle.gradient_colors || ["#FFFFFF", "#F0F0F0"];
+                            colors[0] = color;
+                            setBackgroundStyle(prev => ({ ...prev, gradient_colors: colors }));
+                          }}
+                        />
+                        <ColorPicker
+                          label="End Color *"
+                          value={backgroundStyle.gradient_colors?.[1] || "#F0F0F0"}
+                          onChange={(color) => {
+                            const colors = backgroundStyle.gradient_colors || ["#FFFFFF", "#F0F0F0"];
+                            colors[1] = color;
+                            setBackgroundStyle(prev => ({ ...prev, gradient_colors: colors }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Border Options */}
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="border-enabled"
+                        checked={backgroundStyle.border_enabled || false}
+                        onChange={(e) => setBackgroundStyle(prev => ({ ...prev, border_enabled: e.target.checked }))}
+                        className="rounded"
+                      />
+                      <Label htmlFor="border-enabled">Add Border</Label>
+                    </div>
+
+                    {backgroundStyle.border_enabled && (
+                      <div className="grid grid-cols-3 gap-4 pl-6">
+                        <ColorPicker
+                          label="Border Color"
+                          value={backgroundStyle.border_color || "#000000"}
+                          onChange={(color) => setBackgroundStyle(prev => ({ ...prev, border_color: color }))}
+                        />
+                        <div className="space-y-2">
+                          <Label>Border Width (px)</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={backgroundStyle.border_width || 2}
+                            onChange={(e) => setBackgroundStyle(prev => ({ ...prev, border_width: parseInt(e.target.value) || 2 }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Border Style</Label>
+                          <Select
+                            value={backgroundStyle.border_style || "solid"}
+                            onValueChange={(value: "solid" | "dashed" | "dotted") =>
+                              setBackgroundStyle(prev => ({ ...prev, border_style: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="solid">Solid</SelectItem>
+                              <SelectItem value="dashed">Dashed</SelectItem>
+                              <SelectItem value="dotted">Dotted</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="space-y-2">
               <Label>Signature Image (Optional)</Label>
@@ -801,7 +893,7 @@ export default function EditCertificateTemplatePage() {
                   <div className="space-y-4">
                     <div className="relative">
                       <img
-                        src={signatureImageUrl.startsWith('http') ? signatureImageUrl : `http://localhost:3000${signatureImageUrl}`}
+                        src={signatureImageUrl.startsWith('http') ? signatureImageUrl : `${window.location.origin}${signatureImageUrl.startsWith('/') ? '' : '/'}${signatureImageUrl}`}
                         alt="Signature preview"
                         className="max-w-full h-24 object-contain mx-auto rounded"
                       />
@@ -972,20 +1064,11 @@ export default function EditCertificateTemplatePage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Default Color</Label>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-8 h-8 border rounded-md cursor-pointer" 
-                      style={{ backgroundColor: defaultFontColor }}
-                    />
-                    <Input
-                      type="color"
-                      value={defaultFontColor}
-                      onChange={(e) => setDefaultFontColor(e.target.value)}
-                    />
-                  </div>
-                </div>
+                <ColorPicker
+                  label="Default Text Color"
+                  value={defaultFontColor || '#000000'}
+                  onChange={setDefaultFontColor}
+                />
               </div>
             </div>
             
@@ -1013,24 +1096,139 @@ export default function EditCertificateTemplatePage() {
                 <CardDescription>This text will appear below the participant name</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Textarea
-                    id="appreciationText"
-                    value={appreciationText}
-                    onChange={(e) => setAppreciationText(e.target.value)}
-                    placeholder="Enter appreciation text that will appear on the certificate"
-                    rows={5}
-                    required
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    You can use these placeholders in your text: <code>{`{event_name}`}</code>, <code>{`{achievement}`}</code>, and <code>{`{position}`}</code>.
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Note: The participant name will appear separately above this appreciation text, so you don't need to include it here.
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Tip:</span> Keep these fields out of your certificate template: <code>Event Name</code> and <code>Achievement</code>. Use the placeholders above instead.
-                  </p>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="appreciationText">Appreciation Text</Label>
+                    <Textarea
+                      id="appreciationText"
+                      value={appreciationText}
+                      onChange={(e) => {
+                        setAppreciationText(e.target.value);
+                        setAppreciationTextStyle(prev => ({ ...prev, text: e.target.value }));
+                      }}
+                      placeholder="Enter appreciation text that will appear on the certificate"
+                      rows={5}
+                      required
+                    />
+
+                    {/* Appreciation Text Positioning */}
+                    <div className="border rounded-lg p-4 bg-gray-50">
+                      <Label className="text-sm font-medium mb-3 block">Text Positioning & Styling</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>X Position (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={appreciationTextStyle.x}
+                            onChange={(e) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              x: parseInt(e.target.value) || 0
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Y Position (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={appreciationTextStyle.y}
+                            onChange={(e) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              y: parseInt(e.target.value) || 0
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Font Size</Label>
+                          <Input
+                            type="number"
+                            min="8"
+                            max="72"
+                            value={appreciationTextStyle.font_size}
+                            onChange={(e) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              font_size: parseInt(e.target.value) || 16
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Max Width (%)</Label>
+                          <Input
+                            type="number"
+                            min="10"
+                            max="100"
+                            value={appreciationTextStyle.max_width}
+                            onChange={(e) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              max_width: parseInt(e.target.value) || 80
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Font Family</Label>
+                          <Select
+                            value={appreciationTextStyle.font_family}
+                            onValueChange={(value: string) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              font_family: value
+                            }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Arial">Arial</SelectItem>
+                              <SelectItem value="Helvetica">Helvetica</SelectItem>
+                              <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                              <SelectItem value="Georgia">Georgia</SelectItem>
+                              <SelectItem value="Verdana">Verdana</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Text Alignment</Label>
+                          <Select
+                            value={appreciationTextStyle.alignment}
+                            onValueChange={(value: "left" | "center" | "right") => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              alignment: value
+                            }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="left">Left</SelectItem>
+                              <SelectItem value="center">Center</SelectItem>
+                              <SelectItem value="right">Right</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <ColorPicker
+                            label="Text Color"
+                            value={appreciationTextStyle.color || "#000000"}
+                            onChange={(color) => setAppreciationTextStyle(prev => ({
+                              ...prev,
+                              color
+                            }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">
+                        <span className="font-medium">Available Variables:</span> <code>{`{participant_name}`}</code>, <code>{`{event_name}`}</code>, <code>{`{game_name}`}</code>, <code>{`{venue_name}`}</code>, <code>{`{city_name}`}</code>, <code>{`{date}`}</code>, <code>{`{organization}`}</code>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">Tip:</span> Variables will be automatically replaced with actual data when certificates are generated.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1140,18 +1338,11 @@ export default function EditCertificateTemplatePage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label>Text Color</Label>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-8 h-8 border rounded-md cursor-pointer" 
-                              style={{ backgroundColor: field.color }}
-                            />
-                            <Input
-                              type="color"
-                              value={field.color}
-                              onChange={(e) => updateField(field.id, { color: e.target.value })}
-                            />
-                          </div>
+                          <ColorPicker
+                            label="Text Color"
+                            value={field.color || '#000000'}
+                            onChange={(color) => updateField(field.id, { color })}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>Text Alignment</Label>
