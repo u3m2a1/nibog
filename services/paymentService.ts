@@ -106,7 +106,7 @@ export interface PaymentAnalytics {
  * Initiate a PhonePe payment
  * @param bookingId The booking ID
  * @param userId The user ID
- * @param amount The payment amount in paise (e.g., ₹100 = 10000 paise)
+ * @param amount The payment amount in rupees (e.g., ₹100 = 100, will be converted to paise internally)
  * @param mobileNumber The user's mobile number
  * @returns The PhonePe payment URL
  */
@@ -122,10 +122,16 @@ export async function initiatePhonePePayment(
 
     const validation = validatePhonePeConfig();
     if (!validation.isValid) {
+      console.error('PhonePe Configuration Validation Failed:', validation.errors);
       throw new Error(`PhonePe configuration is invalid: ${validation.errors.join(', ')}`);
     }
 
-    console.log(`Initiating PhonePe payment for booking ID: ${bookingId}, amount: ${amount}`);
+    console.log(`Initiating PhonePe payment for booking ID: ${bookingId}`);
+    console.log(`Amount in rupees: ₹${amount}`);
+    console.log(`Amount in paise (for PhonePe): ${amount * 100}`);
+    console.log(`Using environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+    console.log(`Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID}`);
+    console.log(`Test Mode: ${PHONEPE_CONFIG.IS_TEST_MODE}`);
 
     // Generate a unique transaction ID
     const merchantTransactionId = generateTransactionId(bookingId);
@@ -135,7 +141,7 @@ export async function initiatePhonePePayment(
       merchantId: PHONEPE_CONFIG.MERCHANT_ID,
       merchantTransactionId: merchantTransactionId,
       merchantUserId: userId.toString(),
-      amount: amount * 100, // Convert to paise
+      amount: amount * 100, // Convert rupees to paise (PhonePe requirement)
       // Ensure APP_URL doesn't have trailing slash and parameters are properly encoded
       redirectUrl: `${PHONEPE_CONFIG.APP_URL.replace(/\/+$/, '')}/payment-callback?bookingId=${encodeURIComponent(String(bookingId))}&transactionId=${encodeURIComponent(merchantTransactionId)}`,
       redirectMode: 'REDIRECT',
@@ -172,7 +178,8 @@ export async function initiatePhonePePayment(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Error response: ${errorText}`);
-      throw new Error(`Failed to initiate PhonePe payment. API returned status: ${response.status}`);
+      console.error(`Response status: ${response.status}`);
+      throw new Error(`Failed to initiate PhonePe payment. API returned status: ${response.status}. Error: ${errorText}`);
     }
 
     const data = await response.json();
@@ -182,7 +189,8 @@ export async function initiatePhonePePayment(
       // Return the payment URL
       return data.data.instrumentResponse.redirectInfo.url;
     } else {
-      throw new Error(`PhonePe payment initiation failed: ${data.message}`);
+      console.error('PhonePe payment initiation failed:', data);
+      throw new Error(`PhonePe payment initiation failed: ${data.message || data.error || 'Unknown error'}`);
     }
   } catch (error) {
     console.error('Error initiating PhonePe payment:', error);
@@ -193,11 +201,14 @@ export async function initiatePhonePePayment(
 /**
  * Check the status of a PhonePe payment
  * @param merchantTransactionId The merchant transaction ID
+ * @param bookingData Optional booking data from localStorage to use for creating the booking
  * @returns The payment status
  */
-export async function checkPhonePePaymentStatus(merchantTransactionId: string): Promise<PaymentStatus> {
+export async function checkPhonePePaymentStatus(merchantTransactionId: string, bookingData?: any): Promise<PaymentStatus> {
   try {
     console.log(`Checking PhonePe payment status for transaction ID: ${merchantTransactionId}`);
+    console.log(`Using environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
+    console.log(`Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID}`);
 
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/payments/phonepe-status', {
@@ -207,12 +218,15 @@ export async function checkPhonePePaymentStatus(merchantTransactionId: string): 
       },
       body: JSON.stringify({
         transactionId: merchantTransactionId,
+        bookingData: bookingData || null,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Error response: ${errorText}`);
+      console.error(`Response status: ${response.status}`);
+      console.error(`Response headers:`, Object.fromEntries(response.headers.entries()));
       throw new Error(`Failed to check PhonePe payment status. API returned status: ${response.status}`);
     }
 
@@ -221,14 +235,43 @@ export async function checkPhonePePaymentStatus(merchantTransactionId: string): 
 
     if (data.success) {
       // Map PhonePe status to our payment status
-      switch (data.data.paymentState) {
+      // Handle both 'paymentState' and 'state' fields (PhonePe API inconsistency)
+      const paymentState = data.data?.paymentState || data.data?.state;
+      console.log('Payment state from PhonePe:', paymentState);
+      console.log('PhonePe response code:', data.code);
+      
+      // For test environment, be more flexible with status handling
+      // Check both the server response status and also what PhonePe directly returned
+      
+      // First, check if the server already determined this was a success
+      if (data.bookingCreated || data.paymentCreated) {
+        console.log('Server reported successful booking/payment creation');
+        return 'SUCCESS';
+      }
+      
+      // Check server response first - server may have mapped status more intelligently
+      if (data.code === 'PAYMENT_SUCCESS' || data.code?.includes('SUCCESS')) {
+        return 'SUCCESS';
+      }
+      
+      // Then check PhonePe status
+      switch (paymentState) {
         case 'COMPLETED':
           return 'SUCCESS';
         case 'PENDING':
+          // In test mode, sometimes pending might actually be success based on UI selection
+          if (PHONEPE_CONFIG.IS_TEST_MODE && data.code?.toLowerCase().includes('success')) {
+            return 'SUCCESS';
+          }
           return 'PENDING';
         case 'FAILED':
           return 'FAILED';
         default:
+          console.warn('Unknown payment state:', paymentState);
+          // In test mode, use the response code as a fallback
+          if (PHONEPE_CONFIG.IS_TEST_MODE && data.code?.toLowerCase().includes('success')) {
+            return 'SUCCESS';
+          }
           return 'FAILED';
       }
     } else {

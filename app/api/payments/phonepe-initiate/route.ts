@@ -6,10 +6,14 @@ export async function POST(request: Request) {
     console.log("Server API route: Starting PhonePe payment initiation request");
     console.log(`PhonePe Environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
     console.log(`PhonePe Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID}`);
+    console.log(`PhonePe Test Mode: ${PHONEPE_CONFIG.IS_TEST_MODE}`);
+    console.log(`PhonePe Salt Key: ${PHONEPE_CONFIG.SALT_KEY ? 'Set' : 'Missing'}`);
 
     // Parse the request body
     const { request: base64Payload, xVerify, transactionId, bookingId } = await request.json();
     console.log(`Server API route: Received transaction ID: ${transactionId}, booking ID: ${bookingId}`);
+    console.log(`Server API route: Base64 payload length: ${base64Payload?.length || 0}`);
+    console.log(`Server API route: X-Verify: ${xVerify}`);
 
     // Determine the API URL based on environment (production vs sandbox)
     const apiUrl = PHONEPE_CONFIG.IS_TEST_MODE
@@ -40,6 +44,19 @@ export async function POST(request: Request) {
       const responseData = JSON.parse(responseText);
       console.log("Server API route: PhonePe payment initiation response:", responseData);
 
+      // Check if the response indicates an error
+      if (!responseData.success && responseData.message) {
+        console.error("PhonePe API Error:", responseData.message);
+        return NextResponse.json(
+          {
+            success: false,
+            error: responseData.message,
+            code: responseData.code
+          },
+          { status: 400 }
+        );
+      }
+
       // Store the transaction details in your database here
       // This is important for reconciliation and callback handling
       // Example: await storeTransactionDetails(transactionId, bookingId, responseData);
@@ -47,6 +64,8 @@ export async function POST(request: Request) {
       return NextResponse.json(responseData, { status: 200 });
     } catch (parseError) {
       console.error("Server API route: Error parsing response:", parseError);
+      console.error("Raw response text:", responseText);
+
       // If parsing fails but we got a 200 status, consider it a success
       if (response.status >= 200 && response.status < 300) {
         return NextResponse.json({ success: true }, { status: 200 });

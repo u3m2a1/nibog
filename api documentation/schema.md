@@ -499,6 +499,26 @@ CREATE TABLE payments (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+--- Pending Bookings table (for server-first payment approach)
+
+CREATE TABLE pending_bookings (
+  pending_booking_id SERIAL PRIMARY KEY,
+  transaction_id VARCHAR(100) UNIQUE NOT NULL,
+  user_id INTEGER NOT NULL,
+  booking_data JSONB NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'expired', 'cancelled')),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_pending_bookings_transaction_id ON pending_bookings(transaction_id);
+CREATE INDEX idx_pending_bookings_user_id ON pending_bookings(user_id);
+CREATE INDEX idx_pending_bookings_status ON pending_bookings(status);
+CREATE INDEX idx_pending_bookings_expires_at ON pending_bookings(expires_at);
+
 --- Certificate Templates table
 
 CREATE TABLE certificate_templates (

@@ -16,7 +16,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, addMonths, differenceInMonths, differenceInDays } from "date-fns"
 import { cn } from "@/lib/utils"
-import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2, CheckCircle } from "lucide-react"
+import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, AlertCircle, Loader2, CheckCircle } from "lucide-react"
 import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -35,6 +35,7 @@ import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 import { initiatePhonePePayment } from "@/services/paymentService"
 import { getPromoCodesByEventAndGames, validatePromoCodePreview } from "@/services/promoCodeService"
+import { storePendingBookingForPayment } from "@/services/pendingBookingServices"
 
 // Helper function to format price.
 const formatPrice = (price: number | string | undefined) => {
@@ -155,14 +156,15 @@ export default function RegisterEventClientPage() {
       // Find the game in eligible games by numeric ID
       const game = eligibleGames.find(g => g.id === gameIdNum);
       
-      // Get price from the game object
+      // Get price from the game object - prioritize slot_price from event_games_with_slots table
       let gamePrice = 0;
       if (game) {
         // Parse price values as numbers since they might be stored as strings
-        if (game.custom_price) {
-          gamePrice = parseFloat(game.custom_price.toString());
-        } else if (game.slot_price) {
+        // Fixed: Use slot_price first (from event_games_with_slots table), then fallback to custom_price
+        if (game.slot_price) {
           gamePrice = parseFloat(game.slot_price.toString());
+        } else if (game.custom_price) {
+          gamePrice = parseFloat(game.custom_price.toString());
         }
       }
       
@@ -405,20 +407,68 @@ export default function RegisterEventClientPage() {
   // Fetch games based on event ID and child age
   const fetchGamesByEventAndAge = async (eventId: number, childAge: number) => {
     if (!eventId || childAge === null) return;
-    
+
     setIsLoadingGames(true);
     setGameError("");
-    
+
     try {
       console.log(`Fetching games for event ID: ${eventId} and child age: ${childAge} months`);
-      
+
       // Call the new API to get games by age and event
       const gamesData = await getGamesByAgeAndEvent(eventId, childAge);
-      
+
       if (gamesData && gamesData.length > 0) {
         console.log(`Found ${gamesData.length} games for event ${eventId} and age ${childAge} months`);
         console.log('Game data from API:', gamesData);
-        
+
+        // Update event details with correct date and venue from the games API response
+        const firstGame = gamesData[0];
+        if (firstGame && firstGame.event_date && firstGame.venue_name) {
+          console.log('Updating event details with correct date and venue from games API');
+          console.log('Event date from games API (corrected):', firstGame.event_date);
+          console.log('Venue name from games API:', firstGame.venue_name);
+
+          // Since the SQL query now returns the correct date in YYYY-MM-DD format (Asia/Kolkata timezone)
+          // we can use it directly without any timezone conversion
+          const correctDate = firstGame.event_date; // e.g., "2025-07-30"
+
+          // Parse the date components to create a proper Date object
+          const [year, month, day] = correctDate.split('-').map(Number);
+          console.log('Parsed date components:', { year, month, day });
+
+          // Find the current selected event and update it with correct information
+          const selectedApiEvent = apiEvents.find(event => event.event_id === eventId);
+          if (selectedApiEvent) {
+
+            // Update the event details with correct date and venue
+            const updatedEvent = {
+              id: selectedApiEvent.event_id.toString(),
+              title: selectedApiEvent.event_title,
+              description: selectedApiEvent.event_description,
+              minAgeMonths: 5,
+              maxAgeMonths: 84,
+              date: correctDate, // Use the correct date from games API (already in correct timezone)
+              time: "9:00 AM - 8:00 PM",
+              venue: firstGame.venue_name, // Use the correct venue from games API
+              city: selectedApiEvent.city_name,
+              price: 1800,
+              image: "/images/baby-crawling.jpg",
+            };
+
+            // Update eligible events with the corrected information
+            setEligibleEvents([updatedEvent]);
+
+            // Create Date object using local timezone (month is 0-indexed in JavaScript)
+            const correctEventDate = new Date(year, month - 1, day);
+            console.log('Created Date object:', correctEventDate);
+            console.log('Date will display as:', correctEventDate.toDateString());
+            setEventDate(correctEventDate);
+            setAvailableDates([correctEventDate]);
+
+            console.log('Updated event details:', updatedEvent);
+          }
+        }
+
         // Format games to match the Game interface structure, using API data only
         const formattedGames: Game[] = gamesData.map((game: any) => ({
           id: Number(game.slot_id || 0),
@@ -436,7 +486,8 @@ export default function RegisterEventClientPage() {
           custom_description: game.description || '',
           max_participants: game.max_participants || 0
         }));
-        
+
+        // Set the formatted games (this is separate from eligibleEvents which contains event details)
         setEligibleGames(formattedGames);
       } else {
         console.log(`No games found for event ${eventId} and age ${childAge} months`);
@@ -716,7 +767,7 @@ export default function RegisterEventClientPage() {
         throw new Error("User ID not found. Please log in again.")
       }
 
-      // Prepare booking data and save it to session storage for use after payment
+      // Prepare booking data for database storage
       const bookingData = {
         userId,
         parentName,
@@ -728,28 +779,36 @@ export default function RegisterEventClientPage() {
         gender,
         eventId: selectedApiEvent.event_id,
         gameId: selectedGamesObj.map(game => game?.id).filter(Boolean),
-        gamePrice: selectedGamesObj.map(game => game?.custom_price || game?.slot_price || 0),
+        gamePrice: selectedGamesObj.map(game => game?.slot_price || game?.custom_price || 0), // Fixed: Use slot_price first
         totalAmount: calculateTotalPrice(),
         paymentMethod: "PhonePe",
-        paymentStatus: "Pending",
         termsAccepted,
         addOns: selectedAddOns.map(item => ({
           addOnId: item.addOn.id,
           quantity: item.quantity,
           variantId: item.variantId
-        }))
+        })),
+        ...(appliedPromoCode && { promoCode: promoCode })
       }
 
-      console.log("Prepared booking data for payment:", bookingData)
+      console.log("=== STORING BOOKING DATA IN LOCAL STORAGE ===")
+      console.log("Booking data for local storage:", JSON.stringify(bookingData, null, 2))
+
+      // Generate a transaction ID with format NIBOG_<userId>_<timestamp>
+      const timestamp = new Date().getTime()
+      const transactionId = `NIBOG_${userId}_${timestamp}`
       
-      // Save booking data to session storage for use after payment
-      sessionStorage.setItem('pendingBookingData', JSON.stringify(bookingData))
-      
-      // Generate a unique transaction ID for this payment attempt
-      const tempTransactionId = `NIBOG_TEMP_${userId}_${Date.now()}`
+      // Store complete booking data in localStorage
+      localStorage.setItem('nibog_booking_data', JSON.stringify({
+        ...bookingData,
+        transactionId,
+        timestamp
+      }))
+
+      console.log("✅ Booking data stored in localStorage with transaction ID:", transactionId)
 
       console.log("=== PHONEPE PAYMENT INITIATION ===")
-      console.log("Temp Transaction ID:", tempTransactionId)
+      console.log("Transaction ID:", transactionId)
       console.log("User ID:", userId)
       console.log("Phone:", phone)
 
@@ -757,10 +816,10 @@ export default function RegisterEventClientPage() {
       const totalAmount = calculateTotalPrice()
       console.log("Total Amount (₹):", totalAmount)
 
-      // Initiate the payment directly without creating a booking first
+      // Initiate the payment with the stored transaction ID
       console.log("🚀 Calling initiatePhonePePayment...")
       const paymentUrl = await initiatePhonePePayment(
-        tempTransactionId, // Use temporary ID as we don't have a booking ID yet
+        transactionId, // Use the transaction ID from pending booking
         userId,
         totalAmount,
         phone
@@ -1442,18 +1501,18 @@ export default function RegisterEventClientPage() {
                             key={game.id}
                             className={cn(
                               "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 cursor-pointer",
-                              selectedGames.includes(game.id)
+                              selectedGames.includes(game.id.toString())
                                 ? "border-primary bg-primary/10 shadow-md"
                                 : "border-muted hover:border-primary/30 hover:bg-primary/5"
                             )}
-                            onClick={() => handleGameSelection(game.id)}
+                            onClick={() => handleGameSelection(game.id.toString())}
                           >
                             <div className="flex items-start space-x-3 flex-1">
-                              <Checkbox 
-                                id={`game-${game.id}`} 
-                                className="mt-1" 
-                                checked={selectedGames.includes(game.id)}
-                                onCheckedChange={() => handleGameSelection(game.id)}
+                              <Checkbox
+                                id={`game-${game.id}`}
+                                className="mt-1"
+                                checked={selectedGames.includes(game.id.toString())}
+                                onCheckedChange={() => handleGameSelection(game.id.toString())}
                               />
                                 <div className="space-y-1 flex-1">
                                   <Label htmlFor={`game-${game.id}`} className="font-medium cursor-pointer">

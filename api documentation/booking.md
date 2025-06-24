@@ -7,25 +7,32 @@ payload
 {
   "user_id": 4,
   "parent": {
-    "parent_name": "sarah",
+    "parent_name": "Sarah Johnson",
     "email": "sarah@example.com",
     "additional_phone": "+916303727148"
   },
   "child": {
-    "full_name": "dimbu",
-    "date_of_birth": "2018-05-12",
+    "full_name": "Emma Johnson",
+    "date_of_birth": "2020-05-12",
     "school_name": "Little Stars Academy",
     "gender": "Female"
   },
   "booking": {
     "event_id": 11,
+    "total_amount": 1240.50,
     "payment_method": "PhonePe",
     "payment_status": "successful",
     "terms_accepted": true
   },
   "booking_games": [
-    { "game_id": 2 },
-    { "game_id": 4 }
+    {
+      "game_id": 2,
+      "game_price": 590
+    },
+    {
+      "game_id": 4,
+      "game_price": 450
+    }
   ],
   "booking_addons": [
     {
@@ -37,15 +44,19 @@ payload
     },
     {
       "addon_id": 2,
-      "quantity" : 2
+      "quantity": 2
     }
   ],
-  "promo_code" : "NIBOG25UP"
+  "promo_code": "NIBOG25UP"
 }
 
-note
+Response
 
-the above payload will create a booking for 2 games and 1 addon and each information stored in separate table.
+{
+  success: true,
+  message: "Booking created successfully",
+  booking_id: 31
+}
 
 ## get all bookings
 
