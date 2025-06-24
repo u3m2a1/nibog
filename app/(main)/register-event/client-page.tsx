@@ -854,10 +854,35 @@ export default function RegisterEventClientPage() {
           quantity: item.quantity,
           variantId: item.variantId
         })),
-        ...(appliedPromoCode && { promoCode: promoCode })
+        ...(appliedPromoCode && { promoCode: promoCode }),
+
+        // Add rich event details for email
+        eventTitle: selectedEventDetails?.title || selectedApiEvent.event_title,
+        eventDate: selectedEventDetails?.date ? format(new Date(selectedEventDetails.date), "PPP") : 'TBD',
+        eventVenue: selectedEventDetails?.venue || 'TBD',
+        eventCity: selectedEventDetails?.city || selectedCity || 'TBD', // Use selectedCity as fallback
+
+        // Add rich game details for email
+        selectedGamesObj: selectedGamesObj.map(game => ({
+          id: game?.id,
+          game_id: game?.game_id,
+          custom_title: game?.custom_title,
+          game_title: game?.game_title,
+          custom_description: game?.custom_description,
+          game_description: game?.game_description,
+          start_time: game?.start_time,
+          end_time: game?.end_time,
+          slot_price: game?.slot_price,
+          custom_price: game?.custom_price,
+          max_participants: game?.max_participants,
+          game_duration_minutes: game?.game_duration_minutes
+        }))
       }
 
       console.log("=== STORING BOOKING DATA IN LOCAL STORAGE ===")
+      console.log("Selected city:", selectedCity)
+      console.log("Selected event details city:", selectedEventDetails?.city)
+      console.log("Event venue:", selectedEventDetails?.venue)
       console.log("Booking data for local storage:", JSON.stringify(bookingData, null, 2))
 
       // Generate a transaction ID with format NIBOG_<userId>_<timestamp>

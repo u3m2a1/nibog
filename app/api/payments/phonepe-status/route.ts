@@ -383,7 +383,10 @@ export async function POST(request: Request) {
           const paymentResult = await paymentResponse.json();
           console.log(`Server API route: Payment record created successfully:`, paymentResult);
 
-          // Pending booking cleanup removed - no longer needed since we're not using pending bookings
+          // Email notification is handled by the payment-callback page with rich data from localStorage
+          // No need to send email here to avoid duplicates
+          console.log(`Server API route: Email notification will be handled by payment-callback page with rich data`);
+
           console.log(`Server API route: Booking and payment process completed successfully`);
 
           return NextResponse.json({
@@ -426,4 +429,251 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Send booking confirmation email using existing booking data (no additional API calls needed)
+ */
+async function sendBookingConfirmationWithExistingData(
+  bookingId: string | number,
+  bookingData: any,
+  transactionId: string,
+  totalAmount: number
+) {
+  try {
+    console.log(`📧 Preparing booking confirmation email with existing data...`);
+    console.log(`📧 Booking data available:`, JSON.stringify(bookingData, null, 2));
+
+    // Use the event and venue data we already have from the booking process
+    // No need to make additional API calls - we have everything we need!
+
+    // Extract game details from the rich booking data - no API calls needed!
+    const gameDetails = [];
+
+    console.log(`📧 Available booking data keys:`, Object.keys(bookingData || {}));
+    console.log(`📧 Selected games objects:`, bookingData?.selectedGamesObj);
+
+    // Use the rich game data we now have
+    if (bookingData?.selectedGamesObj && Array.isArray(bookingData.selectedGamesObj)) {
+      bookingData.selectedGamesObj.forEach((game: any, index: number) => {
+        const gamePrice = bookingData.gamePrice?.[index] || game.slot_price || game.custom_price || 0;
+        gameDetails.push({
+          gameName: game.custom_title || game.game_title || `Game ${game.game_id || game.id}`,
+          gameDescription: game.custom_description || game.game_description || '',
+          gamePrice: gamePrice,
+          gameDuration: game.game_duration_minutes || 0,
+          gameTime: game.start_time && game.end_time ?
+            `${game.start_time} - ${game.end_time}` : 'TBD',
+          slotPrice: game.slot_price || 0,
+          maxParticipants: game.max_participants || 0,
+          customPrice: game.custom_price || 0
+        });
+      });
+      console.log(`📧 Extracted ${gameDetails.length} rich games from booking data`);
+    } else {
+      // Fallback to basic game data if rich data not available
+      const gameIds = bookingData?.gameId || [];
+      const gamePrices = bookingData?.gamePrice || [];
+
+      gameIds.forEach((gameId: number, index: number) => {
+        const gamePrice = gamePrices[index] || 0;
+        gameDetails.push({
+          gameName: `Game ${gameId}`,
+          gameDescription: '',
+          gamePrice: gamePrice,
+          gameDuration: 0,
+          gameTime: 'TBD',
+          slotPrice: gamePrice,
+          maxParticipants: 0,
+          customPrice: gamePrice
+        });
+      });
+      console.log(`📧 Used fallback game data for ${gameDetails.length} games`);
+    }
+
+    console.log(`📧 Prepared ${gameDetails.length} games for email:`, gameDetails);
+
+    // Prepare email data using the rich booking data - now with real event and game details!
+    const emailData = {
+      bookingId: parseInt(bookingId.toString()),
+      parentName: bookingData?.parentName || 'Valued Customer',
+      parentEmail: bookingData?.email || '',
+      childName: bookingData?.childName || '',
+      eventTitle: bookingData?.eventTitle || `Event ${bookingData?.eventId}`,
+      eventDate: bookingData?.eventDate || 'TBD',
+      eventVenue: bookingData?.eventVenue || 'TBD',
+      eventCity: bookingData?.eventCity || '',
+      totalAmount: totalAmount,
+      paymentMethod: 'PhonePe',
+      transactionId: transactionId,
+      gameDetails: gameDetails,
+      addOns: bookingData?.addOns || [],
+      bookingRef: `NIBOG_${bookingId}_${Date.now()}`, // Generate a booking reference
+      bookingStatus: 'Confirmed',
+      paymentStatus: 'Paid'
+    };
+
+    console.log(`📧 Prepared email data:`, JSON.stringify(emailData, null, 2));
+
+    // Get email settings
+    const emailSettingsResponse = await fetch('/api/emailsetting/get');
+    if (!emailSettingsResponse.ok) {
+      throw new Error('Email settings not configured');
+    }
+
+    const emailSettings = await emailSettingsResponse.json();
+    if (!emailSettings || emailSettings.length === 0) {
+      throw new Error('No email settings found');
+    }
+
+    const settings = emailSettings[0];
+
+    // Generate email HTML
+    const htmlContent = generateBookingConfirmationHTML(emailData);
+
+    // Send email
+    const emailResponse = await fetch('/api/send-receipt-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: emailData.parentEmail,
+        subject: `🎉 Booking Confirmed - ${emailData.eventTitle} | NIBOG`,
+        html: htmlContent,
+        settings: settings
+      }),
+    });
+
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.json();
+      throw new Error(errorData.error || 'Failed to send email');
+    }
+
+    console.log(`📧 Booking confirmation email sent successfully to ${emailData.parentEmail}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error(`📧 Error sending booking confirmation email:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Generate HTML content for booking confirmation email
+ */
+function generateBookingConfirmationHTML(emailData: any): string {
+  const gameDetailsHtml = emailData.gameDetails.map((game: any) =>
+    `<tr>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">
+        <strong>${game.gameName}</strong>
+        ${game.gameDescription ? `<br><small style="color: #666;">${game.gameDescription}</small>` : ''}
+        ${game.gameDuration > 0 ? `<br><small style="color: #666;">Duration: ${game.gameDuration} minutes</small>` : ''}
+        ${game.gameTime !== 'TBD' ? `<br><small style="color: #007bff;">⏰ ${game.gameTime}</small>` : ''}
+        ${game.maxParticipants > 0 ? `<br><small style="color: #28a745;">👥 Max ${game.maxParticipants} participants</small>` : ''}
+      </td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">
+        ₹${game.gamePrice.toFixed(2)}
+      </td>
+    </tr>`
+  ).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmation - NIBOG</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="margin: 0; font-size: 28px;">🎉 Booking Confirmed!</h1>
+    <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Thank you for choosing NIBOG</p>
+  </div>
+
+  <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+      <h2 style="margin: 0 0 15px 0; color: #495057; font-size: 20px;">Booking Details</h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; width: 40%;">Booking ID:</td>
+          <td style="padding: 8px 0;">#${emailData.bookingId}</td>
+        </tr>
+        ${emailData.bookingRef ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Booking Reference:</td>
+          <td style="padding: 8px 0; font-family: monospace; font-weight: bold; color: #007bff;">${emailData.bookingRef}</td>
+        </tr>
+        ` : ''}
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Parent Name:</td>
+          <td style="padding: 8px 0;">${emailData.parentName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Child Name:</td>
+          <td style="padding: 8px 0;">${emailData.childName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Event:</td>
+          <td style="padding: 8px 0;">${emailData.eventTitle}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Date:</td>
+          <td style="padding: 8px 0;">${emailData.eventDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Venue:</td>
+          <td style="padding: 8px 0;">${emailData.eventVenue}${emailData.eventCity ? `, ${emailData.eventCity}` : ''}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Transaction ID:</td>
+          <td style="padding: 8px 0; font-family: monospace; font-size: 12px;">${emailData.transactionId}</td>
+        </tr>
+      </table>
+    </div>
+
+    ${emailData.gameDetails.length > 0 ? `
+    <div style="margin-bottom: 25px;">
+      <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 18px;">Selected Games</h3>
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+        <thead>
+          <tr style="background: #f8f9fa;">
+            <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Game Details</th>
+            <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${gameDetailsHtml}
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    <div style="background: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 18px; font-weight: bold;">Total Amount:</span>
+        <span style="font-size: 24px; font-weight: bold; color: #28a745;">₹${emailData.totalAmount.toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Payment Method:</span>
+        <span style="font-weight: bold;">${emailData.paymentMethod}</span>
+      </div>
+    </div>
+
+    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+      <strong>✅ Payment Successful!</strong><br>
+      Your booking has been confirmed and payment has been processed successfully.
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+      <p style="margin: 0; color: #666; font-size: 14px;">
+        If you have any questions, please contact us at support@nibog.com
+      </p>
+      <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">
+        Thank you for choosing NIBOG! 🎮
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
 }
