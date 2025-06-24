@@ -1,5 +1,6 @@
 // Booking registration service for handling booking API calls
 import { BOOKING_API } from '@/config/api';
+import { validateGameData, formatGamesForAPI, createFallbackGame } from '@/utils/gameIdValidation';
 
 export interface BookingVariant {
   variant_id: number;
@@ -100,7 +101,7 @@ export function formatBookingDataForAPI(formData: {
   gender: string;
   eventId: number;
   gameId: number[] | number; // Updated to accept both array and single number
-  gamePrice: number;
+  gamePrice: number[] | number; // Updated to accept both array and single number
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: string;
@@ -110,6 +111,12 @@ export function formatBookingDataForAPI(formData: {
 }): BookingRegistrationData {
   // Format the date of birth to YYYY-MM-DD
   const dob = formData.childDob.toISOString().split('T')[0];
+
+  console.log("=== FORMATTING BOOKING DATA FOR API ===");
+  console.log("Input gameId:", formData.gameId);
+  console.log("Input gamePrice:", formData.gamePrice);
+  console.log("gameId type:", typeof formData.gameId);
+  console.log("gamePrice type:", typeof formData.gamePrice);
 
   // Format booking add-ons if present
   const bookingAddons: BookingAddon[] = [];
@@ -173,9 +180,26 @@ export function formatBookingDataForAPI(formData: {
       payment_status: formData.paymentStatus,
       terms_accepted: formData.termsAccepted,
     },
-    booking_games: Array.isArray(formData.gameId) 
-    ? formData.gameId.map(id => ({ game_id: id })) // Create an array of game objects if gameId is an array
-    : [{ game_id: formData.gameId }], // Otherwise create a single object
+    booking_games: (() => {
+      // Ensure gameId is always treated as an array for consistent processing
+      const gameIds = Array.isArray(formData.gameId) ? formData.gameId : [formData.gameId];
+      const gamePrices = Array.isArray(formData.gamePrice) ? formData.gamePrice : [formData.gamePrice];
+
+      console.log("Processing game IDs:", gameIds);
+      console.log("Processing game prices:", gamePrices);
+
+      // Use validation utility to process game data
+      const validationResult = validateGameData(gameIds, gamePrices, formData.totalAmount);
+
+      if (validationResult.isValid && validationResult.validGames.length > 0) {
+        console.log("Successfully validated games for booking registration");
+        return formatGamesForAPI(validationResult.validGames);
+      } else {
+        console.error("Game validation failed for booking registration:", validationResult.errors);
+        console.log("Using fallback game");
+        return [createFallbackGame(formData.totalAmount)];
+      }
+    })()
   };
 
   // Add optional fields if present

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PHONEPE_API, PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonepe';
 import { BOOKING_API } from '@/config/api';
+import { validateGameData, formatGamesForAPI, createFallbackGame } from '@/utils/gameIdValidation';
 
 /**
  * Maps user-provided gender values to database-allowed values
@@ -201,32 +202,34 @@ export async function POST(request: Request) {
                 booking_ref: bookingData.bookingRef || `PP${transactionId.substring(0, 10)}`.substring(0, 12),  // Ensure it fits VARCHAR(12)
                 status: "Confirmed" // Always set status to Confirmed for successful payments
               },
-              booking_games: bookingData.gameId && Array.isArray(bookingData.gameId) && bookingData.gameId.length > 0 ? 
-              // Filter out any potentially invalid game IDs
-              bookingData.gameId.map((gameId: number, index: number) => {
-                if (!gameId || isNaN(Number(gameId))) {
-                  console.log(`Server API route: Invalid game ID detected: ${gameId}, skipping`);
-                  return null;
+              booking_games: (() => {
+                console.log(`Server API route: Processing booking games from booking data`);
+                console.log(`Server API route: bookingData.gameId:`, bookingData.gameId);
+                console.log(`Server API route: bookingData.gamePrice:`, bookingData.gamePrice);
+
+                // Use validation utility to process game data
+                if (bookingData.gameId && bookingData.gamePrice) {
+                  const totalAmountInRupees = amount / 100; // Convert from paise to rupees
+                  const validationResult = validateGameData(
+                    bookingData.gameId,
+                    bookingData.gamePrice,
+                    totalAmountInRupees
+                  );
+
+                  if (validationResult.isValid && validationResult.validGames.length > 0) {
+                    console.log(`Server API route: Successfully validated ${validationResult.validGames.length} games`);
+                    return formatGamesForAPI(validationResult.validGames);
+                  } else {
+                    console.error(`Server API route: Game validation failed:`, validationResult.errors);
+                  }
+                } else {
+                  console.log(`Server API route: Missing game data in booking data`);
                 }
-                
-                // Ensure we have a valid game ID and price
-                const validGameId = Number(gameId);
-                const gamePrice = bookingData.gamePrice && bookingData.gamePrice[index] ? 
-                  Number(bookingData.gamePrice[index]) : 
-                  (amount / 100 / (bookingData.gameId?.length || 1));
-                
-                console.log(`Server API route: Processing valid game ID: ${validGameId}, price: ${gamePrice}`);
-                
-                return {
-                  game_id: validGameId,
-                  game_price: gamePrice
-                };
-              }).filter(Boolean) : [
-                {
-                  game_id: 1,
-                  game_price: amount / 100 // Convert from paise to rupees
-                }
-              ]
+
+                // Fallback: create a single game entry
+                console.log(`Server API route: Using fallback game`);
+                return [createFallbackGame(amount / 100)];
+              })()
             };
 
             // Handle add-ons if present
@@ -312,11 +315,22 @@ export async function POST(request: Request) {
           
           const bookingResult = await bookingResponse.json();
           console.log(`Server API route: Booking created successfully:`, bookingResult);
-          
-          const bookingId = bookingResult.booking_id || bookingResult.id;
-          
+
+          // Handle both array and object responses from the booking API
+          let bookingId;
+          if (Array.isArray(bookingResult) && bookingResult.length > 0) {
+            // API returned an array, get booking_id from first element
+            bookingId = bookingResult[0].booking_id || bookingResult[0].id;
+            console.log(`Server API route: Extracted booking ID from array response: ${bookingId}`);
+          } else if (bookingResult.booking_id || bookingResult.id) {
+            // API returned an object directly
+            bookingId = bookingResult.booking_id || bookingResult.id;
+            console.log(`Server API route: Extracted booking ID from object response: ${bookingId}`);
+          }
+
           if (!bookingId) {
             console.error('Server API route: No booking ID returned from API response');
+            console.error('Server API route: Full response structure:', JSON.stringify(bookingResult, null, 2));
             return NextResponse.json({
               ...responseData,
               bookingCreated: false,

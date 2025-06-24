@@ -1,5 +1,6 @@
 export interface Game {
-  id: number;
+  id: number; // This is the slot_id for unique selection
+  game_id: number; // This is the actual game_id for API calls
   game_title: string;
   game_description: string;
   min_age: number;
@@ -16,6 +17,8 @@ export interface Game {
   custom_title?: string;
   custom_description?: string;
   max_participants?: number;
+  // Store slot_id separately for reference (this is the time slot identifier)
+  slot_id?: number;
 }
 
 /**

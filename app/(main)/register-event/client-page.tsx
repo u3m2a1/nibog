@@ -36,6 +36,7 @@ import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegi
 import { initiatePhonePePayment } from "@/services/paymentService"
 import { getPromoCodesByEventAndGames, validatePromoCodePreview } from "@/services/promoCodeService"
 import { storePendingBookingForPayment } from "@/services/pendingBookingServices"
+import { validateGameData } from "@/utils/gameIdValidation"
 
 // Helper function to format price.
 const formatPrice = (price: number | string | undefined) => {
@@ -95,7 +96,7 @@ export default function RegisterEventClientPage() {
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
-  const [selectedGames, setSelectedGames] = useState<string[]>([])
+  const [selectedGames, setSelectedGames] = useState<number[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
@@ -150,11 +151,8 @@ export default function RegisterEventClientPage() {
     let total = 0;
     
     for (const gameId of selectedGames) {
-      // Convert both IDs to numbers for consistent comparison
-      const gameIdNum = Number(gameId);
-      
       // Find the game in eligible games by numeric ID
-      const game = eligibleGames.find(g => g.id === gameIdNum);
+      const game = eligibleGames.find(g => g.id === gameId);
       
       // Get price from the game object - prioritize slot_price from event_games_with_slots table
       let gamePrice = 0;
@@ -470,8 +468,11 @@ export default function RegisterEventClientPage() {
         }
 
         // Format games to match the Game interface structure, using API data only
+        // IMPORTANT: Use slot_id as the unique identifier for selection (since each slot is unique)
+        // but store game_id separately for API calls
         const formattedGames: Game[] = gamesData.map((game: any) => ({
-          id: Number(game.slot_id || 0),
+          id: Number(game.slot_id || 0), // Use slot_id as unique identifier for selection
+          game_id: Number(game.game_id || 0), // Store actual game_id for API calls
           game_title: game.title || '',
           game_description: game.description || '',
           min_age: game.min_age || 0,
@@ -484,7 +485,9 @@ export default function RegisterEventClientPage() {
           end_time: game.end_time || '',
           custom_title: game.title || '',
           custom_description: game.description || '',
-          max_participants: game.max_participants || 0
+          max_participants: game.max_participants || 0,
+          // Store slot_id separately for reference
+          slot_id: Number(game.slot_id || 0)
         }));
 
         // Set the formatted games (this is separate from eligibleEvents which contains event details)
@@ -503,36 +506,44 @@ export default function RegisterEventClientPage() {
   }
 
   // Handle game selection
-  const handleGameSelection = (gameId: string) => {
+  const handleGameSelection = (gameId: number) => {
     // Toggle selection: add if not selected, remove if already selected
     setSelectedGames(prev => {
       const newSelectedGames = prev.includes(gameId)
         ? prev.filter(id => id !== gameId) // Remove from selection
         : [...prev, gameId]; // Add to selection
-      
+
       // Reset promocode when games change
       setPromoCode('');
       setAppliedPromoCode(null);
       setDiscountAmount(0);
-      
+
       // Fetch applicable promocodes for the new game selection
       if (newSelectedGames.length > 0 && selectedEventType) {
         const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
         if (selectedApiEvent) {
-          fetchApplicablePromocodes(selectedApiEvent.event_id, newSelectedGames.map(id => Number(id)));
+          // Convert slot IDs to game IDs for promo code API
+          const gameIdsForPromo = newSelectedGames.map(slotId => {
+            const game = eligibleGames.find(g => g.id === slotId);
+            return game?.game_id;
+          }).filter(Boolean);
+
+          if (gameIdsForPromo.length > 0) {
+            fetchApplicablePromocodes(selectedApiEvent.event_id, gameIdsForPromo);
+          }
         }
       } else {
         setAvailablePromocodes([]);
       }
-      
+
       return newSelectedGames;
     });
-    
+
     // Log selection state for debugging
     console.log(`Toggled game ID: ${gameId}`);
-    
+
     // Find the selected game for additional logging
-    const game = eligibleGames.find(g => g.id.toString() === gameId);
+    const game = eligibleGames.find(g => g.id === gameId);
     if (game) {
       console.log("Toggled game:", game);
     }
@@ -698,7 +709,7 @@ export default function RegisterEventClientPage() {
       const result = await validatePromoCodePreview(
         promoCode,
         selectedApiEvent.event_id,
-        selectedGames.map(id => Number(id)),
+        selectedGames,
         subtotal
       );
       
@@ -749,11 +760,38 @@ export default function RegisterEventClientPage() {
       setIsProcessingPayment(true)
       setPaymentError(null)
 
-      // Get the selected game details
+      // Get the selected game details with comprehensive logging
+      console.log("=== GAME ID PROCESSING DEBUG ===")
+      console.log("Selected slot IDs (for UI selection):", selectedGames)
+      console.log("Eligible games:", eligibleGames.map(g => ({
+        slot_id: g.id, // This is the slot_id used for selection
+        game_id: g.game_id, // This is the actual game_id for API
+        title: g.custom_title || g.game_title,
+        time: `${g.start_time} - ${g.end_time}`
+      })))
+
       // Filter out any undefined games to prevent errors
       const selectedGamesObj = selectedGames
-        .map(gameId => eligibleGames.find(game => game.id.toString() === gameId))
+        .map(slotId => {
+          const game = eligibleGames.find(game => game.id === slotId)
+          if (!game) {
+            console.error(`❌ Game slot with ID ${slotId} not found in eligible games!`)
+          } else {
+            console.log(`✅ Found game slot: Slot ID ${slotId}, Game ID ${game.game_id}, Title: ${game.custom_title || game.game_title}`)
+          }
+          return game
+        })
         .filter(game => game !== undefined);
+
+      console.log("Selected games objects:", selectedGamesObj.map(g => ({ id: g?.id, title: g?.custom_title || g?.game_title })))
+
+      if (selectedGamesObj.length === 0) {
+        throw new Error("No valid games selected. Please select at least one game.")
+      }
+
+      if (selectedGamesObj.length !== selectedGames.length) {
+        console.warn(`⚠️ Warning: ${selectedGames.length} games selected but only ${selectedGamesObj.length} found in eligible games`)
+      }
 
       // Get the selected event details
       const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
@@ -768,6 +806,32 @@ export default function RegisterEventClientPage() {
       }
 
       // Prepare booking data for database storage
+      // IMPORTANT: Extract actual game_id values for API, not slot_id values
+      const gameIds = selectedGamesObj.map(game => game?.game_id).filter(Boolean)
+      const gamePrices = selectedGamesObj.map(game => game?.slot_price || game?.custom_price || 0)
+      const slotIds = selectedGamesObj.map(game => game?.id).filter(Boolean) // Keep slot IDs for reference
+
+      console.log("=== BOOKING DATA PREPARATION ===")
+      console.log("Slot IDs (selected by user):", slotIds)
+      console.log("Game IDs (for API):", gameIds)
+      console.log("Game prices for booking:", gamePrices)
+      console.log("Event ID:", selectedApiEvent.event_id)
+
+      // Use validation utility to ensure game data is correct
+      const totalAmount = calculateTotalPrice()
+      const validationResult = validateGameData(gameIds, gamePrices, totalAmount)
+
+      if (!validationResult.isValid || validationResult.validGames.length === 0) {
+        console.error("Game validation failed:", validationResult.errors)
+        throw new Error("Invalid game selection. Please select valid games and try again.")
+      }
+
+      const validGameIds = validationResult.validGames.map(game => game.gameId)
+      const validGamePrices = validationResult.validGames.map(game => game.gamePrice)
+
+      console.log("Validated Game IDs:", validGameIds)
+      console.log("Validated Game Prices:", validGamePrices)
+
       const bookingData = {
         userId,
         parentName,
@@ -778,8 +842,10 @@ export default function RegisterEventClientPage() {
         schoolName,
         gender,
         eventId: selectedApiEvent.event_id,
-        gameId: selectedGamesObj.map(game => game?.id).filter(Boolean),
-        gamePrice: selectedGamesObj.map(game => game?.slot_price || game?.custom_price || 0), // Fixed: Use slot_price first
+        // Store both slot IDs and game IDs for proper handling
+        slotId: slotIds,  // Array of selected slot IDs (for reference)
+        gameId: validGameIds,  // Array of actual game IDs (for API)
+        gamePrice: validGamePrices,  // Array of game prices
         totalAmount: calculateTotalPrice(),
         paymentMethod: "PhonePe",
         termsAccepted,
@@ -811,9 +877,6 @@ export default function RegisterEventClientPage() {
       console.log("Transaction ID:", transactionId)
       console.log("User ID:", userId)
       console.log("Phone:", phone)
-
-      // Get the total amount in rupees
-      const totalAmount = calculateTotalPrice()
       console.log("Total Amount (₹):", totalAmount)
 
       // Initiate the payment with the stored transaction ID
@@ -1501,18 +1564,18 @@ export default function RegisterEventClientPage() {
                             key={game.id}
                             className={cn(
                               "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 cursor-pointer",
-                              selectedGames.includes(game.id.toString())
+                              selectedGames.includes(game.id)
                                 ? "border-primary bg-primary/10 shadow-md"
                                 : "border-muted hover:border-primary/30 hover:bg-primary/5"
                             )}
-                            onClick={() => handleGameSelection(game.id.toString())}
+                            onClick={() => handleGameSelection(game.id)}
                           >
                             <div className="flex items-start space-x-3 flex-1">
                               <Checkbox
                                 id={`game-${game.id}`}
                                 className="mt-1"
-                                checked={selectedGames.includes(game.id.toString())}
-                                onCheckedChange={() => handleGameSelection(game.id.toString())}
+                                checked={selectedGames.includes(game.id)}
+                                onCheckedChange={() => handleGameSelection(game.id)}
                               />
                                 <div className="space-y-1 flex-1">
                                   <Label htmlFor={`game-${game.id}`} className="font-medium cursor-pointer">
@@ -1612,13 +1675,13 @@ export default function RegisterEventClientPage() {
               <Button
                 className={cn(
                   "w-full relative overflow-hidden group transition-all duration-300",
-                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGames || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || selectedGames.length === 0 || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                  (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment)
                     ? "opacity-50"
                     : "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
                 )}
                 onClick={handleRegistration}
-                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGames || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || selectedGames.length === 0 || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                          (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment}
               >
                 <span className="relative z-10 flex items-center">
