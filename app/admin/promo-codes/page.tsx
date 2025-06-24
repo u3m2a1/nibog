@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { deletePromoCode } from "@/services/promoCodeService"
 
 // Types for API response
 interface PromoCodeAPI {
@@ -131,6 +133,7 @@ const getStatusBadge = (status: string) => {
 }
 
 export default function PromoCodesPage() {
+  const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedType, setSelectedType] = useState("all")
@@ -170,15 +173,38 @@ export default function PromoCodesPage() {
   }
 
   // Handle delete promo code
-  const handleDeletePromoCode = (id: string) => {
+  const handleDeletePromoCode = async (id: string) => {
     setIsProcessing(id)
 
-    // Simulate API call to delete the promo code
-    setTimeout(() => {
-      // In a real app, this would be an API call to delete the promo code
-      setPromoCodesList(promoCodesList.filter((code: PromoCode) => code.id !== id))
+    try {
+      console.log(`Deleting promo code with ID: ${id}`)
+
+      // Call the delete API
+      const response = await deletePromoCode(parseInt(id))
+
+      console.log("Delete promo code response:", response)
+
+      if (response.success) {
+        // Remove the deleted promo code from the list
+        setPromoCodesList(promoCodesList.filter((code: PromoCode) => code.id !== id))
+
+        toast({
+          title: "Success",
+          description: "Promo code deleted successfully!",
+        })
+      } else {
+        throw new Error(response.error || "Failed to delete promo code")
+      }
+    } catch (error: any) {
+      console.error("Error deleting promo code:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete promo code. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-    }, 1000)
+    }
   }
 
   // Filter promo codes based on search and filters

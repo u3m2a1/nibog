@@ -14,71 +14,61 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Plus, Trash, X, Upload } from "lucide-react"
-import { AddOn, AddOnVariant } from "@/types"
+import { ArrowLeft, Plus, Trash, X, Upload, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { createAddOn, CreateAddOnRequest } from "@/services/addOnService"
+
+interface AddOnVariant {
+  id: string;
+  name: string;
+  price_modifier: number;
+  sku: string;
+  stock_quantity: number;
+}
 
 export default function NewAddOnPage() {
   const router = useRouter()
-  
+  const { toast } = useToast()
+
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState(0)
   const [category, setCategory] = useState<"meal" | "merchandise" | "service" | "other">("other")
   const [isActive, setIsActive] = useState(true)
   const [sku, setSku] = useState("")
-  const [stockQuantity, setStockQuantity] = useState(0)
+  const [stockQuantity, setStockQuantity] = useState("")
   const [hasVariants, setHasVariants] = useState(false)
   const [variants, setVariants] = useState<AddOnVariant[]>([])
   const [images, setImages] = useState<string[]>([])
   const [hasBundleDiscount, setHasBundleDiscount] = useState(false)
   const [minQuantity, setMinQuantity] = useState(2)
   const [discountPercentage, setDiscountPercentage] = useState(10)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState("details")
 
   // New variant form state
   const [newVariantName, setNewVariantName] = useState("")
-  const [newVariantPrice, setNewVariantPrice] = useState(0)
+  const [newVariantPriceModifier, setNewVariantPriceModifier] = useState(0)
   const [newVariantSku, setNewVariantSku] = useState("")
   const [newVariantStock, setNewVariantStock] = useState(0)
-  const [newVariantAttributes, setNewVariantAttributes] = useState<Record<string, string>>({})
-  const [newAttributeKey, setNewAttributeKey] = useState("")
-  const [newAttributeValue, setNewAttributeValue] = useState("")
-
-  const handleAddAttribute = () => {
-    if (newAttributeKey.trim() && newAttributeValue.trim()) {
-      setNewVariantAttributes({
-        ...newVariantAttributes,
-        [newAttributeKey.trim()]: newAttributeValue.trim()
-      })
-      setNewAttributeKey("")
-      setNewAttributeValue("")
-    }
-  }
-
-  const handleRemoveAttribute = (key: string) => {
-    const updatedAttributes = { ...newVariantAttributes }
-    delete updatedAttributes[key]
-    setNewVariantAttributes(updatedAttributes)
-  }
 
   const handleAddVariant = () => {
-    if (newVariantName.trim() && newVariantSku.trim() && newVariantPrice > 0) {
+    if (newVariantName.trim() && newVariantSku.trim()) {
       const newVariant: AddOnVariant = {
         id: `variant-${Date.now()}`,
         name: newVariantName.trim(),
-        price: newVariantPrice,
+        price_modifier: newVariantPriceModifier,
         sku: newVariantSku.trim(),
-        stockQuantity: newVariantStock,
-        attributes: { ...newVariantAttributes }
+        stock_quantity: newVariantStock
       }
-      
+
       setVariants([...variants, newVariant])
-      
+
       // Reset form
       setNewVariantName("")
-      setNewVariantPrice(0)
+      setNewVariantPriceModifier(0)
       setNewVariantSku("")
       setNewVariantStock(0)
-      setNewVariantAttributes({})
     }
   }
 
@@ -87,9 +77,35 @@ export default function NewAddOnPage() {
   }
 
   const handleAddImage = () => {
-    // In a real app, this would open a file picker or media library
-    const newImage = `/placeholder.svg?height=200&width=300&text=Image ${images.length + 1}`
-    setImages([...images, newImage])
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files
+      if (files) {
+        Array.from(files).forEach(file => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const result = e.target?.result as string
+            setImages(prev => [...prev, result])
+          }
+          reader.readAsDataURL(file)
+        })
+      }
+    }
+
+    input.click()
+  }
+
+  // Auto-navigate to next tab when hasVariants changes
+  const handleHasVariantsChange = (checked: boolean) => {
+    setHasVariants(checked)
+    if (checked) {
+      // Auto-navigate to images tab when variants is enabled
+      setActiveTab("images")
+    }
   }
 
   const handleRemoveImage = (index: number) => {
@@ -98,32 +114,130 @@ export default function NewAddOnPage() {
     setImages(updatedImages)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Prepare bundle discount data
-    const bundleDiscountData = hasBundleDiscount ? {
-      minQuantity,
-      discountPercentage
-    } : undefined
-    
-    // In a real app, this would be an API call
-    const newAddOn: Omit<AddOn, "id" | "createdAt" | "updatedAt"> = {
-      name,
-      description,
-      price,
-      category,
-      isActive,
-      hasVariants,
-      images,
-      ...(hasVariants ? { variants } : { sku, stockQuantity }),
-      ...(bundleDiscountData ? { bundleDiscount: bundleDiscountData } : {})
-    }
-    
-    console.log("Creating new add-on:", newAddOn)
 
-    // Redirect to the add-ons list
-    router.push("/admin/add-ons")
+    // Validation
+    if (!name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on name is required",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (!description.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on description is required",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (price <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on price must be greater than 0",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (hasVariants && variants.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one variant or disable 'Has Variants'",
+        variant: "destructive",
+      })
+      setActiveTab("variants")
+      return
+    }
+
+    if (!hasVariants && !sku.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "SKU is required when not using variants",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (!hasVariants && (Number(stockQuantity) <= 0 || stockQuantity === "")) {
+      toast({
+        title: "Validation Error",
+        description: "Stock quantity must be greater than 0 when not using variants",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+
+      // Prepare the request data - EXACT format matching your n8n workflow
+      const requestData: any = {
+        name,
+        description,
+        price,
+        category,
+        images,
+        isActive,
+        hasVariants,
+        variants: hasVariants && variants.length > 0 ? variants.map(v => ({
+          name: v.name,
+          price_modifier: v.price_modifier,
+          sku: v.sku,
+          stock_quantity: v.stock_quantity
+        })) : [],
+        stock_quantity: Number(stockQuantity) || 0, // Convert string to number
+        sku: hasVariants ? `${name.replace(/\s+/g, '-').toUpperCase()}-BASE`.substring(0, 50) : sku,
+        bundleDiscount: hasBundleDiscount ? {
+          minQuantity,
+          discountPercentage
+        } : {
+          minQuantity: 0,
+          discountPercentage: 0
+        }
+      }
+
+      await createAddOn(requestData)
+
+      toast({
+        title: "Success",
+        description: "Add-on created successfully",
+      })
+
+      // Redirect to the add-ons list
+      router.push("/admin/add-ons")
+    } catch (error: any) {
+
+      let errorMessage = "Failed to create add-on. Please try again.";
+
+      if (error.message.includes('400')) {
+        errorMessage = "Invalid data provided. Please check all required fields.";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (error.message.includes('503') || error.message.includes('504')) {
+        errorMessage = "Service temporarily unavailable. Please try again later.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -142,7 +256,7 @@ export default function NewAddOnPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="details" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="details">Basic Details</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
@@ -216,7 +330,7 @@ export default function NewAddOnPage() {
                     <Switch
                       id="has-variants"
                       checked={hasVariants}
-                      onCheckedChange={setHasVariants}
+                      onCheckedChange={handleHasVariantsChange}
                     />
                   </div>
                   
@@ -238,8 +352,8 @@ export default function NewAddOnPage() {
                           id="stock"
                           type="number"
                           min="0"
-                          value={stockQuantity || ""}
-                          onChange={(e) => setStockQuantity(parseInt(e.target.value) || 0)}
+                          value={stockQuantity}
+                          onChange={(e) => setStockQuantity(e.target.value)}
                           required={!hasVariants}
                         />
                       </div>
@@ -252,6 +366,16 @@ export default function NewAddOnPage() {
                   <Label htmlFor="active">Active</Label>
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <div></div>
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("images")}
+                  variant="outline"
+                >
+                  Next: Images →
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -294,6 +418,22 @@ export default function NewAddOnPage() {
                   </Button>
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  variant="outline"
+                >
+                  ← Back: Details
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab(hasVariants ? "variants" : "pricing")}
+                  variant="outline"
+                >
+                  {hasVariants ? "Next: Variants →" : "Next: Pricing →"}
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -311,9 +451,9 @@ export default function NewAddOnPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>SKU</TableHead>
-                        <TableHead>Price</TableHead>
+                        <TableHead>Price Modifier</TableHead>
                         <TableHead>Stock</TableHead>
-                        <TableHead>Attributes</TableHead>
+                        <TableHead>Final Price</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -322,16 +462,18 @@ export default function NewAddOnPage() {
                         <TableRow key={variant.id}>
                           <TableCell className="font-medium">{variant.name}</TableCell>
                           <TableCell>{variant.sku}</TableCell>
-                          <TableCell>₹{variant.price.toFixed(2)}</TableCell>
-                          <TableCell>{variant.stockQuantity}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(variant.attributes).map(([key, value]) => (
-                                <Badge key={key} variant="outline">
-                                  {key}: {value}
-                                </Badge>
-                              ))}
-                            </div>
+                            {variant.price_modifier === 0 ? (
+                              <span className="text-muted-foreground">Base price</span>
+                            ) : (
+                              <span className={variant.price_modifier > 0 ? "text-green-600" : "text-red-600"}>
+                                {variant.price_modifier > 0 ? "+" : ""}₹{variant.price_modifier}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>{variant.stock_quantity}</TableCell>
+                          <TableCell>
+                            ₹{(price + variant.price_modifier).toFixed(2)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -381,15 +523,18 @@ export default function NewAddOnPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="variant-price">Price (₹)</Label>
+                        <Label htmlFor="variant-price-modifier">Price Modifier (₹)</Label>
                         <Input
-                          id="variant-price"
+                          id="variant-price-modifier"
                           type="number"
-                          min="0"
                           step="0.01"
-                          value={newVariantPrice || ""}
-                          onChange={(e) => setNewVariantPrice(parseFloat(e.target.value) || 0)}
+                          value={newVariantPriceModifier || ""}
+                          onChange={(e) => setNewVariantPriceModifier(parseFloat(e.target.value) || 0)}
+                          placeholder="0 for base price"
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Amount to add/subtract from base price (use negative for discount)
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="variant-stock">Stock Quantity</Label>
@@ -403,53 +548,13 @@ export default function NewAddOnPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Attributes</Label>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {Object.entries(newVariantAttributes).map(([key, value]) => (
-                          <Badge key={key} variant="secondary" className="flex items-center gap-1">
-                            {key}: {value}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 p-0"
-                              onClick={() => handleRemoveAttribute(key)}
-                              type="button"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <Input
-                          placeholder="Key (e.g., Size)"
-                          value={newAttributeKey}
-                          onChange={(e) => setNewAttributeKey(e.target.value)}
-                          className="w-1/3"
-                        />
-                        <Input
-                          placeholder="Value (e.g., Medium)"
-                          value={newAttributeValue}
-                          onChange={(e) => setNewAttributeValue(e.target.value)}
-                          className="w-1/3"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleAddAttribute}
-                          disabled={!newAttributeKey.trim() || !newAttributeValue.trim()}
-                        >
-                          Add Attribute
-                        </Button>
-                      </div>
-                    </div>
+
                   </CardContent>
                   <CardFooter>
                     <Button
                       type="button"
                       onClick={handleAddVariant}
-                      disabled={!newVariantName.trim() || !newVariantSku.trim() || newVariantPrice <= 0}
+                      disabled={!newVariantName.trim() || !newVariantSku.trim()}
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add Variant
@@ -457,6 +562,22 @@ export default function NewAddOnPage() {
                   </CardFooter>
                 </Card>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("images")}
+                  variant="outline"
+                >
+                  ← Back: Images
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("pricing")}
+                  variant="outline"
+                >
+                  Next: Pricing →
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -513,6 +634,18 @@ export default function NewAddOnPage() {
                   )}
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab(hasVariants ? "variants" : "images")}
+                  variant="outline"
+                >
+                  {hasVariants ? "← Back: Variants" : "← Back: Images"}
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Ready to create add-on
+                </div>
+              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
@@ -521,8 +654,15 @@ export default function NewAddOnPage() {
           <Button type="button" variant="outline" onClick={() => router.push("/admin/add-ons")}>
             Cancel
           </Button>
-          <Button type="submit">
-            Create Add-on
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Add-on"
+            )}
           </Button>
         </div>
       </form>

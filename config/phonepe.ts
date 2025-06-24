@@ -42,8 +42,33 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
   return defaultValue;
 };
 
+// Get the correct APP_URL based on environment
+const getAppUrl = (): string => {
+  // First try to get from environment variable
+  const envUrl = getEnvVar('NEXT_PUBLIC_APP_URL', '');
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // For development, use localhost
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+
+  // For production, use the production domain
+  return 'https://nibog.in';
+};
+
 // Determine if we're in production mode
-const isProduction = getEnvVar('PHONEPE_ENVIRONMENT', 'production') === 'production';
+const phonepeEnv = getEnvVar('PHONEPE_ENVIRONMENT', 'sandbox'); // Default to sandbox for safety
+console.log('PhonePe Environment Variable:', phonepeEnv);
+console.log('All Environment Variables:', {
+  PHONEPE_ENVIRONMENT: process.env.PHONEPE_ENVIRONMENT,
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL
+});
+console.log('Resolved APP_URL:', getAppUrl());
+const isProduction = phonepeEnv === 'production';
 
 // PhonePe merchant configuration from environment variables
 export const PHONEPE_CONFIG = {
@@ -61,7 +86,7 @@ export const PHONEPE_CONFIG = {
 
   IS_TEST_MODE: !isProduction,
   ENVIRONMENT: isProduction ? 'production' : 'sandbox',
-  APP_URL: getEnvVar('NEXT_PUBLIC_APP_URL', 'https://nibog.in'),
+  APP_URL: getAppUrl(),
 };
 
 // Generate a SHA256 hash
@@ -83,10 +108,21 @@ export function base64Encode(str: string): string {
   }
 }
 
-// Generate a unique transaction ID
+// Generate a unique transaction ID (max 38 chars as required by PhonePe)
 export function generateTransactionId(bookingId: string | number): string {
   const timestamp = new Date().getTime();
-  return `NIBOG_${bookingId}_${timestamp}`;
+  const prefix = 'NIBOG_';
+  const fullId = `${prefix}${bookingId}_${timestamp}`;
+  
+  // Check if the ID exceeds 38 characters and truncate if necessary
+  if (fullId.length <= 38) {
+    return fullId;
+  }
+  
+  // If too long, use a shortened version
+  // Keep the prefix, use last 6 chars of bookingId, and use full timestamp
+  const shortBookingId = String(bookingId).slice(-6);
+  return `${prefix}${shortBookingId}_${timestamp}`;
 }
 
 // Payment status types
@@ -161,7 +197,7 @@ export function logPhonePeConfig(): void {
   console.log(`Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID ? '✓ Set' : '✗ Missing'}`);
   console.log(`Salt Key: ${PHONEPE_CONFIG.SALT_KEY ? '✓ Set' : '✗ Missing'}`);
   console.log(`Salt Index: ${PHONEPE_CONFIG.SALT_INDEX ? '✓ Set' : '✗ Missing'}`);
-  console.log(`App URL: ${PHONEPE_CONFIG.APP_URL ? '✓ Set' : '✗ Missing'}`);
+  console.log(`App URL: ${PHONEPE_CONFIG.APP_URL}`);
   console.log(`Test Mode: ${PHONEPE_CONFIG.IS_TEST_MODE ? 'Enabled' : 'Disabled'}`);
 
   if (!validation.isValid) {

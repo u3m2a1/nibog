@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
-import { Plus, Search, Edit, Trash, Copy } from "lucide-react"
+import { Plus, Search, Edit, Trash, Copy, FileText, Loader2, Eye, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -26,59 +27,201 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-
-// Mock certificate template data - in a real app, this would come from an API
-const certificateTemplates = [
-  {
-    id: "cert-1",
-    name: "Baby Crawling Champion",
-    description: "Certificate for baby crawling competition winners",
-    thumbnail: "/images/certificates/crawling-cert-thumb.jpg",
-    createdAt: "2025-01-15T10:30:00Z",
-    updatedAt: "2025-01-20T14:45:00Z",
-  },
-  {
-    id: "cert-2",
-    name: "Participation Certificate",
-    description: "General participation certificate for all NIBOG events",
-    thumbnail: "/images/certificates/participation-cert-thumb.jpg",
-    createdAt: "2025-01-10T09:15:00Z",
-    updatedAt: "2025-01-10T09:15:00Z",
-  },
-  {
-    id: "cert-3",
-    name: "Baby Walker Award",
-    description: "Certificate for baby walker competition participants",
-    thumbnail: "/images/certificates/walker-cert-thumb.jpg",
-    createdAt: "2025-01-05T11:20:00Z",
-    updatedAt: "2025-01-18T16:30:00Z",
-  },
-]
+import { useToast } from "@/hooks/use-toast"
+import { CertificateTemplate } from "@/types/certificate"
+import {
+  getAllCertificateTemplates,
+  deleteCertificateTemplate,
+  duplicateCertificateTemplate
+} from "@/services/certificateTemplateService"
+import { generateCertificatePreview } from "@/services/certificatePdfService"
 
 export default function CertificateTemplatesPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  
-  // Filter templates based on search query
-  const filteredTemplates = certificateTemplates.filter(template => 
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-  
-  const handleDeleteTemplate = (id: string) => {
-    setIsDeleting(id)
-    
-    // In a real app, this would be an API call
-    // await fetch(`/api/admin/certificate-templates/${id}`, { method: "DELETE" })
-    
-    console.log(`Deleting template: ${id}`)
-    
-    // Reset deleting state after a short delay to simulate API call
-    setTimeout(() => {
-      setIsDeleting(null)
-    }, 1000)
+  const [templates, setTemplates] = useState<CertificateTemplate[]>([])
+  const [filteredTemplates, setFilteredTemplates] = useState<CertificateTemplate[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [loading, setLoading] = useState(true)
+  const [deleteLoading, setDeleteLoading] = useState<number | null>(null)
+  const [previewLoading, setPreviewLoading] = useState<number | null>(null)
+  const { toast } = useToast()
+
+  // Load templates on component mount
+  useEffect(() => {
+    loadTemplates()
+  }, [])
+
+  // Filter templates when search term or type filter changes
+  useEffect(() => {
+    let filtered = templates.filter(template =>
+      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    if (typeFilter !== "all") {
+      filtered = filtered.filter(template => template.type === typeFilter)
+    }
+
+    setFilteredTemplates(filtered)
+  }, [templates, searchTerm, typeFilter])
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true)
+      const data = await getAllCertificateTemplates()
+      setTemplates(data)
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load certificate templates",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
   }
-  
+
+  const handleDelete = async (templateId: number) => {
+    try {
+      setDeleteLoading(templateId)
+      await deleteCertificateTemplate(templateId)
+
+      // Remove from local state
+      setTemplates(prev => prev.filter(t => t.id !== templateId))
+
+      toast({
+        title: "Success",
+        description: "Certificate template deleted successfully"
+      })
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete certificate template",
+        variant: "destructive"
+      })
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  const handleDuplicate = async (template: CertificateTemplate) => {
+    try {
+      const newName = `${template.name} (Copy)`
+      const duplicatedTemplate = await duplicateCertificateTemplate(template.id, newName)
+
+      // Add to local state
+      setTemplates(prev => [duplicatedTemplate, ...prev])
+
+      toast({
+        title: "Success",
+        description: "Certificate template duplicated successfully"
+      })
+    } catch (error) {
+      console.error('Error duplicating template:', error)
+      toast({
+        title: "Error",
+        description: "Failed to duplicate certificate template",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handlePreview = async (template: CertificateTemplate) => {
+    try {
+      setPreviewLoading(template.id)
+
+      // Generate sample certificate data for preview
+      const sampleData = {
+        participant_name: "John Doe",
+        event_name: "Baby Crawling Championship 2024",
+        event_date: new Date().toLocaleDateString(),
+        venue_name: "Community Center Hall",
+        city_name: "Mumbai",
+        certificate_number: "CERT-001",
+        position: "1st Place",
+        score: "95 points",
+        achievement: "Outstanding Performance",
+        instructor: "Ms. Sarah Johnson",
+        organization: "Nibog Events"
+      }
+
+      await generateCertificatePreview(template, sampleData)
+
+      toast({
+        title: "Preview Generated",
+        description: "Certificate preview opened in new window"
+      })
+    } catch (error) {
+      console.error('Error generating preview:', error)
+      toast({
+        title: "Error",
+        description: "Failed to generate certificate preview",
+        variant: "destructive"
+      })
+    } finally {
+      setPreviewLoading(null)
+    }
+  }
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'participation':
+        return 'bg-blue-100 text-blue-800'
+      case 'winner':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'event_specific':
+        return 'bg-green-100 text-green-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Certificate Templates</h1>
+            <p className="text-muted-foreground">Manage certificate templates for NIBOG events</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/admin/events">
+                <Download className="mr-2 h-4 w-4" />
+                Generate for Events
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/admin/certificate-templates/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Template
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Loading templates...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -86,31 +229,52 @@ export default function CertificateTemplatesPage() {
           <h1 className="text-3xl font-bold tracking-tight">Certificate Templates</h1>
           <p className="text-muted-foreground">Manage certificate templates for NIBOG events</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/certificate-templates/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Template
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/events">
+              <Download className="mr-2 h-4 w-4" />
+              Generate for Events
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/certificate-templates/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Template
+            </Link>
+          </Button>
+        </div>
       </div>
-      
+
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              className="h-9 w-full md:w-[300px]"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="flex items-center gap-2 flex-1">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search templates..."
+                className="h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="participation">Participation</SelectItem>
+                <SelectItem value="winner">Winner</SelectItem>
+                <SelectItem value="event_specific">Event Specific</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
-          <CardTitle>All Certificate Templates</CardTitle>
+          <CardTitle>Certificate Templates</CardTitle>
           <CardDescription>
             {filteredTemplates.length} template{filteredTemplates.length !== 1 ? 's' : ''} found
           </CardDescription>
@@ -121,8 +285,9 @@ export default function CertificateTemplatesPage() {
               <TableRow>
                 <TableHead>Preview</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Last Updated</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -131,34 +296,112 @@ export default function CertificateTemplatesPage() {
                 <TableRow key={template.id}>
                   <TableCell>
                     <div className="relative h-16 w-24 overflow-hidden rounded-md border">
-                      {/* In a real app, use actual thumbnail images */}
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                        <span className="text-xs text-muted-foreground">Preview</span>
+                      {(() => {
+                        // Handle new background_style options
+                        if (template.background_style?.type === 'image') {
+                          const imageUrl = template.background_style.image_url || template.background_image;
+                          if (imageUrl) {
+                            return (
+                              <img
+                                src={imageUrl.startsWith('http') ? imageUrl : `${window.location.origin}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`}
+                                alt={template.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            );
+                          }
+                        } else if (template.background_style?.type === 'solid' && template.background_style.solid_color) {
+                          return (
+                            <div
+                              className="h-full w-full"
+                              style={{ backgroundColor: template.background_style.solid_color }}
+                            />
+                          );
+                        } else if (template.background_style?.type === 'gradient' && template.background_style.gradient_colors?.length === 2) {
+                          return (
+                            <div
+                              className="h-full w-full"
+                              style={{
+                                background: `linear-gradient(135deg, ${template.background_style.gradient_colors[0]}, ${template.background_style.gradient_colors[1]})`
+                              }}
+                            />
+                          );
+                        } else if (template.background_image) {
+                          // Legacy background image support
+                          return (
+                            <img
+                              src={template.background_image.startsWith('http') ? template.background_image : `${window.location.origin}${template.background_image.startsWith('/') ? '' : '/'}${template.background_image}`}
+                              alt={template.name}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          );
+                        }
+                        return null;
+                      })()}
+                      <div className={`absolute inset-0 flex items-center justify-center bg-muted ${
+                        (template.background_style?.type === 'image' && (template.background_style.image_url || template.background_image)) ||
+                        template.background_style?.type === 'solid' ||
+                        template.background_style?.type === 'gradient' ||
+                        template.background_image ? 'hidden' : ''
+                      }`}>
+                        <FileText className="h-6 w-6 text-muted-foreground" />
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">
-                    <Link href={`/admin/certificate-templates/${template.id}`} className="hover:underline">
+                    <Link href={`/admin/certificate-templates/${template.id}/edit`} className="hover:underline">
                       {template.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{template.description}</TableCell>
                   <TableCell>
-                    {new Date(template.updatedAt).toLocaleDateString()}
+                    <Badge className={getTypeColor(template.type)}>
+                      {template.type.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {template.description}
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(template.created_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePreview(template)}
+                        disabled={previewLoading === template.id}
+                        title="Preview Certificate"
+                      >
+                        {previewLoading === template.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">Preview</span>
+                      </Button>
                       <Button variant="outline" size="icon" asChild>
                         <Link href={`/admin/certificate-templates/${template.id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
                         </Link>
                       </Button>
-                      <Button variant="outline" size="icon" asChild>
-                        <Link href={`/admin/certificate-templates/${template.id}/duplicate`}>
-                          <Copy className="h-4 w-4" />
-                          <span className="sr-only">Duplicate</span>
-                        </Link>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleDuplicate(template)}
+                      >
+                        <Copy className="h-4 w-4" />
+                        <span className="sr-only">Duplicate</span>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -177,11 +420,18 @@ export default function CertificateTemplatesPage() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDeleteTemplate(template.id)}
-                              disabled={isDeleting === template.id}
+                              onClick={() => handleDelete(template.id)}
+                              disabled={deleteLoading === template.id}
                               className="bg-red-500 hover:bg-red-600"
                             >
-                              {isDeleting === template.id ? "Deleting..." : "Delete"}
+                              {deleteLoading === template.id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                "Delete"
+                              )}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -190,11 +440,26 @@ export default function CertificateTemplatesPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              
+
               {filteredTemplates.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
-                    No certificate templates found.
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <FileText className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-muted-foreground">
+                        {searchTerm || typeFilter !== "all"
+                          ? "No templates match your search criteria"
+                          : "No certificate templates found"
+                        }
+                      </p>
+                      {(!searchTerm && typeFilter === "all") && (
+                        <Button asChild variant="outline">
+                          <Link href="/admin/certificate-templates/new">
+                            Create your first template
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               )}

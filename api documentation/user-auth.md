@@ -1,3 +1,5 @@
+## user auth register
+
 POST https://ai.alviongs.com/webhook/v1/nibog/user/register
 
 payload
@@ -35,8 +37,7 @@ response
     }
 ]
 
-
-
+## user auth login
 
 POST https://ai.alviongs.com/webhook/v1/nibog/user/login
 
@@ -86,12 +87,7 @@ if login failed
 
 []
 
-
-
-
-
-
-
+## get all users
 
 GET https://ai.alviongs.com/webhook/v1/nibog/user/get-all
 
@@ -142,10 +138,7 @@ response
   }
 ]
 
-
-
-
-
+## delete user
 
 POST https://ai.alviongs.com/webhook/v1/nibog/user/delete
 
@@ -164,8 +157,7 @@ response
   }
 ]
 
-
-
+## update user
 
 POST https://ai.alviongs.com/webhook/v1/nibog/user/edit
 

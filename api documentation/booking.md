@@ -1,79 +1,69 @@
-Create booking 
+## create booking 
 
 POST https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create
 
 payload
 
 {
+  "user_id": 4,
   "parent": {
-    "user_id": 4,
-    "parent_name": "John Doe",
-    "email": "johndoe@example.com",
+    "parent_name": "Sarah Johnson",
+    "email": "sarah@example.com",
     "additional_phone": "+916303727148"
   },
-  "children": 
-    {
-      "full_name": "Alice Doe",
-      "date_of_birth": "2018-05-12",
-      "school_name": "Little Stars Academy",
-      "gender": "Female"
-    },
+  "child": {
+    "full_name": "Emma Johnson",
+    "date_of_birth": "2020-05-12",
+    "school_name": "Little Stars Academy",
+    "gender": "Female"
+  },
   "booking": {
-    "user_id": 4,
     "event_id": 11,
-    "total_amount": 120.00,
-    "payment_method": "Credit Card",
-    "payment_status": "Paid",
+    "total_amount": 1240.50,
+    "payment_method": "PhonePe",
+    "payment_status": "successful",
     "terms_accepted": true
   },
-  "booking_games": 
+  "booking_games": [
     {
       "game_id": 2,
-      "child_index": 0,
-      "game_price": 60.00
+      "game_price": 590
+    },
+    {
+      "game_id": 4,
+      "game_price": 450
     }
+  ],
+  "booking_addons": [
+    {
+      "addon_id": 6,
+      "variants": [
+        { "variant_id": 4, "quantity": 2 },
+        { "variant_id": 5, "quantity": 1 }
+      ]
+    },
+    {
+      "addon_id": 2,
+      "quantity": 2
+    }
+  ],
+  "promo_code": "NIBOG25UP"
 }
 
+Response
 
-response
+{
+  success: true,
+  message: "Booking created successfully",
+  booking_id: 31
+}
 
-[
-    {
-        "booking_game_id": 4,
-        "booking_id": 4,
-        "child_id": 7,
-        "game_id": 2,
-        "game_price": "60.00",
-        "attendance_status": "Registered",
-        "is_active": true,
-        "created_at": "2025-05-07T18:41:35.185Z"
-    }
-]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## get all bookings
 
 GET https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all
 
 
 response
-
-
 
 [
     {
@@ -222,7 +212,38 @@ response
     }
 ]
 
+## update booking status
 
+POST https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update-status
+
+payload
+
+{
+    "booking_id": 2,
+    "status": "Confirmed"
+}
+
+response
+
+[
+  {
+    "booking_id": 2,
+    "booking_ref": "nibog",
+    "user_id": 4,
+    "parent_id": 5,
+    "event_id": 11,
+    "status": "Confirmed",
+    "total_amount": "120.00",
+    "payment_method": "Credit Card",
+    "payment_status": "Paid",
+    "terms_accepted": true,
+    "is_active": true,
+    "created_at": "2025-05-07T17:20:17.060Z",
+    "updated_at": "2025-06-13T15:36:41.455Z",
+    "cancelled_at": null,
+    "completed_at": null
+  }
+]
 
 
 

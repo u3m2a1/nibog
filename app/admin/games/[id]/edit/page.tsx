@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -18,14 +18,16 @@ import { getBabyGameById, updateBabyGame } from "@/services/babyGameService"
 import { useToast } from "@/components/ui/use-toast"
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function EditGameTemplate({ params }: Props) {
   const router = useRouter()
   const { toast } = useToast()
 
-  const gameId = parseInt(params.id, 10)
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params)
+  const gameId = parseInt(resolvedParams.id, 10)
 
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -52,37 +54,34 @@ export default function EditGameTemplate({ params }: Props) {
 
         // Validate gameId
         if (isNaN(gameId) || gameId <= 0) {
-          setError(`Invalid game ID: ${params.id}. ID must be a positive number.`)
+          const errorMsg = `Invalid game ID: ${resolvedParams.id}. ID must be a positive number.`
+          setError(errorMsg)
           setIsLoading(false)
           return
         }
 
-        console.log(`Fetching game data for ID: ${gameId}`)
         const gameData = await getBabyGameById(gameId)
-        console.log("Game data received:", gameData)
 
         if (!gameData) {
           throw new Error("No game data returned from API")
         }
 
         setGame(gameData)
-
-        // Set form values
         setName(gameData.game_name || "")
         setDescription(gameData.description || "")
         setMinAge(gameData.min_age || 0)
-        setMaxAge(gameData.max_age || 36)
+        setMaxAge(gameData.max_age || 90)
         setDuration(gameData.duration_minutes || 60)
         setIsActive(gameData.is_active || false)
         setCategories(gameData.categories || [])
 
       } catch (error: any) {
-        console.error("Failed to fetch game data:", error)
-        setError(error.message || "Failed to load game data. Please try again.")
+        const errorMsg = error.message || "Failed to load game data. Please try again."
+        setError(errorMsg)
 
         toast({
           title: "Error",
-          description: error.message || "Failed to load game data",
+          description: errorMsg,
           variant: "destructive",
         })
       } finally {
@@ -91,7 +90,7 @@ export default function EditGameTemplate({ params }: Props) {
     }
 
     fetchGameData()
-  }, [gameId, params.id, toast])
+  }, [gameId, resolvedParams.id]) // Removed toast from dependency array to prevent infinite loop
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
@@ -127,19 +126,15 @@ export default function EditGameTemplate({ params }: Props) {
         id: gameId,
         game_name: name,
         description: description,
-        min_age: minAge,
-        max_age: maxAge,
+        min_age_months: minAge,    // API expects min_age_months
+        max_age_months: maxAge,    // API expects max_age_months
         duration_minutes: duration,
         categories: categories,
         is_active: isActive,
       }
 
-      console.log("Submitting game data:", gameData)
-
       // Call the API to update the game
       const result = await updateBabyGame(gameData)
-
-      console.log("Game updated successfully:", result)
 
       // Show success message
       toast({
@@ -157,7 +152,6 @@ export default function EditGameTemplate({ params }: Props) {
       }, 1500)
 
     } catch (error: any) {
-      console.error("Error updating game:", error)
       setError(error.message || "Failed to update game. Please try again.")
 
       toast({
@@ -269,7 +263,7 @@ export default function EditGameTemplate({ params }: Props) {
                     <Slider
                       value={[minAge, maxAge]}
                       min={0}
-                      max={84}
+                      max={90}
                       step={1}
                       onValueChange={(value) => {
                         setMinAge(value[0])
@@ -320,7 +314,7 @@ export default function EditGameTemplate({ params }: Props) {
                 </Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {categories.map((category) => (
+                {categories.map((category: string) => (
                   <Badge key={category} variant="secondary">
                     {category}
                     <button

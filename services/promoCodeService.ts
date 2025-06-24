@@ -25,6 +25,79 @@ export interface CreatePromoCodeResponse {
   error?: string;
 }
 
+export interface UpdatePromoCodeRequest {
+  id: number;
+  promo_code: string;
+  type: "percentage" | "fixed";
+  value: number;
+  valid_from: string;
+  valid_to: string;
+  usage_limit: number;
+  usage_count?: number;
+  minimum_purchase_amount: number;
+  maximum_discount_amount?: number;
+  description?: string;
+  applicable_events: number[];
+  applicable_games: number[];
+}
+
+export interface UpdatePromoCodeResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  error?: string;
+}
+
+export interface DeletePromoCodeResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  error?: string;
+}
+
+export interface PromoCodeDetail {
+  id: number;
+  promo_code: string;
+  type: "percentage" | "fixed";
+  value: number;
+  valid_from: string;
+  valid_to: string;
+  usage_limit: number;
+  usage_count: number;
+  minimum_purchase_amount: number;
+  maximum_discount_amount?: number;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  promo_data?: {
+    events: Array<{
+      event_id: number;
+      event_title: string;
+      games: Array<{
+        game_id: number;
+        game_title: string;
+      }>;
+    }>;
+    games: Array<{
+      game_id: number;
+      game_title: string;
+    }>;
+    promo_details: {
+      id: number;
+      promo_code: string;
+      type: string;
+      value: number;
+      valid_from: string;
+      valid_to: string;
+      usage_limit: number;
+      usage_count: number;
+      minimum_purchase_amount: number;
+      maximum_discount_amount?: number;
+      description?: string;
+    };
+  };
+}
+
 /**
  * Create a new promo code
  * @param promoCodeData The promo code data to create
@@ -45,14 +118,23 @@ export async function createPromoCode(promoCodeData: CreatePromoCodeRequest): Pr
 
     console.log(`Create promo code response status: ${response.status}`);
 
-    const data = await response.json();
-    console.log("Promo code creation response:", data);
-
-    if (!response.ok) {
-      throw new Error(data.error || `API returned error status: ${response.status}`);
+    let data;
+    try {
+      data = await response.json();
+      console.log("Promo code creation response:", data);
+    } catch (parseError) {
+      console.error("Failed to parse response as JSON:", parseError);
+      throw new Error(`Invalid response from server. Status: ${response.status}`);
     }
 
-    return data;
+    // Check if the response indicates success
+    if (response.ok || data.success) {
+      return data;
+    }
+
+    // If we get here, there was an error
+    const errorMessage = data.error || data.message || `API returned error status: ${response.status}`;
+    throw new Error(errorMessage);
   } catch (error: any) {
     console.error("Error creating promo code:", error);
     throw error;
@@ -143,6 +225,480 @@ export function transformFormDataToAPI(
   console.log("=============================");
 
   return apiData;
+}
+
+/**
+ * Transform form data to update API format
+ * @param formData Form data from the UI
+ * @param selectedEvents Selected event IDs
+ * @param selectedGames Selected game IDs in format "eventId-gameId"
+ * @param applyToAll Whether to apply to all events
+ * @param allEvents All available events
+ * @returns Transformed data for update API
+ */
+export function transformFormDataToUpdateAPI(
+  formData: {
+    code: string;
+    discount: string;
+    discountType: string;
+    maxDiscount: string;
+    minPurchase: string;
+    validFrom: string;
+    validTo: string;
+    usageLimit: string;
+    description: string;
+  },
+  selectedEvents: string[],
+  selectedGames: string[],
+  applyToAll: boolean,
+  allEvents: Array<{id: string, name: string, games: Array<{id: string, name: string}>}>,
+  usageCount: number = 0
+): Omit<UpdatePromoCodeRequest, 'id'> {
+
+  // Transform dates to YYYY-MM-DD format (not ISO for update API)
+  const validFrom = formData.validFrom;
+  const validTo = formData.validTo;
+
+  // Prepare applicable_events and applicable_games arrays
+  let applicableEvents: number[] = [];
+  let applicableGames: number[] = [];
+
+  if (applyToAll) {
+    // If apply to all, include all event IDs
+    applicableEvents = allEvents.map(event => parseInt(event.id));
+    // Include all game IDs
+    applicableGames = allEvents.flatMap(event =>
+      event.games.map(game => parseInt(game.id))
+    );
+  } else {
+    // If specific events selected, use those
+    applicableEvents = selectedEvents.map(eventId => parseInt(eventId));
+
+    // Get games for selected events from selectedGames
+    applicableGames = selectedGames.map(gameId => {
+      const parts = gameId.split('-');
+      // The second part should be the actual game_id from the API
+      return parseInt(parts[1]);
+    }).filter(gameId => !isNaN(gameId));
+  }
+
+  const updateData: Omit<UpdatePromoCodeRequest, 'id'> = {
+    promo_code: formData.code,
+    type: formData.discountType as "percentage" | "fixed",
+    value: parseFloat(formData.discount),
+    valid_from: validFrom,
+    valid_to: validTo,
+    usage_limit: parseInt(formData.usageLimit),
+    usage_count: usageCount,
+    minimum_purchase_amount: parseFloat(formData.minPurchase),
+    maximum_discount_amount: formData.maxDiscount ? parseFloat(formData.maxDiscount) : undefined,
+    description: formData.description || "",
+    applicable_events: applicableEvents,
+    applicable_games: applicableGames
+  };
+
+  console.log("=== UPDATE TRANSFORMATION DEBUG ===");
+  console.log("Selected Events:", selectedEvents);
+  console.log("Selected Games:", selectedGames);
+  console.log("Apply to All:", applyToAll);
+  console.log("Applicable Events:", applicableEvents);
+  console.log("Applicable Games:", applicableGames);
+  console.log("Final Update Data:", updateData);
+  console.log("====================================");
+
+  return updateData;
+}
+
+/**
+ * Get promo code by ID
+ * @param id Promo code ID
+ * @returns Promo code details
+ */
+export async function getPromoCodeById(id: number): Promise<PromoCodeDetail> {
+  console.log(`Fetching promo code with ID: ${id}`);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/promo-codes/get', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    console.log(`Get promo code response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Retrieved promo code:", data);
+
+    // The API returns an array with a single promo code, so we need to extract it
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    } else if (!Array.isArray(data)) {
+      return data;
+    }
+
+    throw new Error("Promo code not found");
+  } catch (error) {
+    console.error("Error fetching promo code:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update promo code
+ * @param promoCodeData Promo code data to update
+ * @returns Update response
+ */
+export async function updatePromoCode(promoCodeData: UpdatePromoCodeRequest): Promise<UpdatePromoCodeResponse> {
+  console.log("Updating promo code:", promoCodeData);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/promo-codes/update', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(promoCodeData),
+    });
+
+    console.log(`Update promo code response status: ${response.status}`);
+
+    let data;
+    try {
+      data = await response.json();
+      console.log("Promo code update response:", data);
+    } catch (parseError) {
+      console.error("Failed to parse response as JSON:", parseError);
+      throw new Error(`Invalid response from server. Status: ${response.status}`);
+    }
+
+    // Check if the response indicates success
+    if (response.ok || data.success) {
+      return data;
+    }
+
+    throw new Error(data.error || `Update failed with status: ${response.status}`);
+  } catch (error) {
+    console.error("Error updating promo code:", error);
+    throw error;
+  }
+}
+
+/**
+ * Transform API data to form format for editing
+ * @param apiData Promo code data from API
+ * @returns Form data for editing
+ */
+export function transformAPIDataToForm(apiData: PromoCodeDetail) {
+  // Format dates to YYYY-MM-DD format for date inputs
+  const formatDateForInput = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return dateString;
+    }
+  };
+
+  // Extract events and games from promo_data if available
+  let selectedEvents: string[] = [];
+  let selectedGames: string[] = [];
+  let applyToAll = false;
+
+  if (apiData.promo_data?.events) {
+    selectedEvents = apiData.promo_data.events.map(event => event.event_id.toString());
+
+    // Extract games in the format "eventId-gameId"
+    apiData.promo_data.events.forEach(event => {
+      event.games.forEach(game => {
+        selectedGames.push(`${event.event_id}-${game.game_id}`);
+      });
+    });
+  }
+
+  // If no specific events are selected, assume apply to all
+  if (selectedEvents.length === 0) {
+    applyToAll = true;
+  }
+
+  return {
+    formData: {
+      code: apiData.promo_code,
+      discount: apiData.value.toString(),
+      discountType: apiData.type,
+      maxDiscount: apiData.maximum_discount_amount ? apiData.maximum_discount_amount.toString() : "",
+      minPurchase: apiData.minimum_purchase_amount.toString(),
+      validFrom: formatDateForInput(apiData.valid_from),
+      validTo: formatDateForInput(apiData.valid_to),
+      usageLimit: apiData.usage_limit.toString(),
+      description: apiData.description || ""
+    },
+    selectedEvents,
+    selectedGames,
+    applyToAll,
+    usageCount: apiData.usage_count || 0
+  };
+}
+
+/**
+ * Delete promo code by ID
+ * @param id Promo code ID
+ * @returns Delete response
+ */
+export async function deletePromoCode(id: number): Promise<DeletePromoCodeResponse> {
+  console.log(`Deleting promo code with ID: ${id}`);
+
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/promo-codes/delete', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    console.log(`Delete promo code response status: ${response.status}`);
+
+    let data;
+    try {
+      data = await response.json();
+      console.log("Promo code delete response:", data);
+    } catch (parseError) {
+      console.error("Failed to parse response as JSON:", parseError);
+      throw new Error(`Invalid response from server. Status: ${response.status}`);
+    }
+
+    // Check if the response indicates success
+    if (response.ok || data.success) {
+      return data;
+    }
+
+    throw new Error(data.error || `Delete failed with status: ${response.status}`);
+  } catch (error) {
+    console.error("Error deleting promo code:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get promo codes by event ID and game IDs for booking creation
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @returns Array of promo codes
+ */
+export async function getPromoCodesByEventAndGames(eventId: number, gameIds: number[]): Promise<PromoCodeDetail[]> {
+  try {
+    const response = await fetch('/api/promo-codes/get-by-event-games', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        event_id: eventId,
+        game_ids: gameIds
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Get all active promo codes for booking creation
+ * @returns Array of active promo codes
+ */
+export async function getAllActivePromoCodes(): Promise<PromoCodeDetail[]> {
+  console.log("Fetching all active promo codes");
+
+  try {
+    const response = await fetch('/api/promo-codes/get-all', {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log(`Get all promo codes response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response: ${errorText}`);
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Retrieved all promo codes:", data);
+
+    // Filter only active promo codes
+    const activePromoCodes = Array.isArray(data) ? data.filter((promo: any) => promo.is_active !== false) : [];
+    return activePromoCodes;
+  } catch (error) {
+    console.error("Error fetching all promo codes:", error);
+    throw error;
+  }
+}
+
+/**
+ * Preview promo code validation (without incrementing usage)
+ * @param promoCode Promo code string
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @param amount Original amount
+ * @returns Preview validation result
+ */
+export async function validatePromoCodePreview(
+  promoCode: string,
+  eventId: number,
+  gameIds: number[],
+  amount: number
+): Promise<{ isValid: boolean; discountAmount: number; finalAmount: number; message: string }> {
+  try {
+    const response = await fetch('/api/promo-codes/validate-preview', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code: promoCode,
+        event_id: eventId,
+        game_ids: gameIds,
+        amount: amount
+      }),
+    });
+
+    if (!response.ok) {
+      return {
+        isValid: false,
+        discountAmount: 0,
+        finalAmount: amount,
+        message: "Failed to validate promo code"
+      };
+    }
+
+    const data = await response.json();
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      isValid: result.is_valid || false,
+      discountAmount: parseFloat(result.discount_amount) || 0,
+      finalAmount: parseFloat(result.final_amount) || amount,
+      message: result.message || "Validation completed"
+    };
+  } catch (error) {
+    return {
+      isValid: false,
+      discountAmount: 0,
+      finalAmount: amount,
+      message: "Failed to validate promo code"
+    };
+  }
+}
+
+/**
+ * Final promo code validation (with usage increment)
+ * @param promoCode Promo code string
+ * @param eventId Event ID
+ * @param gameIds Array of game IDs
+ * @param amount Original amount
+ * @returns Final validation result with promo details
+ */
+export async function validatePromoCodeFinal(
+  promoCode: string,
+  eventId: number,
+  gameIds: number[],
+  amount: number
+): Promise<{
+  isValid: boolean;
+  discountAmount: number;
+  finalAmount: number;
+  message: string;
+  promoCodeId?: number;
+  promoCode?: string;
+}> {
+  try {
+    const response = await fetch('/api/promo-codes/validate-final', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code: promoCode,
+        event_id: eventId,
+        game_ids: gameIds,
+        amount: amount
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Promo code validation failed: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      isValid: result.is_valid || false,
+      discountAmount: parseFloat(result.discount_amount) || 0,
+      finalAmount: parseFloat(result.final_amount) || amount,
+      message: result.message || "Validation completed",
+      promoCodeId: result.promo_id || result.promo_details?.id,
+      promoCode: promoCode
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Rollback promo code usage count
+ * @param promoCodeId Promo code ID to rollback
+ * @returns Rollback result
+ */
+export async function rollbackPromoCodeUsage(promoCodeId: number): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await fetch('/api/promo-codes/rollback-usage', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        promo_code_id: promoCodeId,
+        reason: "booking_failed"
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to rollback promo code usage: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success || false,
+      message: data.message || "Rollback completed"
+    };
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**

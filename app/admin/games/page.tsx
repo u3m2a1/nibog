@@ -32,14 +32,16 @@ export default function GameTemplatesPage() {
       try {
         setIsLoading(true)
         setError(null)
+
         const data = await getAllBabyGames()
+
         setGames(data)
       } catch (err: any) {
-        console.error("Error fetching games:", err)
-        setError(err.message || "Failed to fetch games")
+        const errorMsg = err.message || "Failed to fetch games"
+        setError(errorMsg)
         toast({
           title: "Error",
-          description: err.message || "Failed to fetch games",
+          description: errorMsg,
           variant: "destructive",
         })
       } finally {
@@ -60,7 +62,6 @@ export default function GameTemplatesPage() {
         variant: "default",
       })
     } catch (err: any) {
-      console.error("Error deleting game:", err)
       toast({
         title: "Error",
         description: err.message || "Failed to delete game",
@@ -76,10 +77,10 @@ export default function GameTemplatesPage() {
           <p className="text-muted-foreground">Manage baby games for NIBOG Olympic events</p>
         </div>
         <Button asChild>
-          <a href="/admin/games/new">
+          <Link href="/admin/games/new">
             <Plus className="mr-2 h-4 w-4" />
             Add New Baby Game
-          </a>
+          </Link>
         </Button>
       </div>
 
@@ -103,10 +104,10 @@ export default function GameTemplatesPage() {
         <div className="rounded-md border p-8 text-center">
           <p className="text-muted-foreground mb-4">No games found</p>
           <Button asChild>
-            <a href="/admin/games/new">
+            <Link href="/admin/games/new">
               <Plus className="mr-2 h-4 w-4" />
               Add Your First Game
-            </a>
+            </Link>
           </Button>
         </div>
       ) : (
@@ -115,6 +116,7 @@ export default function GameTemplatesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Age Range</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Categories</TableHead>
@@ -126,6 +128,11 @@ export default function GameTemplatesPage() {
               {games.map((game) => (
                 <TableRow key={game.id}>
                   <TableCell className="font-medium">{game.game_name}</TableCell>
+                  <TableCell className="max-w-xs">
+                    <div className="truncate" title={game.description || "No description"}>
+                      {game.description || "No description"}
+                    </div>
+                  </TableCell>
                   <TableCell>{game.min_age} - {game.max_age} months</TableCell>
                   <TableCell>{game.duration_minutes} minutes</TableCell>
                   <TableCell>
@@ -147,16 +154,16 @@ export default function GameTemplatesPage() {
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
-                        <a href={`/admin/games/${game.id}`}>
+                        <Link href={`/admin/games/${game.id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View</span>
-                        </a>
+                        </Link>
                       </Button>
                       <Button variant="ghost" size="icon" asChild>
-                        <a href={`/admin/games/${game.id}/edit`}>
+                        <Link href={`/admin/games/${game.id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
-                        </a>
+                        </Link>
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

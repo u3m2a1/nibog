@@ -177,6 +177,8 @@ export type AddOnVariant = {
   id: string
   name: string
   price: number
+  price_modifier?: number // Additional price to add to base price
+  addon_id?: number // Reference to parent add-on
   attributes: Record<string, string> // e.g., { size: "M", color: "Red" }
   stockQuantity: number
   sku: string
@@ -228,4 +230,22 @@ export type BabyGame = {
   is_active: boolean
   created_at?: string
   updated_at?: string
+}
+
+// Event list item for display in UI components and SWR integration
+export type EventListItem = {
+  id: string
+  title: string
+  description: string
+  minAgeMonths: number
+  maxAgeMonths: number
+  date: string
+  time: string
+  venue: string
+  city: string
+  price: number
+  image: string
+  spotsLeft: number
+  totalSpots: number
+  isOlympics?: boolean
 }

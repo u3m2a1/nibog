@@ -1,32 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft } from "lucide-react"
-import { TimePickerDemo } from "@/components/time-picker"
-
-// Mock data - in a real app, this would come from an API
-const events = [
-  {
-    id: "E001",
-    title: "Baby Sensory Play",
-    venue: {
-      name: "Little Explorers Center",
-      city: "Mumbai",
-    },
-    date: "2025-04-15",
-    gameTemplate: {
-      suggestedPrice: 799,
-      durationMinutes: 90,
-    },
-  },
-]
+import { ArrowLeft, Plus, Loader2 } from "lucide-react"
+import { getEventWithGames, createEventGameSlot } from "@/services/eventService"
+import { getAllBabyGames, type BabyGame } from "@/services/babyGameService"
+import { useToast } from "@/hooks/use-toast"
+import { TruncatedText } from "@/components/ui/truncated-text"
 
 type Props = {
   params: { id: string }
@@ -34,170 +21,304 @@ type Props = {
 
 export default function NewSlotPage({ params }: Props) {
   const router = useRouter()
-  const event = events.find((e) => e.id === params.id)
-  
-  const [startTime, setStartTime] = useState<Date | undefined>(new Date())
-  const [endTime, setEndTime] = useState<Date | undefined>(new Date())
-  const [price, setPrice] = useState(event?.gameTemplate.suggestedPrice || 799)
-  const [maxParticipants, setMaxParticipants] = useState(12)
-  const [status, setStatus] = useState("active")
+  const { toast } = useToast()
+  const eventId = params.id
 
-  if (!event) {
+  // State for event and games data
+  const [event, setEvent] = useState<any>(null)
+  const [availableGames, setAvailableGames] = useState<BabyGame[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Form state
+  const [formData, setFormData] = useState({
+    gameId: "",
+    customTitle: "",
+    customDescription: "",
+    customPrice: "",
+    startTime: "",
+    endTime: "",
+    slotPrice: "",
+    maxParticipants: "12"
+  })
+
+  // Fetch event and games data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const [eventData, gamesData] = await Promise.all([
+          getEventWithGames(eventId),
+          getAllBabyGames()
+        ])
+
+        setEvent(eventData)
+        setAvailableGames(gamesData)
+      } catch (err: any) {
+        setError(err.message || "Failed to load data")
+        toast({
+          title: "Error",
+          description: err.message || "Failed to load data",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [eventId, toast])
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !event) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Event Not Found</h2>
-          <p className="text-muted-foreground">The event you're looking for doesn't exist or has been removed.</p>
+          <h2 className="text-2xl font-bold">Error</h2>
+          <p className="text-muted-foreground">
+            {error || "Failed to load event data"}
+          </p>
           <Button className="mt-4" asChild>
-            <Link href="/admin/events">Back to Events</Link>
+            <Link href={`/admin/events/${eventId}/slots`}>Back to Slots</Link>
           </Button>
         </div>
       </div>
     )
   }
 
-  // Initialize end time based on start time and duration
-  const initializeEndTime = (start: Date) => {
-    const end = new Date(start)
-    end.setMinutes(end.getMinutes() + (event?.gameTemplate.durationMinutes || 90))
-    setEndTime(end)
-  }
-
-  // Handle start time change
-  const handleStartTimeChange = (time: Date | undefined) => {
-    setStartTime(time)
-    if (time) {
-      initializeEndTime(time)
-    }
-  }
-
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Validate form
-    if (!startTime || !endTime) {
-      alert("Please select start and end times.")
+
+    // Basic validation
+    if (!formData.gameId || !formData.startTime || !formData.endTime || !formData.maxParticipants) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
       return
     }
-    
-    if (startTime >= endTime) {
-      alert("End time must be after start time.")
+
+    // Validate time
+    if (formData.startTime >= formData.endTime) {
+      toast({
+        title: "Validation Error",
+        description: "End time must be after start time",
+        variant: "destructive",
+      })
       return
     }
-    
-    if (price <= 0) {
-      alert("Price must be greater than zero.")
-      return
+
+    setIsSubmitting(true)
+
+    try {
+      // Prepare the slot data for the API
+      const slotData = {
+        event_id: Number(eventId),
+        game_id: Number(formData.gameId),
+        custom_title: formData.customTitle || "",
+        custom_description: formData.customDescription || "",
+        custom_price: formData.customPrice ? Number(formData.customPrice) : 0,
+        start_time: formData.startTime + ":00", // Add seconds format
+        end_time: formData.endTime + ":00", // Add seconds format
+        slot_price: formData.slotPrice ? Number(formData.slotPrice) : 0,
+        max_participants: Number(formData.maxParticipants)
+      }
+
+      console.log("Creating slot with data:", slotData)
+
+      // Call the API to create the slot
+      const result = await createEventGameSlot(slotData)
+
+      console.log("Slot created successfully:", result)
+
+      toast({
+        title: "Success",
+        description: "Game slot created successfully",
+      })
+
+      // Navigate back to slots page
+      router.push(`/admin/events/${eventId}/slots`)
+    } catch (err: any) {
+      console.error("Error creating slot:", err)
+      toast({
+        title: "Error",
+        description: err.message || "Failed to create slot",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
-    
-    if (maxParticipants <= 0) {
-      alert("Maximum participants must be greater than zero.")
-      return
-    }
-    
-    // In a real app, this would be an API call to create the slot
-    console.log({
-      eventId: params.id,
-      startTime: startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
-      endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }),
-      price,
-      maxParticipants,
-      status,
-    })
-    
-    // Redirect to event slots page
-    router.push(`/admin/events/${params.id}/slots`)
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" asChild>
-          <Link href={`/admin/events/${params.id}/slots`}>
+          <Link href={`/admin/events/${eventId}/slots`}>
             <ArrowLeft className="h-4 w-4" />
             <span className="sr-only">Back</span>
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add New Time Slot</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Add New Game Slot</h1>
           <p className="text-muted-foreground">
-            {event.title} | {event.venue.name}, {event.venue.city} | {event.date}
+            {event.event_title} | {event.venue?.venue_name}, {event.city?.city_name}
           </p>
+          {event.event_description && (
+            <div className="mt-1">
+              <TruncatedText
+                text={event.event_description}
+                maxLength={120}
+                className="text-sm text-muted-foreground"
+                showTooltip={true}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Time Slot Details</CardTitle>
-            <CardDescription>Define a new time slot for this event</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Game Slot Details</CardTitle>
+          <CardDescription>Configure the game and time slot settings</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Start Time</Label>
-                <TimePickerDemo
-                  date={startTime}
-                  setDate={handleStartTimeChange}
-                />
+                <Label htmlFor="gameId">Game Template *</Label>
+                <Select value={formData.gameId} onValueChange={(value) => setFormData(prev => ({ ...prev, gameId: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a game template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableGames.map((game) => (
+                      <SelectItem key={game.id || game.game_name} value={game.id?.toString() || ""}>
+                        {game.game_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-2">
-                <Label>End Time</Label>
-                <TimePickerDemo
-                  date={endTime}
-                  setDate={setEndTime}
-                />
-              </div>
-            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="price">Price (₹)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min="0"
-                  value={price}
-                  onChange={(e) => setPrice(parseInt(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Suggested price: ₹{event.gameTemplate.suggestedPrice}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="maxParticipants">Maximum Participants</Label>
+                <Label htmlFor="maxParticipants">Max Participants *</Label>
                 <Input
                   id="maxParticipants"
                   type="number"
                   min="1"
-                  value={maxParticipants}
-                  onChange={(e) => setMaxParticipants(parseInt(e.target.value))}
+                  value={formData.maxParticipants}
+                  onChange={(e) => setFormData(prev => ({ ...prev, maxParticipants: e.target.value }))}
+                  placeholder="e.g., 12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Start Time *</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={formData.startTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="endTime">End Time *</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={formData.endTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="slotPrice">Slot Price (₹)</Label>
+                <Input
+                  id="slotPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.slotPrice}
+                  onChange={(e) => setFormData(prev => ({ ...prev, slotPrice: e.target.value }))}
+                  placeholder="e.g., 799"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customPrice">Custom Price (₹)</Label>
+                <Input
+                  id="customPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.customPrice}
+                  onChange={(e) => setFormData(prev => ({ ...prev, customPrice: e.target.value }))}
+                  placeholder="e.g., 799"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">Initial Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="customTitle">Custom Title</Label>
+              <Input
+                id="customTitle"
+                value={formData.customTitle}
+                onChange={(e) => setFormData(prev => ({ ...prev, customTitle: e.target.value }))}
+                placeholder="Override the default game title"
+              />
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" asChild>
-              <Link href={`/admin/events/${params.id}/slots`}>Cancel</Link>
-            </Button>
-            <Button type="submit">Add Time Slot</Button>
-          </CardFooter>
-        </Card>
-      </form>
+
+            <div className="space-y-2">
+              <Label htmlFor="customDescription">Custom Description</Label>
+              <Textarea
+                id="customDescription"
+                value={formData.customDescription}
+                onChange={(e) => setFormData(prev => ({ ...prev, customDescription: e.target.value }))}
+                placeholder="Override the default game description"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" asChild>
+                <Link href={`/admin/events/${eventId}/slots`}>Cancel</Link>
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Slot
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

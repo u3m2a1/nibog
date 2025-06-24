@@ -17,8 +17,6 @@ export interface City {
  */
 export const getAllCities = async (): Promise<City[]> => {
   try {
-    console.log("Fetching all cities...");
-
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/cities/get-all', {
       method: "GET",
@@ -26,9 +24,6 @@ export const getAllCities = async (): Promise<City[]> => {
         "Content-Type": "application/json",
       },
     });
-
-    // Log the response status for debugging
-    console.log(`Get all cities response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -47,17 +42,14 @@ export const getAllCities = async (): Promise<City[]> => {
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} cities from API`);
 
     // Validate the data structure
     if (!Array.isArray(data)) {
-      console.warn("API did not return an array for cities:", data);
       return [];
     }
 
     return data;
   } catch (error) {
-    console.error("Error fetching cities:", error);
     throw error;
   }
 };
@@ -154,8 +146,8 @@ export const createCity = async (cityData: Omit<City, "id" | "created_at" | "upd
   try {
     console.log("Creating city with data:", cityData);
 
-    // According to the API documentation, we should use POST method with a request body
-    const response = await fetch(CITY_API.CREATE, {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/cities/create', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,18 +159,32 @@ export const createCity = async (cityData: Omit<City, "id" | "created_at" | "upd
     console.log(`Create city response status: ${response.status}`);
 
     if (!response.ok) {
-      throw new Error(`Error creating city: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `Error creating city: ${response.status}`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
     console.log("Create city response data:", data);
 
-    // Validate the data structure
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    // Handle different response formats
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0]; // API returns an array with the created city
+    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return data; // API returns an object with the created city
+    } else {
       throw new Error("API returned invalid data format for city creation");
     }
-
-    return data[0]; // API returns an array with the created city
   } catch (error) {
     console.error("Error creating city:", error);
     throw error;
@@ -214,8 +220,8 @@ export const updateCity = async (cityData: City): Promise<City> => {
 
     console.log("Updating city with normalized data:", normalizedCityData);
 
-    // According to the API documentation, we should use POST method with a request body
-    const response = await fetch(CITY_API.UPDATE, {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/cities/update', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -227,14 +233,19 @@ export const updateCity = async (cityData: City): Promise<City> => {
     console.log(`Update city response status: ${response.status}`);
 
     if (!response.ok) {
-      // Try to get more details about the error
+      const errorText = await response.text();
+      let errorMessage = `Error updating city: ${response.status}`;
+
       try {
-        const errorData = await response.json();
-        console.error("Error response data:", errorData);
-        throw new Error(`Error updating city: ${response.status}. Details: ${JSON.stringify(errorData)}`);
-      } catch (parseError) {
-        throw new Error(`Error updating city: ${response.status}. Could not parse error details.`);
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
       }
+
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -268,79 +279,38 @@ export const deleteCity = async (id: number): Promise<{ success: boolean }> => {
   try {
     console.log(`Attempting to delete city with ID: ${id}`);
 
-    // According to the API documentation, we should use DELETE method with a request body
-    console.log("Using DELETE method with request body as per API documentation...");
-
-    // Make the API call exactly as specified in the documentation
-    const response = await fetch(CITY_API.DELETE, {
-      method: "DELETE", // Use DELETE method as specified
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/cities/delete', {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ id }), // Send ID in the request body
+      body: JSON.stringify({ id }),
     });
 
-    // Log the response status and headers for debugging
-    console.log(`Delete response status: ${response.status}`);
-    console.log(`Delete response status text: ${response.statusText}`);
+    // Log the response status for debugging
+    console.log(`Delete city response status: ${response.status}`);
 
-    // Check if the response is successful
-    if (response.ok) {
-      // Parse the response data
-      const data = await response.json();
-      console.log("Delete response data:", data);
-
-      // Check if the response indicates success
-      if (data && Array.isArray(data) && data.length > 0 && data[0].success === true) {
-        console.log("Delete successful - API confirmed deletion");
-        return { success: true };
-      } else if (data && typeof data === 'object' && data.success === true) {
-        console.log("Delete successful - API confirmed deletion (object format)");
-        return { success: true };
-      } else {
-        console.warn("API response doesn't explicitly confirm success:", data);
-        // If the response is OK but doesn't explicitly confirm success,
-        // we'll assume it was successful
-        return { success: true };
-      }
-    } else {
-      // If the response is not OK, log the error and try a fallback
-      console.error(`Delete request failed with status: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Error deleting city: ${response.status}`;
 
       try {
-        // Try to parse the error response
-        const errorData = await response.json();
-        console.error("Error response data:", errorData);
-      } catch (parseError) {
-        console.error("Could not parse error response:", parseError);
-      }
-
-      // Try a fallback approach with POST method
-      console.log("Trying fallback with POST method...");
-      const fallbackResponse = await fetch(CITY_API.DELETE, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ id }),
-      });
-
-      if (fallbackResponse.ok) {
-        const fallbackData = await fallbackResponse.json();
-        console.log("Fallback delete response data:", fallbackData);
-
-        if (fallbackData && (
-            (Array.isArray(fallbackData) && fallbackData.length > 0 && fallbackData[0].success === true) ||
-            (typeof fallbackData === 'object' && fallbackData.success === true)
-        )) {
-          console.log("Delete successful with fallback approach");
-          return { success: true };
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
         }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
       }
 
-      // If the fallback also fails, throw an error
-      throw new Error(`Failed to delete city with ID ${id}. API returned status: ${response.status}`);
+      throw new Error(errorMessage);
     }
+
+    const data = await response.json();
+    console.log("Delete city response data:", data);
+
+    return { success: true };
   } catch (error) {
     console.error(`Error deleting city with ID ${id}:`, error);
     throw error;

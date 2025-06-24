@@ -10,13 +10,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building, Trash2 } from "lucide-react"
+import { Calendar as CalendarIcon, Plus, Search, Filter, Eye, Edit, Copy, Pause, Play, X, MapPin, Building, Trash2, ChevronLeft, ChevronRight, Clock, Users } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, getDay, startOfWeek, endOfWeek } from "date-fns"
 import { cn } from "@/lib/utils"
-import { getAllEvents, EventListItem, deleteEvent } from "@/services/eventService"
-import { useToast } from "@/components/ui/use-toast"
+import { deleteEvent, updateEvent } from "@/services/eventService"
+import { getAllCities, City } from "@/services/cityService"
+import { getVenuesByCity } from "@/services/venueService"
+import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
+import { useToast } from "@/hooks/use-toast"
+import { TruncatedText } from "@/components/ui/truncated-text"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,144 +32,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
-// Mock data - in a real app, this would come from an API
-const events = [
-  {
-    id: "E001",
-    title: "Baby Crawling",
-    gameTemplate: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S001", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 12, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E002",
-    title: "Baby Walker",
-    gameTemplate: "Baby Walker",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S003", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 15, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E003",
-    title: "Running Race",
-    gameTemplate: "Running Race",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-10-26",
-    slots: [
-      { id: "S004", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 10, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E004",
-    title: "Hurdle Toddle",
-    gameTemplate: "Hurdle Toddle",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    date: "2025-03-16",
-    slots: [
-      { id: "S006", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 20, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E005",
-    title: "Cycle Race",
-    gameTemplate: "Cycle Race",
-    venue: "Sports Complex",
-    city: "Vizag",
-    date: "2025-08-15",
-    slots: [
-      { id: "S008", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 12, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E006",
-    title: "Ring Holding",
-    gameTemplate: "Ring Holding",
-    venue: "Indoor Stadium",
-    city: "Bangalore",
-    date: "2025-10-12",
-    slots: [
-      { id: "S009", time: "9:00 AM - 8:00 PM", capacity: 50, booked: 15, status: "active" },
-    ],
-    status: "draft",
-  },
-  {
-    id: "E007",
-    title: "Baby Gymnastics",
-    gameTemplate: "Baby Gymnastics",
-    venue: "Little Movers Gym",
-    city: "Hyderabad",
-    date: "2025-04-28",
-    slots: [
-      { id: "S010", time: "09:30 AM - 10:30 AM", capacity: 8, booked: 0, status: "active" },
-      { id: "S011", time: "11:00 AM - 12:00 PM", capacity: 8, booked: 0, status: "active" },
-    ],
-    status: "scheduled",
-  },
-  {
-    id: "E008",
-    title: "Toddler Dance Party",
-    gameTemplate: "Toddler Dance",
-    venue: "Rhythm Studio",
-    city: "Delhi",
-    date: "2025-04-30",
-    slots: [
-      { id: "S012", time: "04:00 PM - 05:30 PM", capacity: 15, booked: 0, status: "active" },
-    ],
-    status: "scheduled",
-  },
-]
 
-// Mock cities data
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-  { id: "8", name: "Pune" },
-  { id: "9", name: "Patna" },
-  { id: "10", name: "Ranchi" },
-]
-
-// Mock venues data
-const venues = [
-  { id: "1", name: "Gachibowli Indoor Stadium", city: "Hyderabad" },
-  { id: "2", name: "Indoor Stadium", city: "Chennai" },
-  { id: "3", name: "Indoor Stadium", city: "Bangalore" },
-  { id: "4", name: "Sports Complex", city: "Vizag" },
-  { id: "5", name: "Indoor Stadium", city: "Mumbai" },
-  { id: "6", name: "Sports Complex", city: "Delhi" },
-  { id: "7", name: "Indoor Stadium", city: "Kolkata" },
-]
-
-// Mock game templates data
-const gameTemplates = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
-  { id: "7", name: "Ball Throw" },
-  { id: "8", name: "Balancing Beam" },
-]
 
 export default function EventsPage() {
   const { toast } = useToast()
@@ -175,11 +50,33 @@ export default function EventsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date>()
-  const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
+  const [apiEvents, setApiEvents] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDeletingEvent, setIsDeletingEvent] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [eventToUpdate, setEventToUpdate] = useState<string | null>(null)
+
+  // Calendar view state
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedDayEvents, setSelectedDayEvents] = useState<any[]>([])
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false)
+
+  // State for filter data from APIs
+  const [cities, setCities] = useState<City[]>([])
+  const [venues, setVenues] = useState<any[]>([]) // Venues with city details
+  const [gameTemplates, setGameTemplates] = useState<BabyGame[]>([])
+  const [isLoadingFilters, setIsLoadingFilters] = useState(true)
+
+  // Function to fetch events with complete information
+  const fetchEventsWithGames = async () => {
+    const response = await fetch('/api/events/get-all-with-games')
+    if (!response.ok) {
+      throw new Error(`Failed to fetch events: ${response.status}`)
+    }
+    return response.json()
+  }
 
   // Fetch events from API when component mounts
   useEffect(() => {
@@ -188,15 +85,10 @@ export default function EventsPage() {
         setIsLoading(true)
         setError(null)
 
-        console.log("Fetching events from API...")
-
-        // Fetch events from the API
-        const eventsData = await getAllEvents()
-        console.log("Events data from API:", eventsData)
-        console.log(`Received ${eventsData.length} events from API`)
+        // Fetch events from the API with complete information
+        const eventsData = await fetchEventsWithGames()
 
         if (eventsData.length === 0) {
-          console.warn("No events found in the API response")
           toast({
             title: "No Events Found",
             description: "There are no events in the database. You can create a new event using the 'Create New Event' button.",
@@ -206,7 +98,6 @@ export default function EventsPage() {
 
         setApiEvents(eventsData)
       } catch (err: any) {
-        console.error("Failed to fetch events:", err)
         setError(err.message || "Failed to load events")
         toast({
           title: "Error",
@@ -221,29 +112,87 @@ export default function EventsPage() {
     fetchEvents()
   }, [])
 
+  // Fetch filter data (cities, venues, game templates) from APIs
+  useEffect(() => {
+    const fetchFilterData = async () => {
+      try {
+        setIsLoadingFilters(true)
+
+        // Fetch cities and games first
+        const [citiesData, gamesData] = await Promise.all([
+          getAllCities(),
+          getAllBabyGames()
+        ])
+
+        setCities(citiesData)
+        setGameTemplates(gamesData)
+
+        // Fetch venues for each city using get-by-city API
+        try {
+          const allVenues: any[] = []
+
+          // Fetch venues for each city
+          for (const city of citiesData) {
+            if (city.id) {
+              try {
+                const cityVenues = await getVenuesByCity(city.id)
+                // Add city name to each venue
+                const venuesWithCityName = cityVenues.map(venue => ({
+                  ...venue,
+                  city_name: city.city_name
+                }))
+                allVenues.push(...venuesWithCityName)
+              } catch (cityVenueError) {
+                // If fetching venues for a specific city fails, continue with other cities
+                console.warn(`Failed to fetch venues for city ${city.city_name}:`, cityVenueError)
+              }
+            }
+          }
+
+          setVenues(allVenues)
+        } catch (venueError) {
+          // If venue fetching fails completely, set empty array
+          setVenues([])
+        }
+      } catch (err: any) {
+        toast({
+          title: "Warning",
+          description: "Some filter options may not be available due to a loading error.",
+          variant: "default",
+        })
+      } finally {
+        setIsLoadingFilters(false)
+      }
+    }
+
+    fetchFilterData()
+  }, [])
+
   // Convert API events to the format expected by the UI
-  const convertedEvents = apiEvents.map(apiEvent => {
-    // Get all games for the event
-    const gameNames = apiEvent.games.map(game => game.game_title);
+  const convertedEvents = apiEvents && Array.isArray(apiEvents) ? apiEvents.map((apiEvent: any) => {
+    // Extract games from the nested structure
+    const games = apiEvent.games || [];
+    const gameNames = games.map((game: any) => game.custom_title || game.game_title || "Unknown Game");
     const uniqueGameNames = [...new Set(gameNames)]; // Remove duplicates
 
     return {
-      id: apiEvent.event_id.toString(),
-      title: apiEvent.event_title,
+      id: apiEvent.event_id?.toString() || "unknown",
+      title: apiEvent.event_title || "Untitled Event",
       gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
-      venue: apiEvent.venue_name,
-      city: apiEvent.city_name,
-      date: apiEvent.event_date.split('T')[0], // Format date to YYYY-MM-DD
-      slots: apiEvent.games.map(game => ({
-        id: `${apiEvent.event_id}-${game.game_id}`,
-        time: `${game.start_time} - ${game.end_time}`,
-        capacity: game.max_participants,
+      venue: apiEvent.venue?.venue_name || "Unknown Venue",
+      venueId: apiEvent.venue?.venue_id?.toString() || "unknown", // Add venue ID for proper linking
+      city: apiEvent.city?.city_name || "Unknown City",
+      date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : "Unknown Date", // Format date to YYYY-MM-DD
+      slots: games.map((game: any, index: number) => ({
+        id: `${apiEvent.event_id || 'unknown'}-${game.game_id || 'unknown'}-${index}`,
+        time: `${game.start_time || '00:00'} - ${game.end_time || '00:00'}`,
+        capacity: game.max_participants || 0,
         booked: 0, // API doesn't provide this information
         status: "active" // Assuming all slots are active
       })),
-      status: apiEvent.event_status.toLowerCase()
+      status: apiEvent.event_status ? apiEvent.event_status.toLowerCase() : "unknown"
     };
-  });
+  }) : [];
 
   // Always use API data, even if it's empty
   const eventsToUse = convertedEvents;
@@ -290,22 +239,19 @@ export default function EventsPage() {
   })
 
   // Handle event deletion
-  const handleDeleteEvent = async () => {
-    if (!eventToDelete) return;
-
-    console.log(`Starting deletion process for event ID: ${eventToDelete}`);
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!eventId) return;
 
     try {
       setIsDeletingEvent(true);
+      setEventToDelete(eventId);
 
       // Call the API to delete the event
-      console.log(`Calling deleteEvent with ID: ${eventToDelete}`);
-      const result = await deleteEvent(Number(eventToDelete));
-      console.log("Delete event result:", JSON.stringify(result));
+      const result = await deleteEvent(Number(eventId));
 
       // Check if the result indicates success (either directly or as an array with success property)
-      const isSuccess = result.success || (Array.isArray(result) && result[0]?.success === true);
-      console.log(`Delete operation success: ${isSuccess}`);
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
 
       if (isSuccess) {
         toast({
@@ -314,12 +260,8 @@ export default function EventsPage() {
         });
 
         // Remove the deleted event from the state
-        console.log(`Removing event with ID ${eventToDelete} from state`);
-        console.log(`Current events: ${apiEvents.map(e => e.event_id).join(', ')}`);
-
         setApiEvents(prevEvents => {
-          const filteredEvents = prevEvents.filter(event => event.event_id.toString() !== eventToDelete);
-          console.log(`Events after filtering: ${filteredEvents.map(e => e.event_id).join(', ')}`);
+          const filteredEvents = (prevEvents || []).filter(event => event.event_id.toString() !== eventId);
           return filteredEvents;
         });
 
@@ -329,8 +271,6 @@ export default function EventsPage() {
         throw new Error("Failed to delete event. Please try again.");
       }
     } catch (error: any) {
-      console.error("Error deleting event:", error);
-
       toast({
         title: "Error",
         description: error.message || "Failed to delete event. Please try again.",
@@ -338,13 +278,172 @@ export default function EventsPage() {
       });
     } finally {
       setIsDeletingEvent(false);
+      setEventToDelete(null);
+    }
+  };
+
+  // Handle pause/resume event
+  const handleToggleEventStatus = async (eventId: string, currentStatus: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setEventToUpdate(eventId);
+
+      // Find the event in the current data
+      const eventToUpdate = apiEvents.find(event => event.event_id.toString() === eventId);
+      if (!eventToUpdate) {
+        throw new Error("Event not found");
+      }
+
+      // Determine the new status
+      const newStatus = currentStatus.toLowerCase() === "published" ? "Paused" : "Published";
+
+      // Prepare the update data with all required fields
+      const updateData = {
+        id: Number(eventId),
+        title: eventToUpdate.event_title,
+        description: eventToUpdate.event_description,
+        city_id: eventToUpdate.city?.city_id || eventToUpdate.city_id,
+        venue_id: eventToUpdate.venue?.venue_id || eventToUpdate.venue_id,
+        event_date: eventToUpdate.event_date.split('T')[0], // Format as YYYY-MM-DD
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+        games: eventToUpdate.games || []
+      };
+
+      // Call the API to update the event status
+      const result = await updateEvent(updateData);
+
+      // Check if the result indicates success
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
+
+      if (isSuccess) {
+        toast({
+          title: "Success",
+          description: `Event ${newStatus.toLowerCase()} successfully`,
+        });
+
+        // Update the event status in the state
+        setApiEvents(prevEvents => {
+          return prevEvents.map(event =>
+            event.event_id.toString() === eventId
+              ? { ...event, event_status: newStatus }
+              : event
+          );
+        });
+      } else {
+        throw new Error(`Failed to ${newStatus.toLowerCase()} event. Please try again.`);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to update event status. Please try again.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setEventToUpdate(null);
+    }
+  };
+
+  // Handle cancel event
+  const handleCancelEvent = async (eventId: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      setEventToUpdate(eventId);
+
+      // Find the event in the current data
+      const eventToCancel = apiEvents.find(event => event.event_id.toString() === eventId);
+      if (!eventToCancel) {
+        throw new Error("Event not found");
+      }
+
+      // Prepare the update data with all required fields
+      const updateData = {
+        id: Number(eventId),
+        title: eventToCancel.event_title,
+        description: eventToCancel.event_description,
+        city_id: eventToCancel.city?.city_id || eventToCancel.city_id,
+        venue_id: eventToCancel.venue?.venue_id || eventToCancel.venue_id,
+        event_date: eventToCancel.event_date.split('T')[0], // Format as YYYY-MM-DD
+        status: "Cancelled",
+        updated_at: new Date().toISOString(),
+        games: eventToCancel.games || []
+      };
+
+      // Call the API to cancel the event
+      const result = await updateEvent(updateData);
+
+      // Check if the result indicates success
+      const isSuccess = (result && typeof result === 'object' && 'success' in result && result.success) ||
+                        (Array.isArray(result) && result[0]?.success === true);
+
+      if (isSuccess) {
+        toast({
+          title: "Success",
+          description: "Event cancelled successfully",
+        });
+
+        // Update the event status in the state
+        setApiEvents(prevEvents => {
+          return prevEvents.map(event =>
+            event.event_id.toString() === eventId
+              ? { ...event, event_status: "Cancelled" }
+              : event
+          );
+        });
+      } else {
+        throw new Error("Failed to cancel event. Please try again.");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel event. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setEventToUpdate(null);
     }
   };
 
   // Get filtered venues based on selected city
   const filteredVenues = selectedCity
-    ? venues.filter((venue) => venue.city === selectedCity)
+    ? venues.filter((venue) => venue.city_name === selectedCity)
     : venues
+
+  // Calendar helper functions
+  const generateCalendarDays = (month: Date) => {
+    const start = startOfWeek(startOfMonth(month))
+    const end = endOfWeek(endOfMonth(month))
+    return eachDayOfInterval({ start, end })
+  }
+
+  const getEventsForDay = (day: Date) => {
+    const dayString = format(day, "yyyy-MM-dd")
+    return filteredEvents.filter(event => event.date === dayString)
+  }
+
+  const handleDayClick = (day: Date) => {
+    const dayEvents = getEventsForDay(day)
+    setSelectedDayEvents(dayEvents)
+    setIsEventModalOpen(true)
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1))
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'published': return 'bg-green-500'
+      case 'paused': return 'bg-amber-500'
+      case 'cancelled': return 'bg-red-500'
+      case 'draft': return 'bg-gray-500'
+      case 'completed': return 'bg-blue-500'
+      default: return 'bg-gray-400'
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -405,8 +504,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Cities</SelectItem>
                         {cities.map((city) => (
-                          <SelectItem key={city.id} value={city.name}>
-                            {city.name}
+                          <SelectItem key={city.id} value={city.city_name}>
+                            {city.city_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -421,8 +520,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Venues</SelectItem>
                         {filteredVenues.map((venue) => (
-                          <SelectItem key={venue.id} value={venue.name}>
-                            {venue.name}
+                          <SelectItem key={venue.id} value={venue.venue_name}>
+                            {venue.venue_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -437,8 +536,8 @@ export default function EventsPage() {
                       <SelectContent>
                         <SelectItem value="">All Templates</SelectItem>
                         {gameTemplates.map((template) => (
-                          <SelectItem key={template.id} value={template.name}>
-                            {template.name}
+                          <SelectItem key={template.id} value={template.game_name}>
+                            {template.game_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -562,19 +661,29 @@ export default function EventsPage() {
                 ) : (
                   filteredEvents.map((event) => (
                     <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.title}</TableCell>
+                      <TableCell className="font-medium">
+                        <TruncatedText
+                          text={event.title}
+                          maxLength={50}
+                          showTooltip={true}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="max-w-[200px]">
-                          {event.gameTemplate.split(", ").map((game, index) => (
-                            <Badge key={index} variant="outline" className="mr-1 mb-1">
-                              {game}
-                            </Badge>
-                          ))}
+                          {event.gameTemplate && typeof event.gameTemplate === 'string' ?
+                            event.gameTemplate.split(", ").map((game, index) => (
+                              <Badge key={index} variant="outline" className="mr-1 mb-1">
+                                {game}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline">Unknown</Badge>
+                            )
+                          }
                         </div>
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/admin/events/venues/${encodeURIComponent(event.venue)}`}
+                          href={`/admin/events/venues/${event.venueId}`}
                           className="flex items-center hover:underline"
                         >
                           <Building className="mr-1 h-3 w-3 text-muted-foreground" />
@@ -593,22 +702,26 @@ export default function EventsPage() {
                       <TableCell>{event.date}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          {event.slots.map((slot) => (
-                            <div key={slot.id} className="flex items-center gap-2 text-xs">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "h-1.5 w-1.5 rounded-full p-0",
-                                  slot.status === "active" && "bg-green-500",
-                                  slot.status === "paused" && "bg-amber-500",
-                                  slot.status === "cancelled" && "bg-red-500"
-                                )}
-                              />
-                              <span>
-                                {slot.time} ({slot.booked}/{slot.capacity})
-                              </span>
-                            </div>
-                          ))}
+                          {event.slots && Array.isArray(event.slots) && event.slots.length > 0 ?
+                            event.slots.map((slot) => (
+                              <div key={slot.id} className="flex items-center gap-2 text-xs">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full p-0",
+                                    slot.status === "active" && "bg-green-500",
+                                    slot.status === "paused" && "bg-amber-500",
+                                    slot.status === "cancelled" && "bg-red-500"
+                                  )}
+                                />
+                                <span>
+                                  {slot.time} ({slot.booked}/{slot.capacity})
+                                </span>
+                              </div>
+                            )) : (
+                              <span className="text-xs text-muted-foreground">No slots</span>
+                            )
+                          }
                         </div>
                       </TableCell>
                       <TableCell>
@@ -652,22 +765,69 @@ export default function EventsPage() {
                             </Link>
                           </Button>
                           {event.status === "published" && (
-                            <Button variant="ghost" size="icon">
-                              <Pause className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleEventStatus(event.id, event.status)}
+                              disabled={isUpdatingStatus && eventToUpdate === event.id}
+                            >
+                              {isUpdatingStatus && eventToUpdate === event.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                              ) : (
+                                <Pause className="h-4 w-4" />
+                              )}
                               <span className="sr-only">Pause event</span>
                             </Button>
                           )}
                           {event.status === "paused" && (
-                            <Button variant="ghost" size="icon">
-                              <Play className="h-4 w-4" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleEventStatus(event.id, event.status)}
+                              disabled={isUpdatingStatus && eventToUpdate === event.id}
+                            >
+                              {isUpdatingStatus && eventToUpdate === event.id ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                              ) : (
+                                <Play className="h-4 w-4" />
+                              )}
                               <span className="sr-only">Resume event</span>
                             </Button>
                           )}
                           {(event.status === "published" || event.status === "paused" || event.status === "draft") && (
-                            <Button variant="ghost" size="icon">
-                              <X className="h-4 w-4" />
-                              <span className="sr-only">Cancel event</span>
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <X className="h-4 w-4" />
+                                  <span className="sr-only">Cancel event</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel Event</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to cancel this event? This will prevent any new bookings, but existing bookings will be maintained. This action can be reversed by editing the event status.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleCancelEvent(event.id)}
+                                    disabled={isUpdatingStatus && eventToUpdate === event.id}
+                                    className="bg-orange-500 hover:bg-orange-600"
+                                  >
+                                    {isUpdatingStatus && eventToUpdate === event.id ? (
+                                      <>
+                                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                        Cancelling...
+                                      </>
+                                    ) : (
+                                      "Cancel Event"
+                                    )}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -687,14 +847,8 @@ export default function EventsPage() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => {
-                                    console.log(`Setting event to delete: ${event.id}`);
-                                    setEventToDelete(event.id);
-                                    setTimeout(() => {
-                                      handleDeleteEvent();
-                                    }, 100); // Small delay to ensure state is updated
-                                  }}
-                                  disabled={isDeletingEvent}
+                                  onClick={() => handleDeleteEvent(event.id)}
+                                  disabled={isDeletingEvent && eventToDelete === event.id}
                                   className="bg-red-500 hover:bg-red-600"
                                 >
                                   {isDeletingEvent && eventToDelete === event.id ? (
@@ -722,19 +876,346 @@ export default function EventsPage() {
         <TabsContent value="calendar" className="space-y-4">
           <Card>
             <CardContent className="p-6">
-              <div className="flex h-[400px] items-center justify-center rounded-lg border border-dashed p-8 text-center">
-                <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                  <CalendarIcon className="h-10 w-10 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">Calendar View</h3>
-                  <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                    View events organized by date in a calendar format. Coming soon!
-                  </p>
+              {isLoading ? (
+                <div className="flex h-[400px] items-center justify-center">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <span className="ml-2">Loading events...</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Calendar Header */}
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold">
+                      {format(currentMonth, "MMMM yyyy")}
+                    </h2>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigateMonth('prev')}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigateMonth('next')}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Day headers */}
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground">
+                        {day}
+                      </div>
+                    ))}
+
+                    {/* Calendar days */}
+                    {generateCalendarDays(currentMonth).map((day, index) => {
+                      const dayEvents = getEventsForDay(day)
+                      const isCurrentMonth = format(day, 'M') === format(currentMonth, 'M')
+                      const isCurrentDay = isToday(day)
+
+                      return (
+                        <div
+                          key={index}
+                          className={cn(
+                            "min-h-[100px] p-1 border border-border cursor-pointer hover:bg-muted/50 transition-colors",
+                            !isCurrentMonth && "bg-muted/20 text-muted-foreground",
+                            isCurrentDay && "bg-primary/10 border-primary"
+                          )}
+                          onClick={() => handleDayClick(day)}
+                        >
+                          <div className="flex flex-col h-full">
+                            <div className={cn(
+                              "text-sm font-medium mb-1",
+                              isCurrentDay && "text-primary font-bold"
+                            )}>
+                              {format(day, 'd')}
+                            </div>
+
+                            <div className="flex-1 space-y-1">
+                              {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                                <div
+                                  key={eventIndex}
+                                  className={cn(
+                                    "text-xs p-1 rounded text-white truncate",
+                                    getStatusColor(event.status)
+                                  )}
+                                  title={`${event.title} - ${event.status}`}
+                                >
+                                  {event.title}
+                                </div>
+                              ))}
+
+                              {dayEvents.length > 3 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{dayEvents.length - 3} more
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-4 pt-4 border-t">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-green-500"></div>
+                      <span className="text-sm">Published</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-amber-500"></div>
+                      <span className="text-sm">Paused</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-red-500"></div>
+                      <span className="text-sm">Cancelled</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-gray-500"></div>
+                      <span className="text-sm">Draft</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded bg-blue-500"></div>
+                      <span className="text-sm">Completed</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Event Details Modal */}
+      <Dialog open={isEventModalOpen} onOpenChange={setIsEventModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Events for {selectedDayEvents.length > 0 && format(new Date(selectedDayEvents[0].date), "MMMM d, yyyy")}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''} scheduled for this day
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedDayEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No events scheduled for this day</p>
+              </div>
+            ) : (
+              selectedDayEvents.map((event) => (
+                <Card key={event.id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-semibold">
+                          <TruncatedText
+                            text={event.title}
+                            maxLength={60}
+                            showTooltip={true}
+                          />
+                        </h3>
+                        {event.status === "published" && (
+                          <Badge className="bg-green-500 hover:bg-green-600">Published</Badge>
+                        )}
+                        {event.status === "draft" && (
+                          <Badge variant="outline">Draft</Badge>
+                        )}
+                        {event.status === "paused" && (
+                          <Badge className="bg-amber-500 hover:bg-amber-600">Paused</Badge>
+                        )}
+                        {event.status === "cancelled" && (
+                          <Badge className="bg-red-500 hover:bg-red-600">Cancelled</Badge>
+                        )}
+                        {event.status === "completed" && (
+                          <Badge className="bg-blue-500 hover:bg-blue-600">Completed</Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <span>{event.city}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          <span>{event.venue}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="text-sm font-medium mb-2">Games:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {event.gameTemplate && typeof event.gameTemplate === 'string' ?
+                            event.gameTemplate.split(", ").map((game: string, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {game}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline" className="text-xs">Unknown</Badge>
+                            )
+                          }
+                        </div>
+                      </div>
+
+                      {event.slots && event.slots.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-sm font-medium mb-2">Time Slots:</div>
+                          <div className="space-y-1">
+                            {event.slots.map((slot: any) => (
+                              <div key={slot.id} className="flex items-center gap-2 text-sm">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span>{slot.time}</span>
+                                <Users className="h-3 w-3 text-muted-foreground ml-2" />
+                                <span>{slot.booked}/{slot.capacity}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 ml-4">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/${event.id}`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View details</span>
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/${event.id}/edit`}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit event</span>
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/admin/events/clone/${event.id}`}>
+                          <Copy className="h-4 w-4" />
+                          <span className="sr-only">Clone event</span>
+                        </Link>
+                      </Button>
+
+                      {/* Action buttons with same functionality as table view */}
+                      {event.status === "published" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleEventStatus(event.id, event.status)}
+                          disabled={isUpdatingStatus && eventToUpdate === event.id}
+                        >
+                          {isUpdatingStatus && eventToUpdate === event.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                          ) : (
+                            <Pause className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Pause event</span>
+                        </Button>
+                      )}
+                      {event.status === "paused" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleEventStatus(event.id, event.status)}
+                          disabled={isUpdatingStatus && eventToUpdate === event.id}
+                        >
+                          {isUpdatingStatus && eventToUpdate === event.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">Resume event</span>
+                        </Button>
+                      )}
+                      {(event.status === "published" || event.status === "paused" || event.status === "draft") && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <X className="h-4 w-4" />
+                              <span className="sr-only">Cancel event</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel Event</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to cancel this event? This will prevent any new bookings, but existing bookings will be maintained. This action can be reversed by editing the event status.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleCancelEvent(event.id)}
+                                disabled={isUpdatingStatus && eventToUpdate === event.id}
+                                className="bg-orange-500 hover:bg-orange-600"
+                              >
+                                {isUpdatingStatus && eventToUpdate === event.id ? (
+                                  <>
+                                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                    Cancelling...
+                                  </>
+                                ) : (
+                                  "Cancel Event"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <span className="sr-only">Delete event</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this event? This action cannot be undone.
+                              All registrations and data associated with this event will be permanently removed.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteEvent(event.id)}
+                              disabled={isDeletingEvent && eventToDelete === event.id}
+                              className="bg-red-500 hover:bg-red-600"
+                            >
+                              {isDeletingEvent && eventToDelete === event.id ? (
+                                <>
+                                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                                  Deleting...
+                                </>
+                              ) : (
+                                "Delete Event"
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

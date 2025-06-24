@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export async function PUT(request: Request) {
+export async function POST(request: Request) {
   try {
     // Parse the request body
     const venueData = await request.json();
@@ -36,31 +36,72 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Normalize the data
+    // Normalize the data - ensure all required fields are present
     const normalizedData = {
       id: Number(venueData.id),
-      venue_name: venueData.venue_name,
+      venue_name: venueData.venue_name.trim(),
       city_id: Number(venueData.city_id),
-      address: venueData.address,
-      capacity: venueData.capacity ? Number(venueData.capacity) : undefined,
-      is_active: venueData.is_active !== undefined ? venueData.is_active : true
+      address: venueData.address.trim(),
+      capacity: venueData.capacity ? Number(venueData.capacity) : 0,
+      is_active: venueData.is_active !== undefined ? Boolean(venueData.is_active) : true
     };
 
+    // Remove undefined values
+    Object.keys(normalizedData).forEach(key => {
+      if ((normalizedData as any)[key] === undefined) {
+        delete (normalizedData as any)[key];
+      }
+    });
+
     console.log("Server API route: Normalized venue data:", normalizedData);
+    console.log("Server API route: Data being sent to external API:", JSON.stringify(normalizedData, null, 2));
 
     // Forward the request to the external API with the correct URL
-    const apiUrl = "https://ai.alviongs.com/webhook/V1/nibog/venues/update";
+    const apiUrl = "https://ai.alviongs.com/webhook/v1/nibog/venues/update";
     console.log("Server API route: Calling API URL:", apiUrl);
 
-    const response = await fetch(apiUrl, {
-      method: "PUT",
+    // Try POST method first (as per documentation)
+    let response = await fetch(apiUrl, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(normalizedData),
     });
 
+    // If POST fails, try PUT method as fallback
+    if (!response.ok) {
+      console.log("POST method failed, trying PUT method as fallback...");
+      response = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(normalizedData),
+      });
+    }
+
     console.log(`Server API route: Update venue response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Server API route: Error response: ${errorText}`);
+
+      let errorMessage = `Error updating venue: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: response.status }
+      );
+    }
 
     // Get the response data
     const responseText = await response.text();
@@ -75,10 +116,10 @@ export async function PUT(request: Request) {
       // Handle different response formats
       if (Array.isArray(responseData) && responseData.length > 0) {
         // If the API returns an array with one venue, return the first item
-        return NextResponse.json(responseData[0], { status: response.status });
+        return NextResponse.json(responseData[0], { status: 200 });
       } else if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
         // If the API returns a single venue object, return it
-        return NextResponse.json(responseData, { status: response.status });
+        return NextResponse.json(responseData, { status: 200 });
       } else if (Array.isArray(responseData) && responseData.length === 0) {
         // If the API returns an empty array, return an error
         return NextResponse.json(
@@ -89,7 +130,7 @@ export async function PUT(request: Request) {
         // Unexpected response format
         return NextResponse.json(
           { error: "Unexpected response format from API", data: responseData },
-          { status: response.status }
+          { status: 500 }
         );
       }
     } catch (parseError) {

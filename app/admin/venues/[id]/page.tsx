@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -56,13 +56,16 @@ const mockEvents = [
 ]
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function VenueDetailPage({ params }: Props) {
   const router = useRouter()
   const { toast } = useToast()
-  const venueId = parseInt(params.id)
+
+  // Unwrap the params Promise using React.use()
+  const resolvedParams = use(params)
+  const venueId = parseInt(resolvedParams.id)
 
   const [venue, setVenue] = useState<any>(null)
   const [city, setCity] = useState<any>(null)

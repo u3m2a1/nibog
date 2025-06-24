@@ -1,4 +1,4 @@
-import { BABY_GAME_API } from "@/config/api";
+// Baby game service - handles all baby game related API calls
 
 export interface BabyGame {
   id?: number;
@@ -22,24 +22,6 @@ export interface BabyGame {
  * @returns The created game
  */
 export async function createBabyGame(gameData: BabyGame): Promise<BabyGame> {
-  console.log("Creating baby game:", gameData);
-
-  // Format the data for the API
-  // Based on the API documentation and response, we need to use these exact field names
-  const apiData = {
-    game_name: gameData.game_name,
-    description: gameData.description || gameData.game_description, // Use description instead of game_description
-    min_age: gameData.min_age || gameData.min_age_months, // Use min_age instead of min_age_months
-    max_age: gameData.max_age || gameData.max_age_months, // Use max_age instead of max_age_months
-    duration_minutes: gameData.duration_minutes,
-    categories: gameData.categories,
-    is_active: gameData.is_active
-  };
-
-  // Log the data to verify it's being sent correctly
-  console.log("Original game data:", gameData);
-  console.log("Formatted API data:", JSON.stringify(apiData, null, 2));
-
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/babygames/create', {
@@ -47,24 +29,19 @@ export async function createBabyGame(gameData: BabyGame): Promise<BabyGame> {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(apiData),
+      body: JSON.stringify(gameData), // Send original gameData, let the API route handle field mapping
     });
 
-    console.log(`Create baby game response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
+      await response.text(); // Consume the response body
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Created baby game:", data);
 
     // Return the first item if it's an array, otherwise return the data
     return Array.isArray(data) ? data[0] : data;
   } catch (error) {
-    console.error("Error creating baby game:", error);
     throw error;
   }
 }
@@ -74,8 +51,6 @@ export async function createBabyGame(gameData: BabyGame): Promise<BabyGame> {
  * @returns A list of all baby games
  */
 export async function getAllBabyGames(): Promise<BabyGame[]> {
-  console.log("Fetching all baby games");
-
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/babygames/get-all', {
@@ -85,20 +60,20 @@ export async function getAllBabyGames(): Promise<BabyGame[]> {
       },
     });
 
-    console.log(`Get all baby games response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
-      throw new Error(`API returned error status: ${response.status}`);
+      throw new Error(`API returned error status: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log(`Retrieved ${data.length} baby games`);
+
+    // Ensure we return an array
+    if (!Array.isArray(data)) {
+      return [];
+    }
 
     return data;
   } catch (error) {
-    console.error("Error fetching baby games:", error);
     throw error;
   }
 }
@@ -109,8 +84,6 @@ export async function getAllBabyGames(): Promise<BabyGame[]> {
  * @returns The baby game with the specified ID
  */
 export async function getBabyGameById(id: number): Promise<BabyGame> {
-  console.log(`Fetching baby game with ID: ${id}`);
-
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/babygames/get', {
@@ -121,21 +94,22 @@ export async function getBabyGameById(id: number): Promise<BabyGame> {
       body: JSON.stringify({ id }),
     });
 
-    console.log(`Get baby game response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
-      throw new Error(`API returned error status: ${response.status}`);
+      throw new Error(`API returned error status: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Retrieved baby game:", data);
 
     // Return the first item if it's an array, otherwise return the data
-    return Array.isArray(data) ? data[0] : data;
+    const gameData = Array.isArray(data) ? data[0] : data;
+
+    if (!gameData) {
+      throw new Error("No game data found");
+    }
+
+    return gameData;
   } catch (error) {
-    console.error(`Error fetching baby game with ID ${id}:`, error);
     throw error;
   }
 }
@@ -146,49 +120,30 @@ export async function getBabyGameById(id: number): Promise<BabyGame> {
  * @returns The updated game
  */
 export async function updateBabyGame(gameData: BabyGame): Promise<BabyGame> {
-  console.log("Updating baby game:", gameData);
-
   if (!gameData.id) {
     throw new Error("Game ID is required for update");
   }
 
-  // Format the data for the API
-  const apiData = {
-    id: gameData.id,
-    game_name: gameData.game_name,
-    description: gameData.description || gameData.game_description,
-    min_age: gameData.min_age || gameData.min_age_months,
-    max_age: gameData.max_age || gameData.max_age_months,
-    duration_minutes: gameData.duration_minutes,
-    categories: gameData.categories,
-    is_active: gameData.is_active
-  };
-
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/babygames/update', {
-      method: "PUT",
+      method: "POST", // Changed from PUT to POST as per API documentation
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(apiData),
+      body: JSON.stringify(gameData), // Send original gameData, let the API route handle field mapping
     });
 
-    console.log(`Update baby game response status: ${response.status}`);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
+      await response.text(); // Consume the response body
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Updated baby game:", data);
 
     // Return the first item if it's an array, otherwise return the data
     return Array.isArray(data) ? data[0] : data;
   } catch (error) {
-    console.error("Error updating baby game:", error);
     throw error;
   }
 }
@@ -199,8 +154,6 @@ export async function updateBabyGame(gameData: BabyGame): Promise<BabyGame> {
  * @returns A success indicator
  */
 export async function deleteBabyGame(id: number): Promise<{ success: boolean }> {
-  console.log(`Deleting baby game with ID: ${id}`);
-
   if (!id || isNaN(Number(id)) || Number(id) <= 0) {
     throw new Error("Invalid game ID. ID must be a positive number.");
   }
@@ -208,18 +161,15 @@ export async function deleteBabyGame(id: number): Promise<{ success: boolean }> 
   try {
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/babygames/delete', {
-      method: "DELETE",
+      method: "POST", // Changed from DELETE to POST as per API documentation
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ id: Number(id) }),
     });
 
-    console.log(`Delete baby game response status: ${response.status}`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error response: ${errorText}`);
 
       try {
         // Try to parse the error response as JSON
@@ -234,7 +184,6 @@ export async function deleteBabyGame(id: number): Promise<{ success: boolean }> 
     // Try to parse the response
     try {
       const data = await response.json();
-      console.log("Delete baby game response:", data);
 
       // Check if the response indicates success
       if (data && (data.success === true || (Array.isArray(data) && data[0]?.success === true))) {
@@ -243,12 +192,10 @@ export async function deleteBabyGame(id: number): Promise<{ success: boolean }> 
 
       return { success: true }; // Default to success if we got a 200 response
     } catch (parseError) {
-      console.error("Error parsing delete response:", parseError);
       // If we can't parse the response but got a 200 status, consider it a success
       return { success: true };
     }
   } catch (error) {
-    console.error(`Error deleting baby game with ID ${id}:`, error);
     throw error;
   }
 }

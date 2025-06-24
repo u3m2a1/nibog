@@ -38,7 +38,6 @@ export async function saveEmailSetting(emailSettingData: EmailSetting): Promise<
     }
 
     const data = await response.json();
-    console.log("Saved email settings:", data);
 
     // Return the first item if it's an array, otherwise return the data
     return Array.isArray(data) ? data[0] : data;
@@ -74,12 +73,11 @@ export async function getEmailSetting(): Promise<EmailSetting | null> {
       if (response.status === 404) {
         return null;
       }
-      
+
       throw new Error(`API returned error status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Retrieved email settings:", data);
 
     // Return the first item if it's an array, otherwise return the data
     return Array.isArray(data) ? data[0] : data;

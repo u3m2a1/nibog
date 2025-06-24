@@ -26,32 +26,49 @@ export const CITY_API = {
 
 // Venue API endpoints - Exactly as specified in the API documentation with correct case
 export const VENUE_API = {
-  CREATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/create`,
-  UPDATE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/update`,
-  GET: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get`,
-  GET_ALL: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-all`,
-  GET_BY_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/get-by-city`,
-  GET_ALL_WITH_CITY: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/getall-with-city`,
-  DELETE: `${API_BASE_URL.replace('/v1/', '/V1/')}/venues/delete`,
+  CREATE: `${API_BASE_URL}/venues/create`,
+  UPDATE: `${API_BASE_URL}/venues/update`,
+  GET: `${API_BASE_URL}/venues/get`,
+  GET_ALL: `${API_BASE_URL}/venues/get-all`,
+  GET_BY_CITY: `${API_BASE_URL}/venues/get-by-city`,
+  GET_ALL_WITH_CITY: `${API_BASE_URL}/venues/getall-with-city`,
+  DELETE: `${API_BASE_URL}/venues/delete`,
 };
 
 // Baby Game API endpoints
-const BABY_GAME_BASE_URL = "https://ai.alviongs.com/webhook/V1/nibog";
 export const BABY_GAME_API = {
-  CREATE: `${BABY_GAME_BASE_URL}/babygame/create`,
-  UPDATE: `${BABY_GAME_BASE_URL}/babygame/update`,
-  GET: `${BABY_GAME_BASE_URL}/babygame/get`,
-  GET_ALL: `${BABY_GAME_BASE_URL}/babygame/get-all`,
-  DELETE: `${BABY_GAME_BASE_URL}/babygame/delete`,
+  CREATE: `${API_BASE_URL}/babygame/create`,
+  UPDATE: `${API_BASE_URL}/babygame/update`,
+  GET: `${API_BASE_URL}/babygame/get`,
+  GET_ALL: `${API_BASE_URL}/babygame/get-all`,
+  DELETE: `${API_BASE_URL}/babygame/delete`,
 };
 
-// Event API endpoints
+// Basic Event API endpoints (for events without games/slots)
+export const BASIC_EVENT_API = {
+  CREATE: `${API_BASE_URL}/event/create`, // POST
+  GET: `${API_BASE_URL}/event/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event/delete`, // POST with id in body
+};
+
+// Event Registration API endpoints (for events with games and slots)
 export const EVENT_API = {
-  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/create", // POST - This is the endpoint for creating events with games and slots
-  GET: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get",       // POST with id in body
-  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/get-all", // GET
-  UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/update", // POST with full event data
-  DELETE: "https://ai.alviongs.com/webhook/v1/nibog/event-game-slots/delete", // POST with id in body
+  CREATE: `${API_BASE_URL}/event-registration/create`, // POST - This is the correct endpoint for creating events with games and slots
+  GET: `${API_BASE_URL}/event-registration/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event-registration/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event-registration/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event-registration/delete`, // POST with id in body
+};
+
+// Event Game Slot API endpoints (for individual game slot management)
+export const EVENT_GAME_SLOT_API = {
+  CREATE: `${API_BASE_URL}/event-game-slot/create`, // POST - For creating individual game slots
+  GET: `${API_BASE_URL}/event-game-slot/get`,       // POST with id in body
+  GET_ALL: `${API_BASE_URL}/event-game-slot/get-all`, // GET
+  UPDATE: `${API_BASE_URL}/event-game-slot/update`, // POST with full event data
+  DELETE:  `${API_BASE_URL}/event-game-slot/delete`, // POST with id in body
 };
 
 
@@ -101,6 +118,7 @@ export const BOOKING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create", // POST
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all", // GET
   UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update", // POST
+  UPDATE_STATUS: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update-status", // POST
 };
 
 // Promo Code API endpoints
@@ -108,6 +126,16 @@ export const PROMO_CODE_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/promocode/create", // POST
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/promocode/get-all", // GET
   GET_BY_ID: "https://ai.alviongs.com/webhook/v1/nibog/promocode/get", // POST
+};
+
+// Payment API endpoints
+export const PAYMENT_API = {
+  CREATE: "https://ai.alviongs.com/webhook/v1/nibog/payments/create", // POST
+  GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/payments/get-all", // GET
+  GET_BY_ID: "https://ai.alviongs.com/webhook/v1/nibog/payments/get", // POST
+  UPDATE_STATUS: "https://ai.alviongs.com/webhook/v1/nibog/payments/update-status", // POST
+  ANALYTICS: "https://ai.alviongs.com/webhook/v1/nibog/payments/analytics", // GET
+  EXPORT: "https://ai.alviongs.com/webhook/v1/nibog/payments/export", // GET
 };
 
 // PhonePe API endpoints are now in config/phonepe.ts

@@ -32,29 +32,6 @@ CREATE TABLE events (
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE baby_games (
   id SERIAL PRIMARY KEY,
   game_name VARCHAR(255) NOT NULL,
@@ -91,41 +68,6 @@ CREATE TABLE venues (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (city_id) REFERENCES cities(id)
 );
-
-
-CREATE TABLE events (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  description TEXT,
-  city_id INT NOT NULL,
-  venue_id INT NOT NULL,
-  event_date DATE NOT NULL,
-  status VARCHAR(20) DEFAULT 'Draft',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (city_id) REFERENCES cities(id),
-  FOREIGN KEY (venue_id) REFERENCES venues(id)
-);
-
-
-CREATE TABLE event_games_with_slots (
-  id SERIAL PRIMARY KEY,
-  event_id INT NOT NULL,
-  game_id INT NOT NULL,
-  custom_title VARCHAR(255),
-  custom_description TEXT,
-  custom_price DECIMAL(10, 2),
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  slot_price DECIMAL(10, 2),
-  max_participants INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (event_id) REFERENCES events(id),
-  FOREIGN KEY (game_id) REFERENCES baby_games(id)
-);
-
-
 
 CREATE TABLE employee (
     id SERIAL PRIMARY KEY,
@@ -175,9 +117,6 @@ CREATE TABLE employee (
     
 );
 
-
-
-
 CREATE TABLE social_media_settings (
     id SERIAL PRIMARY KEY,
     facebook_url TEXT NOT NULL DEFAULT 'https://facebook.com/nibog',
@@ -220,16 +159,6 @@ CREATE TABLE email_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT valid_smtp_host CHECK (smtp_host ~* '^[a-zA-Z0-9.-]+$')
 );
-
-
-
-
-
-
-
-
-
-
 
 ## authentication
 
@@ -408,28 +337,6 @@ FOR EACH ROW
 EXECUTE FUNCTION check_auth_method();
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 CREATE TABLE parents (
     parent_id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -495,11 +402,6 @@ CREATE TABLE booking_games (
 );
 
 
-
-
-
-
-
 ## promo code
 CREATE TABLE promo_codes (
     id SERIAL PRIMARY KEY,
@@ -529,4 +431,151 @@ CREATE TABLE promo_code_mappings (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Testimonials table
+CREATE TABLE testimonials (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    city VARCHAR(100),
+    event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    testimonial TEXT,
+    submitted_at DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(20) CHECK (status IN ('Published', 'Pending', 'Rejected')) DEFAULT 'Pending'
+);
 
+
+-- Add-ons table
+CREATE TABLE addons (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC(10, 2) NOT NULL,
+    category VARCHAR(20) CHECK (category IN ('meal', 'merchandise', 'service', 'other')) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    has_variants BOOLEAN DEFAULT false,
+    stock_quantity INTEGER DEFAULT 0,
+    sku TEXT UNIQUE NOT NULL,
+    bundle_min_quantity INTEGER,
+    bundle_discount_percentage NUMERIC(5, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add-on variants table
+CREATE TABLE addon_variants (
+    id SERIAL PRIMARY KEY,
+    addon_id INTEGER REFERENCES addons(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    price_modifier NUMERIC(10, 2) DEFAULT 0, -- e.g., +₹20 or -₹10
+    sku TEXT UNIQUE,
+    stock_quantity INTEGER DEFAULT 0
+);
+
+
+-- Add-on images table
+CREATE TABLE addon_images (
+    id SERIAL PRIMARY KEY,
+    addon_id INTEGER REFERENCES addons(id) ON DELETE CASCADE,
+    image_url TEXT NOT NULL
+);
+
+--- Payments table
+
+CREATE TABLE payments (
+  payment_id SERIAL PRIMARY KEY,
+  booking_id INTEGER NOT NULL REFERENCES bookings(booking_id),
+  transaction_id VARCHAR(100) UNIQUE NOT NULL,
+  phonepe_transaction_id VARCHAR(100) UNIQUE,
+  amount DECIMAL(10,2) NOT NULL,
+  payment_method VARCHAR(50) DEFAULT 'PhonePe',
+  payment_status VARCHAR(20) NOT NULL CHECK (payment_status IN ('successful', 'pending', 'failed', 'refunded')),
+  payment_date TIMESTAMP,
+  gateway_response JSONB,
+  refund_amount DECIMAL(10,2) DEFAULT 0,
+  refund_date TIMESTAMP,
+  refund_reason TEXT,
+  admin_notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--- Pending Bookings table (for server-first payment approach)
+
+CREATE TABLE pending_bookings (
+  pending_booking_id SERIAL PRIMARY KEY,
+  transaction_id VARCHAR(100) UNIQUE NOT NULL,
+  user_id INTEGER NOT NULL,
+  booking_data JSONB NOT NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'expired', 'cancelled')),
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_pending_bookings_transaction_id ON pending_bookings(transaction_id);
+CREATE INDEX idx_pending_bookings_user_id ON pending_bookings(user_id);
+CREATE INDEX idx_pending_bookings_status ON pending_bookings(status);
+CREATE INDEX idx_pending_bookings_expires_at ON pending_bookings(expires_at);
+
+--- Certificate Templates table
+
+CREATE TABLE certificate_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('participation', 'winner', 'event_specific')),
+    certificate_title VARCHAR(255), -- Certificate title that appears on the certificate
+    background_image VARCHAR(500), -- File path URL (e.g., '/images/certificatetemplates/template_1_bg.jpg') - Legacy field
+    background_style JSONB, -- New: Structured background options (type, colors, borders, etc.)
+    paper_size VARCHAR(20) DEFAULT 'a4' CHECK (paper_size IN ('a4', 'letter', 'a3')),
+    orientation VARCHAR(20) DEFAULT 'landscape' CHECK (orientation IN ('landscape', 'portrait')),
+    fields JSONB NOT NULL, -- Store field configurations as JSON
+    appreciation_text TEXT, -- Legacy: Dynamic appreciation message with placeholders
+    appreciation_text_style JSONB, -- New: Structured appreciation text with positioning and styling
+    signature_image VARCHAR(500), -- E-signature image URL
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+--- Generated Certificates table
+
+CREATE TABLE generated_certificates (
+    id SERIAL PRIMARY KEY,
+    template_id INTEGER NOT NULL REFERENCES certificate_templates(id),
+    event_id INTEGER NOT NULL REFERENCES events(id),
+    game_id INTEGER REFERENCES baby_games(id), -- Optional, for game-specific certificates
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    child_id INTEGER REFERENCES children(child_id), -- Optional, for child-specific certificates
+    certificate_data JSONB NOT NULL, -- Store filled certificate data
+    pdf_url VARCHAR(255), -- URL to generated PDF file
+    status VARCHAR(50) DEFAULT 'generated' CHECK (status IN ('generated', 'sent', 'downloaded', 'failed')),
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP,
+    downloaded_at TIMESTAMP
+);
+
+--- Indexes for performance
+
+-- Indexes for certificate_templates
+CREATE INDEX idx_certificate_templates_type ON certificate_templates(type);
+CREATE INDEX idx_certificate_templates_active ON certificate_templates(is_active);
+
+-- Indexes for generated_certificates
+CREATE INDEX idx_generated_certificates_event ON generated_certificates(event_id);
+CREATE INDEX idx_generated_certificates_user ON generated_certificates(user_id);
+CREATE INDEX idx_generated_certificates_status ON generated_certificates(status);
+CREATE INDEX idx_generated_certificates_template ON generated_certificates(template_id);
+
+--- Booking Add-ons table
+
+CREATE TABLE booking_addons (
+    id SERIAL PRIMARY KEY,
+    booking_id INTEGER NOT NULL,
+    addon_id INTEGER NOT NULL,
+    variant_id INTEGER,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

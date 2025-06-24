@@ -19,6 +19,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
+import { deletePromoCode } from "@/services/promoCodeService"
 
 // Types for actual API response (flattened structure)
 interface PromoCodeAPIResponse {
@@ -229,6 +231,7 @@ type Props = {
 
 export default function PromoCodeDetailPage({ params }: Props) {
   const router = useRouter()
+  const { toast } = useToast()
 
   // Unwrap params using React.use()
   const unwrappedParams = use(params)
@@ -276,16 +279,38 @@ export default function PromoCodeDetailPage({ params }: Props) {
   }
   
   // Handle delete promo code
-  const handleDeletePromoCode = () => {
+  const handleDeletePromoCode = async () => {
     setIsProcessing("delete")
-    
-    // Simulate API call to delete the promo code
-    setTimeout(() => {
-      console.log(`Deleting promo code ${promoCodeId}`)
+
+    try {
+      console.log(`Deleting promo code with ID: ${promoCodeId}`)
+
+      // Call the delete API
+      const response = await deletePromoCode(parseInt(promoCodeId))
+
+      console.log("Delete promo code response:", response)
+
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Promo code deleted successfully!",
+        })
+
+        // Redirect to the promo codes list
+        router.push("/admin/promo-codes")
+      } else {
+        throw new Error(response.error || "Failed to delete promo code")
+      }
+    } catch (error: any) {
+      console.error("Error deleting promo code:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete promo code. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
       setIsProcessing(null)
-      // In a real app, you would delete the promo code and then redirect
-      router.push("/admin/promo-codes")
-    }, 1000)
+    }
   }
   
   if (isLoading) {

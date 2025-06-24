@@ -23,6 +23,7 @@ import { getAllCities } from "@/services/cityService"
 import { getVenuesByCity } from "@/services/venueService"
 import { getAllBabyGames, BabyGame } from "@/services/babyGameService"
 import { createEvent, formatEventDataForAPI } from "@/services/eventService"
+import { toast } from "@/components/ui/use-toast"
 
 const venues = [
   { id: "1", name: "Little Explorers Center", city: "Mumbai" },
@@ -263,7 +264,11 @@ export default function NewEventPage() {
 
     // Check if game is already added
     if (selectedGames.some(game => game.templateId === templateId)) {
-      alert("This game is already added to the event.")
+      toast({
+        title: "Game Already Added",
+        description: "This game is already added to the event.",
+        variant: "destructive",
+      })
       return
     }
 
@@ -361,14 +366,22 @@ export default function NewEventPage() {
 
     // Validate form
     if (!selectedVenue || !selectedDate || selectedGames.length === 0) {
-      alert("Please fill in all required fields and add at least one game.")
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields and add at least one game.",
+        variant: "destructive",
+      })
       return
     }
 
     // Check if all games have at least one slot
     const gamesWithoutSlots = selectedGames.filter(game => game.slots.length === 0)
     if (gamesWithoutSlots.length > 0) {
-      alert(`Please add at least one time slot to each game. Games without slots: ${gamesWithoutSlots.map(g => g.customTitle).join(", ")}`)
+      toast({
+        title: "Validation Error",
+        description: `Please add at least one time slot to each game. Games without slots: ${gamesWithoutSlots.map(g => g.customTitle).join(", ")}`,
+        variant: "destructive",
+      })
       return
     }
 
@@ -399,13 +412,22 @@ export default function NewEventPage() {
       console.log("Created event:", createdEvent)
 
       // Show success message
-      alert("Event created successfully!")
+      toast({
+        title: "Success",
+        description: "Event created successfully!",
+      })
 
-      // Redirect to events list
-      router.push("/admin/events")
+      // Redirect to events list after a short delay to show the toast
+      setTimeout(() => {
+        router.push("/admin/events")
+      }, 1500)
     } catch (error: any) {
       console.error("Error creating event:", error)
-      alert(`Failed to create event: ${error.message || "Unknown error"}`)
+      toast({
+        title: "Error",
+        description: `Failed to create event: ${error.message || "Unknown error"}`,
+        variant: "destructive",
+      })
     }
   }
 

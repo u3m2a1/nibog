@@ -1,6 +1,6 @@
 "use client"
 
-import { use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Edit, Trash, AlertTriangle, Package, Tag, ShoppingCart } from "lucide-react"
+import { ArrowLeft, Edit, Trash, AlertTriangle, Package, Tag, ShoppingCart, Loader2, RefreshCw } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,8 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { addOns } from "@/data/add-ons"
-import { formatPrice } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import { getAddOnById, deleteAddOn, AddOn } from "@/services/addOnService"
 import { useRouter } from "next/navigation"
 
 type Props = {
@@ -30,30 +30,120 @@ type Props = {
 
 export default function AddOnDetailPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const addOnId = unwrappedParams.id
-  
-  const addOn = addOns.find((a) => a.id === addOnId)
-  
-  const handleDeleteAddOn = () => {
-    // In a real app, this would be an API call to delete the add-on
-    console.log(`Deleting add-on ${addOnId}`)
-    
-    // Redirect to the add-ons list
-    router.push("/admin/add-ons")
+  const { toast } = useToast()
+  const [addOn, setAddOn] = useState<AddOn | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+
+  const addOnId = params.id
+
+  // Retry function
+  const retryFetch = () => {
+    setRetryCount(prev => prev + 1)
+    setError(null)
   }
 
-  if (!addOn) {
+  // Fetch add-on data
+  useEffect(() => {
+    const fetchAddOn = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const data = await getAddOnById(addOnId)
+        setAddOn(data)
+      } catch (error: any) {
+        let errorMessage = "Failed to load add-on details"
+
+        if (error.message.includes('timeout') || error.message.includes('Request timeout')) {
+          errorMessage = "The request is taking too long. Please try again or check your connection."
+        } else if (error.message.includes('503') || error.message.includes('504')) {
+          errorMessage = "The add-on service is temporarily unavailable. Please try again later."
+        } else if (error.message.includes('not found')) {
+          errorMessage = "Add-on not found. It may have been deleted or the ID is incorrect."
+        }
+
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (addOnId && !addOn) {
+      fetchAddOn()
+    }
+  }, [addOnId, retryCount])
+
+  const handleDeleteAddOn = async () => {
+    try {
+      setIsDeleting(true)
+
+      await deleteAddOn(Number(addOnId))
+
+      toast({
+        title: "Success",
+        description: "Add-on deleted successfully",
+      })
+
+      // Redirect to the add-ons list
+      router.push("/admin/add-ons")
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to delete add-on. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold">Add-on Not Found</h2>
-          <p className="text-muted-foreground">The add-on you're looking for doesn't exist or has been removed.</p>
-          <Button className="mt-4" asChild>
-            <Link href="/admin/add-ons">Back to Add-ons</Link>
-          </Button>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <h2 className="text-xl font-semibold">Loading add-on details...</h2>
+          <p className="text-muted-foreground">
+            {retryCount > 0 ? `Retrying... (Attempt ${retryCount + 1})` : "Please wait while we fetch the add-on information."}
+          </p>
+          <div className="text-xs text-muted-foreground">
+            Add-on ID: {addOnId}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || (!addOn && !isLoading)) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
+          <h2 className="text-xl font-semibold">
+            {error ? "Error loading add-on" : "Add-on not found"}
+          </h2>
+          <p className="text-muted-foreground max-w-md">
+            {error || "The add-on you are looking for does not exist."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            {error && (
+              <Button variant="outline" onClick={retryFetch}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            )}
+            <Button onClick={() => router.push("/admin/add-ons")}>
+              Back to Add-ons
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -72,8 +162,8 @@ export default function AddOnDetailPage({ params }: Props) {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{addOn.name}</h1>
             <p className="text-muted-foreground">
-              {addOn.category.charAt(0).toUpperCase() + addOn.category.slice(1)} • 
-              SKU: {addOn.hasVariants ? "Multiple" : addOn.sku}
+              {addOn.category.charAt(0).toUpperCase() + addOn.category.slice(1)} •
+              SKU: {addOn.has_variants ? "Multiple" : addOn.sku}
             </p>
           </div>
         </div>
@@ -86,9 +176,17 @@ export default function AddOnDetailPage({ params }: Props) {
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline" className="text-red-500 hover:bg-red-50 hover:text-red-600">
-                <Trash className="mr-2 h-4 w-4" />
-                Delete
+              <Button
+                variant="outline"
+                className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash className="mr-2 h-4 w-4" />
+                )}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -112,8 +210,9 @@ export default function AddOnDetailPage({ params }: Props) {
                 <AlertDialogAction
                   className="bg-red-500 hover:bg-red-600"
                   onClick={handleDeleteAddOn}
+                  disabled={isDeleting}
                 >
-                  Delete
+                  {isDeleting ? "Deleting..." : "Delete"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -139,19 +238,19 @@ export default function AddOnDetailPage({ params }: Props) {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Base Price</h3>
-                  <p className="mt-1">{formatPrice(addOn.price)}</p>
+                  <p className="mt-1">₹{parseFloat(addOn.price).toLocaleString()}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
                   <div className="mt-1">
-                    {addOn.isActive ? (
+                    {addOn.is_active ? (
                       <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
                     ) : (
                       <Badge variant="outline">Inactive</Badge>
                     )}
                   </div>
                 </div>
-                {!addOn.hasVariants && (
+                {!addOn.has_variants && (
                   <>
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">SKU</h3>
@@ -159,15 +258,15 @@ export default function AddOnDetailPage({ params }: Props) {
                     </div>
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">Stock Quantity</h3>
-                      <p className="mt-1">{addOn.stockQuantity} units</p>
+                      <p className="mt-1">{addOn.stock_quantity} units</p>
                     </div>
                   </>
                 )}
-                {addOn.bundleDiscount && (
+                {addOn.bundle_min_quantity > 0 && (
                   <div className="sm:col-span-2">
                     <h3 className="text-sm font-medium text-muted-foreground">Bundle Discount</h3>
                     <p className="mt-1">
-                      {addOn.bundleDiscount.discountPercentage}% off when ordering {addOn.bundleDiscount.minQuantity} or more
+                      {parseFloat(addOn.bundle_discount_percentage)}% off when ordering {addOn.bundle_min_quantity} or more
                     </p>
                   </div>
                 )}
@@ -196,7 +295,7 @@ export default function AddOnDetailPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {addOn.hasVariants && (
+          {addOn.has_variants && (
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle>Variants</CardTitle>
@@ -208,9 +307,9 @@ export default function AddOnDetailPage({ params }: Props) {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>SKU</TableHead>
-                      <TableHead>Price</TableHead>
+                      <TableHead>Price Modifier</TableHead>
+                      <TableHead>Final Price</TableHead>
                       <TableHead>Stock</TableHead>
-                      <TableHead>Attributes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -218,22 +317,24 @@ export default function AddOnDetailPage({ params }: Props) {
                       <TableRow key={variant.id}>
                         <TableCell className="font-medium">{variant.name}</TableCell>
                         <TableCell>{variant.sku}</TableCell>
-                        <TableCell>{formatPrice(variant.price)}</TableCell>
                         <TableCell>
-                          {variant.stockQuantity <= 5 ? (
-                            <span className="text-red-500">{variant.stockQuantity} units</span>
+                          {variant.price_modifier === 0 ? (
+                            <span className="text-muted-foreground">No change</span>
                           ) : (
-                            <span>{variant.stockQuantity} units</span>
+                            <span className={variant.price_modifier > 0 ? "text-green-600" : "text-red-600"}>
+                              {variant.price_modifier > 0 ? "+" : ""}₹{variant.price_modifier}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(variant.attributes).map(([key, value]) => (
-                              <Badge key={key} variant="outline">
-                                {key}: {value}
-                              </Badge>
-                            ))}
-                          </div>
+                          ₹{(parseFloat(addOn.price) + variant.price_modifier).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          {variant.stock_quantity <= 5 ? (
+                            <span className="text-red-500">{variant.stock_quantity} units</span>
+                          ) : (
+                            <span>{variant.stock_quantity} units</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -262,7 +363,7 @@ export default function AddOnDetailPage({ params }: Props) {
                   Manage Inventory
                 </Link>
               </Button>
-              {addOn.hasVariants && (
+              {addOn.has_variants && (
                 <Button className="w-full justify-start" variant="outline" asChild>
                   <Link href={`/admin/add-ons/${addOn.id}/variants`}>
                     <Tag className="mr-2 h-4 w-4" />
@@ -284,7 +385,7 @@ export default function AddOnDetailPage({ params }: Props) {
               <CardTitle>Inventory Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              {addOn.hasVariants ? (
+              {addOn.has_variants ? (
                 <div className="space-y-4">
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Total Variants</div>
@@ -293,13 +394,13 @@ export default function AddOnDetailPage({ params }: Props) {
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Total Stock</div>
                     <div className="mt-1 text-2xl font-bold">
-                      {addOn.variants?.reduce((total, variant) => total + variant.stockQuantity, 0)} units
+                      {addOn.variants?.reduce((total, variant) => total + variant.stock_quantity, 0)} units
                     </div>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Low Stock Variants</div>
                     <div className="mt-1 text-2xl font-bold">
-                      {addOn.variants?.filter(v => v.stockQuantity <= 5).length || 0}
+                      {addOn.variants?.filter(v => v.stock_quantity <= 5).length || 0}
                     </div>
                   </div>
                 </div>
@@ -307,14 +408,14 @@ export default function AddOnDetailPage({ params }: Props) {
                 <div className="space-y-4">
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Current Stock</div>
-                    <div className="mt-1 text-2xl font-bold">{addOn.stockQuantity} units</div>
+                    <div className="mt-1 text-2xl font-bold">{addOn.stock_quantity} units</div>
                   </div>
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Stock Status</div>
                     <div className="mt-1">
-                      {addOn.stockQuantity === 0 ? (
+                      {addOn.stock_quantity === 0 ? (
                         <Badge variant="outline" className="bg-red-50 text-red-500">Out of Stock</Badge>
-                      ) : addOn.stockQuantity <= 10 ? (
+                      ) : addOn.stock_quantity <= 10 ? (
                         <Badge variant="outline" className="bg-amber-50 text-amber-500">Low Stock</Badge>
                       ) : (
                         <Badge variant="outline" className="bg-green-50 text-green-500">In Stock</Badge>

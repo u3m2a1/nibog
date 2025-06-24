@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,144 +16,50 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format, addMonths, differenceInMonths, differenceInDays } from "date-fns"
 import { cn } from "@/lib/utils"
-import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, Loader2, CheckCircle } from "lucide-react"
-import { useState, useEffect } from "react"
+import { CalendarIcon, Info, ArrowRight, ArrowLeft, MapPin, AlertTriangle, AlertCircle, Loader2, CheckCircle } from "lucide-react"
+import { useState, useEffect, useMemo, useCallback, memo } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import AddOnSelector from "@/components/add-on-selector"
-import { addOns } from "@/data/add-ons"
+
+// Lazy load components that aren't needed on initial render
+const AddOnSelector = dynamic(() => import("@/components/add-on-selector"), {
+  loading: () => <div className="p-4 text-center">Loading add-ons...</div>,
+  ssr: false
+})
+
+import { fetchAllAddOnsFromExternalApi } from "@/services/addOnService"
 import { AddOn } from "@/types"
 import { getAllCities } from "@/services/cityService"
-import { getEventsByCityId, EventListItem, EventGameListItem } from "@/services/eventService"
+import { getEventsByCityId, getGamesByAgeAndEvent, EventListItem, EventGameListItem } from "@/services/eventService"
 import { getGamesByAge, Game } from "@/services/gameService"
 import { registerBooking, formatBookingDataForAPI } from "@/services/bookingRegistrationService"
 import { initiatePhonePePayment } from "@/services/paymentService"
+import { getPromoCodesByEventAndGames, validatePromoCodePreview } from "@/services/promoCodeService"
+import { storePendingBookingForPayment } from "@/services/pendingBookingServices"
+import { validateGameData } from "@/utils/gameIdValidation"
 
 // Helper function to format price.
-const formatPrice = (price: number) => {
-  return `₹${price.toLocaleString('en-IN')}`
+const formatPrice = (price: number | string | undefined) => {
+  // Convert price to a number and handle undefined/NaN cases
+  const numericPrice = typeof price === 'string' ? parseFloat(price) : Number(price || 0);
+  
+  // Check if the result is a valid number
+  if (isNaN(numericPrice)) {
+    console.warn('Invalid price value:', price);
+    return '₹0';
+  }
+  
+  // Round to 2 decimal places and remove trailing zeros
+  const roundedPrice = Math.round(numericPrice * 100) / 100;
+  
+  // If it's a whole number, don't show decimal places
+  if (roundedPrice === Math.floor(roundedPrice)) {
+    return `₹${roundedPrice.toLocaleString('en-IN')}`;
+  }
+  
+  // Otherwise format with exactly 2 decimal places
+  return `₹${roundedPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
-
-// Mock data - in a real app, this would come from an API
-const events = [
-  {
-    id: "1",
-    title: "Baby Crawling",
-    description: "Let your little crawler compete in a fun and safe environment.",
-    minAgeMonths: 5,
-    maxAgeMonths: 13,
-    date: "2025-10-26",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    price: 1800,
-    image: "/images/baby-crawling.jpg",
-  },
-  {
-    id: "2",
-    title: "Baby Walker",
-    description: "Fun-filled baby walker race in a safe environment.",
-    minAgeMonths: 5,
-    maxAgeMonths: 13,
-    date: "2025-10-26",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    price: 1800,
-    image: "/images/baby-walker.jpg",
-  },
-  {
-    id: "3",
-    title: "Running Race",
-    description: "Exciting running race for toddlers in a fun and safe environment.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-10-26",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    price: 1800,
-    image: "/images/running-race.jpg",
-  },
-  {
-    id: "4",
-    title: "Hurdle Toddle",
-    description: "Fun hurdle race for toddlers to develop coordination and balance.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-03-16",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    price: 1800,
-    image: "/images/hurdle-toddle.jpg",
-  },
-  {
-    id: "5",
-    title: "Cycle Race",
-    description: "Exciting cycle race for children to showcase their skills.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-08-15",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Sports Complex",
-    city: "Vizag",
-    price: 1800,
-    image: "/images/cycle-race.jpg",
-  },
-  {
-    id: "6",
-    title: "Ring Holding",
-    description: "Fun ring holding game to develop hand-eye coordination.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-10-12",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Indoor Stadium",
-    city: "Bangalore",
-    price: 1800,
-    image: "/images/ring-holding.jpg",
-  },
-  {
-    id: "7",
-    title: "Ball Throw",
-    description: "Develop throwing skills and hand-eye coordination in a fun competitive environment.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-09-18",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Indoor Stadium",
-    city: "Mumbai",
-    price: 1800,
-    image: "/images/ball-throw.jpg",
-  },
-  {
-    id: "8",
-    title: "Balancing Beam",
-    description: "Fun balancing activities to develop coordination and confidence.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-11-15",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Sports Complex",
-    city: "Delhi",
-    price: 1800,
-    image: "/images/balancing-beam.jpg",
-  },
-  {
-    id: "9",
-    title: "Frog Jump",
-    description: "Exciting jumping competition for toddlers in a fun and safe environment.",
-    minAgeMonths: 13,
-    maxAgeMonths: 84,
-    date: "2025-12-10",
-    time: "9:00 AM - 8:00 PM",
-    venue: "Indoor Stadium",
-    city: "Kolkata",
-    price: 1800,
-    image: "/images/frog-jump.jpg",
-  },
-]
 
 // Cities will be fetched from API
 
@@ -181,380 +88,206 @@ export default function RegisterEventClientPage() {
   const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState<boolean>(false)
   const [eventError, setEventError] = useState<string | null>(null)
+  const [apiAddOns, setApiAddOns] = useState<AddOn[]>([])
+  const [isLoadingAddOns, setIsLoadingAddOns] = useState<boolean>(false)
+  const [addOnError, setAddOnError] = useState<string | null>(null)
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null)
   const [games, setGames] = useState<Game[]>([])
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
-  const [selectedGame, setSelectedGame] = useState<string>("")
+  const [selectedGames, setSelectedGames] = useState<number[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
   const [bookingReference, setBookingReference] = useState<string | null>(null)
+  
+  // Promocode related states
+  const [availablePromocodes, setAvailablePromocodes] = useState<any[]>([])
+  const [isLoadingPromocodes, setIsLoadingPromocodes] = useState<boolean>(false)
+  const [promocodeError, setPromocodeError] = useState<string | null>(null)
+  const [promoCode, setPromoCode] = useState<string>('')
+  const [appliedPromoCode, setAppliedPromoCode] = useState<any | null>(null)
+  const [discountAmount, setDiscountAmount] = useState<number>(0)
+  const [isApplyingPromocode, setIsApplyingPromocode] = useState<boolean>(false)
 
   // Get authentication state from auth context
   const { isAuthenticated, user } = useAuth()
+  
+  // Fetch add-ons from external API
+  useEffect(() => {
+    async function loadAddOns() {
+      setIsLoadingAddOns(true);
+      setAddOnError(null);
+      try {
+        const addOnData = await fetchAllAddOnsFromExternalApi();
+        console.log('Fetched add-ons from external API:', addOnData);
+        setApiAddOns(addOnData);
+      } catch (error) {
+        console.error('Failed to load add-ons:', error);
+        setAddOnError('Failed to load add-ons. Please try again.');
+      } finally {
+        setIsLoadingAddOns(false);
+      }
+    }
+    
+    loadAddOns();
+  }, [])
 
-  // Calculate child's age on event date
-  const calculateAge = (birthDate: Date, onDate: Date) => {
-    const ageInMonths = differenceInMonths(onDate, birthDate)
+  // Calculate child's age based on current date
+  const calculateAge = (birthDate: Date) => {
+    const currentDate = new Date()
+    const ageInMonths = differenceInMonths(currentDate, birthDate)
     return ageInMonths
   }
 
-  // Calculate total price including add-ons and GST
+  // Calculate total price of selected games with memoization to prevent unnecessary recalculations
+  const calculateGamesTotal = useCallback(() => {
+    if (!selectedGames || selectedGames.length === 0) {
+      return 0;
+    }
+    
+    // Calculate total based on eligible games prices
+    let total = 0;
+    
+    for (const gameId of selectedGames) {
+      // Find the game in eligible games by numeric ID
+      const game = eligibleGames.find(g => g.id === gameId);
+      
+      // Get price from the game object - prioritize slot_price from event_games_with_slots table
+      let gamePrice = 0;
+      if (game) {
+        // Parse price values as numbers since they might be stored as strings
+        // Fixed: Use slot_price first (from event_games_with_slots table), then fallback to custom_price
+        if (game.slot_price) {
+          gamePrice = parseFloat(game.slot_price.toString());
+        } else if (game.custom_price) {
+          gamePrice = parseFloat(game.custom_price.toString());
+        }
+      }
+      
+      total += gamePrice;
+    }
+    
+    return total;
+  }, [selectedGames, eligibleGames]); // Recalculate only when these dependencies change
+
+  // Calculate total price including add-ons, GST, and promocode discount
   const calculateTotalPrice = () => {
-    if (!selectedEventDetails) return 0
-
-    const eventPrice = selectedEventDetails.price
-    const addOnsTotal = selectedAddOns.reduce((total, item) => total + (item.addOn.price * item.quantity), 0)
-    const subtotal = eventPrice + addOnsTotal
-    const gst = Math.round(subtotal * 0.18)
-
-    return subtotal + gst
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+    
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+    
+    const gst = parseFloat((discountedSubtotal * 0.18).toFixed(2));
+    const total = discountedSubtotal + gst;
+    
+    // Ensure final total is rounded to 2 decimal places
+    return parseFloat(total.toFixed(2));
   }
 
   // Calculate GST amount
   const calculateGST = () => {
-    if (!selectedEventDetails) return 0
-
-    const eventPrice = selectedEventDetails.price
-    const addOnsTotal = selectedAddOns.reduce((total, item) => total + (item.addOn.price * item.quantity), 0)
-    const subtotal = eventPrice + addOnsTotal
-
-    return Math.round(subtotal * 0.18)
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+    
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+    
+    const gst = discountedSubtotal * 0.18;
+    
+    // Round to 2 decimal places
+    return parseFloat(gst.toFixed(2));
   }
 
   // Calculate add-ons subtotal
   const calculateAddOnsTotal = () => {
-    return selectedAddOns.reduce((total, item) => {
-      let price = item.addOn.price
+    const total = selectedAddOns.reduce((sum, item) => {
+      let price = parseFloat(item.addOn.price.toString()) || 0;
 
       // Check if this is a variant with a different price
       if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
-        const variant = item.addOn.variants.find(v => v.id === item.variantId)
+        const variant = item.addOn.variants.find(v => v.id === item.variantId);
         if (variant) {
-          price = variant.price
+          // Use the variant's price if available, otherwise add price modifier to base price
+          if (typeof variant.price === 'number' || !isNaN(parseFloat(variant.price?.toString() || ''))) {
+            price = parseFloat(variant.price.toString());
+          } else if (typeof variant.price_modifier === 'number' || !isNaN(parseFloat((variant.price_modifier || 0).toString()))) {
+            const modifier = parseFloat((variant.price_modifier || 0).toString());
+            price = parseFloat(item.addOn.price.toString()) + modifier;
+          }
         }
       }
 
       // Apply bundle discount if applicable
       if (item.addOn.bundleDiscount && item.quantity >= item.addOn.bundleDiscount.minQuantity) {
-        const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100)
-        price = price * discountMultiplier
+        const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100);
+        price = price * discountMultiplier;
       }
 
-      return total + (price * item.quantity)
-    }, 0)
+      // Round to 2 decimal places for each item's total
+      const itemTotal = price * item.quantity;
+      return sum + parseFloat(itemTotal.toFixed(2));
+    }, 0);
+    
+    // Round final total to 2 decimal places
+    return parseFloat(total.toFixed(2));
   }
 
   // Handle DOB change
-  const handleDobChange = async (date: Date | undefined) => {
+  const handleDobChange = (date: Date | undefined) => {
     setDob(date)
-    setSelectedEventType("") // Reset event type when DOB changes
-    setSelectedGame("") // Reset selected game
-    setEligibleGames([]) // Reset eligible games
-
-    if (date && eventDate) {
-      const ageInMonths = calculateAge(date, eventDate)
+    
+    if (date) {
+      // Calculate child's age in months based on the current date
+      const ageInMonths = calculateAge(date)
       setChildAgeMonths(ageInMonths)
-
-      // Filter eligible events based on age
-      const eligible = events.filter(
-        event =>
-          event.minAgeMonths <= ageInMonths &&
-          event.maxAgeMonths >= ageInMonths &&
-          event.city === selectedCity
-      )
-      setEligibleEvents(eligible)
-
-      // Reset selected event if not eligible
-      if (eligible.length > 0 && !eligible.find(e => e.id === selectedEvent)) {
-        setSelectedEvent("")
+      
+      console.log(`Child's age: ${ageInMonths} months`)
+      
+      // If an event is already selected, fetch games for this age
+      if (selectedEventType) {
+        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+        if (selectedApiEvent) {
+          fetchGamesByEventAndAge(selectedApiEvent.event_id, ageInMonths);
+        }
       }
-
-      // Get unique dates for this city
-      const dates = eligible.map(event => new Date(event.date))
-      const uniqueDates = Array.from(new Set(dates.map(date => date.toISOString())))
-        .map(dateStr => new Date(dateStr))
-      setAvailableDates(uniqueDates)
-
-      // Set event date to the first available date
-      if (uniqueDates.length > 0) {
-        setEventDate(uniqueDates[0])
-      }
-
-      // Fetch games based on child's age
-      try {
-        setIsLoadingGames(true)
-        setGameError(null)
-
-        console.log(`Fetching games for age: ${ageInMonths} months`)
-        const gamesData = await getGamesByAge(ageInMonths)
-        console.log("Games data from API:", gamesData)
-
-        setGames(gamesData)
-
-        // Check if we have a selected event with games
-        let eventGames: Game[] = [];
-
-        if (selectedEventType && apiEvents.length > 0) {
-          // Find the selected event
-          const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
-
-          if (selectedApiEvent && selectedApiEvent.games && Array.isArray(selectedApiEvent.games)) {
-            console.log("Found games in selected event:", selectedApiEvent.games);
-
-            // Convert event games to Game format
-            eventGames = selectedApiEvent.games.map(game => ({
-              id: game.game_id,
-              game_title: game.game_title,
-              game_description: game.game_description || game.custom_description,
-              min_age: game.min_age,
-              max_age: game.max_age,
-              game_duration_minutes: game.game_duration_minutes,
-              categories: game.categories,
-              custom_price: game.custom_price || game.slot_price,
-              start_time: game.start_time,
-              end_time: game.end_time
-            }));
-
-            // Filter games based on age
-            const eligibleEventGames = eventGames.filter(
-              game => game.min_age <= ageInMonths && game.max_age >= ageInMonths
-            );
-
-            if (eligibleEventGames.length > 0) {
-              console.log(`Found ${eligibleEventGames.length} eligible games from event for age ${ageInMonths} months`);
-              setEligibleGames(eligibleEventGames);
-
-              // If there's only one eligible game, select it automatically
-              if (eligibleEventGames.length === 1) {
-                setSelectedGame(eligibleEventGames[0].id.toString());
-              }
-
-              // We found games from the event, so we can return early
-              return;
-            }
-          }
-        }
-
-        // If we don't have event games or no eligible event games, use the API games
-        // Filter games based on age
-        const eligibleGames = gamesData.filter(
-          game => game.min_age <= ageInMonths && game.max_age >= ageInMonths
-        );
-
-        console.log(`Found ${eligibleGames.length} eligible games from API for age ${ageInMonths} months`);
-
-        // If no games are returned from the API or no eligible games after filtering,
-        // create some default games as a fallback
-        if (eligibleGames.length === 0) {
-          console.log("No eligible games found, creating fallback games");
-
-          // Create fallback games based on age range
-          const fallbackGames = [];
-
-          if (ageInMonths >= 5 && ageInMonths <= 13) {
-            fallbackGames.push({
-              id: 1001,
-              game_title: "Baby Crawling",
-              game_description: "Let your little crawler compete in a fun and safe environment.",
-              min_age: 5,
-              max_age: 13,
-              game_duration_minutes: 30,
-              categories: ["physical", "fun"]
-            });
-
-            fallbackGames.push({
-              id: 1002,
-              game_title: "Baby Walker",
-              game_description: "Fun-filled baby walker race in a safe environment.",
-              min_age: 5,
-              max_age: 13,
-              game_duration_minutes: 30,
-              categories: ["physical", "fun"]
-            });
-          }
-
-          if (ageInMonths >= 13 && ageInMonths <= 84) {
-            fallbackGames.push({
-              id: 1003,
-              game_title: "Running Race",
-              game_description: "Exciting running race for toddlers in a fun and safe environment.",
-              min_age: 13,
-              max_age: 84,
-              game_duration_minutes: 45,
-              categories: ["physical", "fun"]
-            });
-
-            fallbackGames.push({
-              id: 1004,
-              game_title: "Hurdle Toddle",
-              game_description: "Fun hurdle race for toddlers to develop coordination and balance.",
-              min_age: 13,
-              max_age: 84,
-              game_duration_minutes: 45,
-              categories: ["physical", "fun"]
-            });
-          }
-
-          setEligibleGames(fallbackGames);
-
-          // If there's only one fallback game, select it automatically
-          if (fallbackGames.length === 1) {
-            setSelectedGame(fallbackGames[0].id.toString());
-          }
-        } else {
-          setEligibleGames(eligibleGames);
-
-          // If there's only one eligible game, select it automatically
-          if (eligibleGames.length === 1) {
-            setSelectedGame(eligibleGames[0].id.toString());
-          }
-        }
-      } catch (error: any) {
-        console.error(`Failed to fetch games for age ${ageInMonths} months:`, error)
-
-        // First, try to use games from the selected event if available
-        if (selectedEventType && apiEvents.length > 0) {
-          const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
-
-          if (selectedApiEvent && selectedApiEvent.games && Array.isArray(selectedApiEvent.games)) {
-            console.log("API call failed, but found games in selected event:", selectedApiEvent.games);
-
-            // Convert event games to Game format
-            const eventGames = selectedApiEvent.games.map(game => ({
-              id: game.game_id,
-              game_title: game.game_title,
-              game_description: game.game_description || game.custom_description,
-              min_age: game.min_age,
-              max_age: game.max_age,
-              game_duration_minutes: game.game_duration_minutes,
-              categories: game.categories,
-              custom_price: game.custom_price || game.slot_price,
-              start_time: game.start_time,
-              end_time: game.end_time
-            }));
-
-            // Filter games based on age
-            const eligibleEventGames = eventGames.filter(
-              game => game.min_age <= ageInMonths && game.max_age >= ageInMonths
-            );
-
-            if (eligibleEventGames.length > 0) {
-              console.log(`Found ${eligibleEventGames.length} eligible games from event for age ${ageInMonths} months`);
-              setEligibleGames(eligibleEventGames);
-
-              // If there's only one eligible game, select it automatically
-              if (eligibleEventGames.length === 1) {
-                setSelectedGame(eligibleEventGames[0].id.toString());
-              }
-
-              // Clear the error since we're providing event games
-              setGameError(null);
-              return;
-            }
-          }
-        }
-
-        // If no event games available, create fallback games
-        console.log("API call failed and no event games available, creating fallback games")
-
-        // Create fallback games based on age range
-        const fallbackGames = [];
-
-        if (ageInMonths >= 5 && ageInMonths <= 13) {
-          fallbackGames.push({
-            id: 1001,
-            game_title: "Baby Crawling",
-            game_description: "Let your little crawler compete in a fun and safe environment.",
-            min_age: 5,
-            max_age: 13,
-            game_duration_minutes: 30,
-            categories: ["physical", "fun"]
-          });
-
-          fallbackGames.push({
-            id: 1002,
-            game_title: "Baby Walker",
-            game_description: "Fun-filled baby walker race in a safe environment.",
-            min_age: 5,
-            max_age: 13,
-            game_duration_minutes: 30,
-            categories: ["physical", "fun"]
-          });
-        }
-
-        if (ageInMonths >= 13 && ageInMonths <= 84) {
-          fallbackGames.push({
-            id: 1003,
-            game_title: "Running Race",
-            game_description: "Exciting running race for toddlers in a fun and safe environment.",
-            min_age: 13,
-            max_age: 84,
-            game_duration_minutes: 45,
-            categories: ["physical", "fun"]
-          });
-
-          fallbackGames.push({
-            id: 1004,
-            game_title: "Hurdle Toddle",
-            game_description: "Fun hurdle race for toddlers to develop coordination and balance.",
-            min_age: 13,
-            max_age: 84,
-            game_duration_minutes: 45,
-            categories: ["physical", "fun"]
-          });
-        }
-
-        setEligibleGames(fallbackGames);
-
-        // Clear the error since we're providing fallback games
-        setGameError(null);
-      } finally {
-        setIsLoadingGames(false)
-      }
+    } else {
+      // Reset age if DOB is cleared
+      setChildAgeMonths(null)
     }
   }
 
   // Handle event date change when selecting from available dates
   const handleEventDateChange = (date: Date) => {
     setEventDate(date)
-    if (dob) {
-      const ageInMonths = calculateAge(dob, date)
-      setChildAgeMonths(ageInMonths)
-
-      // Filter eligible events based on age and selected date
-      const eligible = events.filter(
-        event =>
-          event.minAgeMonths <= ageInMonths &&
-          event.maxAgeMonths >= ageInMonths &&
-          event.city === selectedCity &&
-          new Date(event.date).toDateString() === date.toDateString()
-      )
-      setEligibleEvents(eligible)
-
-      // Reset selected event if not eligible
-      if (eligible.length > 0 && !eligible.find(e => e.id === selectedEvent)) {
-        setSelectedEvent("")
-      }
-    }
+    // Note: Child age is now based on current date, not event date
+    // We're not updating the child age when event date changes
   }
 
-  // Handle city change
+  // Handle city change and fetch events for the selected city
   const handleCityChange = async (city: string) => {
     setSelectedCity(city)
     setSelectedEventType("") // Reset event type when city changes
-    setSelectedEvent("") // Reset selected event
+    setSelectedEvent("") // Reset selected event when city changes
+    setEligibleEvents([]) // Reset eligible events
+    setEligibleGames([]) // Reset eligible games
+    setSelectedGames([]) // Reset selected games
 
-    // Find the city ID from the selected city name
-    const selectedCityObj = cities.find(c => c.name === city);
-    if (!selectedCityObj || !selectedCityObj.id) {
-      console.error("Could not find city ID for selected city:", city);
-      return;
-    }
+    // Find city ID from the cities list
+    const cityObj = cities.find(c => c.name === city)
+    if (!cityObj) return
 
-    const cityId = Number(selectedCityObj.id);
+    const cityId = cityObj.id
     setSelectedCityId(cityId);
 
     // Fetch events for the selected city
@@ -568,37 +301,46 @@ export default function RegisterEventClientPage() {
 
       setApiEvents(eventsData);
 
-      // If child's age is already calculated, filter eligible events
-      if (childAgeMonths !== null) {
-        // Filter eligible events based on age from the mock data (for now)
-        // Later we'll use the API events
-        const eligible = events.filter(
-          event =>
-            event.minAgeMonths <= childAgeMonths &&
-            event.maxAgeMonths >= childAgeMonths &&
-            event.city === city
-        )
-        setEligibleEvents(eligible)
-
-        // Reset selected event if not eligible
-        if (eligible.length > 0 && !eligible.find(e => e.id === selectedEvent)) {
-          setSelectedEvent("")
-        }
-
-        // Get unique dates for this city
-        const dates = eligible.map(event => new Date(event.date))
+      // No need to filter events by age anymore - games will be fetched separately
+      // when both event and DOB are selected
+      
+      // Convert API events to the format expected by the UI for display purposes
+      if (eventsData.length > 0) {
+        const apiEventsMapped = eventsData.map(event => ({
+          id: event.event_id.toString(),
+          title: event.event_title,
+          description: event.event_description,
+          minAgeMonths: 5, // Default min age if not specified in API data
+          maxAgeMonths: 84, // Default max age if not specified in API data
+          date: event.event_date.split('T')[0], // Format the date
+          time: "9:00 AM - 8:00 PM", // Default time
+          venue: event.venue_name || "Venue TBD",
+          city: event.city_name || city,
+          price: 1800, // Default price
+          image: "/images/baby-crawling.jpg" // Default image
+        }));
+        
+        // Set all events as eligible without age filtering
+        setEligibleEvents(apiEventsMapped);
+        
+        // Get unique dates for this city from API events
+        const dates = apiEventsMapped.map(event => new Date(event.date));
         const uniqueDates = Array.from(new Set(dates.map(date => date.toISOString())))
-          .map(dateStr => new Date(dateStr))
-        setAvailableDates(uniqueDates)
+          .map(dateStr => new Date(dateStr));
+        setAvailableDates(uniqueDates);
 
         // Set event date to the first available date
         if (uniqueDates.length > 0) {
-          setEventDate(uniqueDates[0])
+          setEventDate(uniqueDates[0]);
         }
       }
     } catch (error: any) {
       console.error(`Failed to fetch events for city ID ${cityId}:`, error);
       setEventError("Failed to load events. Please try again.");
+      
+      // Clear events on error
+      setEligibleEvents([]);
+      setAvailableDates([]);
     } finally {
       setIsLoadingEvents(false);
     }
@@ -608,6 +350,14 @@ export default function RegisterEventClientPage() {
   const handleEventTypeChange = (eventType: string) => {
     setSelectedEventType(eventType)
     setSelectedEvent("") // Reset selected event when event type changes
+    setEligibleGames([]) // Reset games when event type changes
+    setSelectedGames([]) // Reset selected games when event type changes
+    
+    // Reset promocode when event changes
+    setPromoCode('')
+    setAppliedPromoCode(null)
+    setDiscountAmount(0)
+    setAvailablePromocodes([])
 
     // Find the selected event from API events
     const selectedApiEvent = apiEvents.find(event => event.event_title === eventType);
@@ -640,10 +390,10 @@ export default function RegisterEventClientPage() {
         setEventDate(eventDate);
         setAvailableDates([eventDate]);
 
-        // If DOB is set, calculate age for this event date
-        if (dob) {
-          const ageInMonths = calculateAge(dob, eventDate);
-          setChildAgeMonths(ageInMonths);
+        // If DOB is set, use the already calculated age (based on current date)
+        if (dob && childAgeMonths !== null) {
+          // Fetch games for this event and child age
+          fetchGamesByEventAndAge(selectedApiEvent.event_id, childAgeMonths);
         }
       }
     } else {
@@ -651,16 +401,151 @@ export default function RegisterEventClientPage() {
       setEligibleEvents([]);
     }
   }
+  
+  // Fetch games based on event ID and child age
+  const fetchGamesByEventAndAge = async (eventId: number, childAge: number) => {
+    if (!eventId || childAge === null) return;
+
+    setIsLoadingGames(true);
+    setGameError("");
+
+    try {
+      console.log(`Fetching games for event ID: ${eventId} and child age: ${childAge} months`);
+
+      // Call the new API to get games by age and event
+      const gamesData = await getGamesByAgeAndEvent(eventId, childAge);
+
+      if (gamesData && gamesData.length > 0) {
+        console.log(`Found ${gamesData.length} games for event ${eventId} and age ${childAge} months`);
+        console.log('Game data from API:', gamesData);
+
+        // Update event details with correct date and venue from the games API response
+        const firstGame = gamesData[0];
+        if (firstGame && firstGame.event_date && firstGame.venue_name) {
+          console.log('Updating event details with correct date and venue from games API');
+          console.log('Event date from games API (corrected):', firstGame.event_date);
+          console.log('Venue name from games API:', firstGame.venue_name);
+
+          // Since the SQL query now returns the correct date in YYYY-MM-DD format (Asia/Kolkata timezone)
+          // we can use it directly without any timezone conversion
+          const correctDate = firstGame.event_date; // e.g., "2025-07-30"
+
+          // Parse the date components to create a proper Date object
+          const [year, month, day] = correctDate.split('-').map(Number);
+          console.log('Parsed date components:', { year, month, day });
+
+          // Find the current selected event and update it with correct information
+          const selectedApiEvent = apiEvents.find(event => event.event_id === eventId);
+          if (selectedApiEvent) {
+
+            // Update the event details with correct date and venue
+            const updatedEvent = {
+              id: selectedApiEvent.event_id.toString(),
+              title: selectedApiEvent.event_title,
+              description: selectedApiEvent.event_description,
+              minAgeMonths: 5,
+              maxAgeMonths: 84,
+              date: correctDate, // Use the correct date from games API (already in correct timezone)
+              time: "9:00 AM - 8:00 PM",
+              venue: firstGame.venue_name, // Use the correct venue from games API
+              city: selectedApiEvent.city_name,
+              price: 1800,
+              image: "/images/baby-crawling.jpg",
+            };
+
+            // Update eligible events with the corrected information
+            setEligibleEvents([updatedEvent]);
+
+            // Create Date object using local timezone (month is 0-indexed in JavaScript)
+            const correctEventDate = new Date(year, month - 1, day);
+            console.log('Created Date object:', correctEventDate);
+            console.log('Date will display as:', correctEventDate.toDateString());
+            setEventDate(correctEventDate);
+            setAvailableDates([correctEventDate]);
+
+            console.log('Updated event details:', updatedEvent);
+          }
+        }
+
+        // Format games to match the Game interface structure, using API data only
+        // IMPORTANT: Use slot_id as the unique identifier for selection (since each slot is unique)
+        // but store game_id separately for API calls
+        const formattedGames: Game[] = gamesData.map((game: any) => ({
+          id: Number(game.slot_id || 0), // Use slot_id as unique identifier for selection
+          game_id: Number(game.game_id || 0), // Store actual game_id for API calls
+          game_title: game.title || '',
+          game_description: game.description || '',
+          min_age: game.min_age || 0,
+          max_age: game.max_age || 0,
+          game_duration_minutes: game.duration_minutes || 0,
+          categories: game.categories || [],
+          custom_price: game.listed_price || 0,
+          slot_price: game.slot_price || 0,
+          start_time: game.start_time || '',
+          end_time: game.end_time || '',
+          custom_title: game.title || '',
+          custom_description: game.description || '',
+          max_participants: game.max_participants || 0,
+          // Store slot_id separately for reference
+          slot_id: Number(game.slot_id || 0)
+        }));
+
+        // Set the formatted games (this is separate from eligibleEvents which contains event details)
+        setEligibleGames(formattedGames);
+      } else {
+        console.log(`No games found for event ${eventId} and age ${childAge} months`);
+        setEligibleGames([]);
+      }
+    } catch (error) {
+      console.error('Error fetching games:', error);
+      setGameError("Failed to load games. Please try again.");
+      setEligibleGames([]);
+    } finally {
+      setIsLoadingGames(false);
+    }
+  }
 
   // Handle game selection
-  const handleGameSelection = (gameId: string) => {
-    setSelectedGame(gameId)
-    console.log(`Selected game ID: ${gameId}`)
+  const handleGameSelection = (gameId: number) => {
+    // Toggle selection: add if not selected, remove if already selected
+    setSelectedGames(prev => {
+      const newSelectedGames = prev.includes(gameId)
+        ? prev.filter(id => id !== gameId) // Remove from selection
+        : [...prev, gameId]; // Add to selection
 
-    // Find the selected game
-    const game = eligibleGames.find(g => g.id.toString() === gameId)
+      // Reset promocode when games change
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+
+      // Fetch applicable promocodes for the new game selection
+      if (newSelectedGames.length > 0 && selectedEventType) {
+        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+        if (selectedApiEvent) {
+          // Convert slot IDs to game IDs for promo code API
+          const gameIdsForPromo = newSelectedGames.map(slotId => {
+            const game = eligibleGames.find(g => g.id === slotId);
+            return game?.game_id;
+          }).filter(Boolean);
+
+          if (gameIdsForPromo.length > 0) {
+            fetchApplicablePromocodes(selectedApiEvent.event_id, gameIdsForPromo);
+          }
+        }
+      } else {
+        setAvailablePromocodes([]);
+      }
+
+      return newSelectedGames;
+    });
+
+    // Log selection state for debugging
+    console.log(`Toggled game ID: ${gameId}`);
+
+    // Find the selected game for additional logging
+    const game = eligibleGames.find(g => g.id === gameId);
     if (game) {
-      console.log("Selected game:", game)
+      console.log("Toggled game:", game);
     }
   }
 
@@ -673,9 +558,8 @@ export default function RegisterEventClientPage() {
     return Array.from(new Set(eventTitles));
   }
 
-  // Get selected event details - check both static events and eligible events
-  const selectedEventDetails = events.find(event => event.id === selectedEvent) ||
-                               eligibleEvents.find(event => event.id === selectedEvent);
+  // Get selected event details from eligible events
+  const selectedEventDetails = eligibleEvents.find(event => event.id === selectedEvent);
 
   // Handle registration - now focuses on authentication check and navigation
   const handleRegistration = async () => {
@@ -693,7 +577,7 @@ export default function RegisterEventClientPage() {
         selectedCity,
         selectedEventType,
         selectedEvent,
-        selectedGame,
+        selectedGames,
         childAgeMonths,
         availableDates: availableDates.map(date => date.toISOString()),
         step: 1, // Current step
@@ -702,7 +586,7 @@ export default function RegisterEventClientPage() {
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
       // Save add-ons to session storage
-      saveAddOnsToSession()
+      saveDataToSession()
 
       // Show user-friendly message about login requirement
       alert("Please log in to continue with your registration. Your progress will be saved.")
@@ -711,7 +595,7 @@ export default function RegisterEventClientPage() {
       router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
     } else {
       // User is authenticated, proceed to add-ons step
-      saveAddOnsToSession()
+      saveDataToSession()
       setStep(2)
     }
   }
@@ -732,7 +616,7 @@ export default function RegisterEventClientPage() {
         selectedCity,
         selectedEventType,
         selectedEvent,
-        selectedGame,
+        selectedGames,
         childAgeMonths,
         availableDates: availableDates.map(date => date.toISOString()),
         step: 3, // Payment step
@@ -740,8 +624,8 @@ export default function RegisterEventClientPage() {
       }
       sessionStorage.setItem('registrationData', JSON.stringify(registrationData))
 
-      // Save add-ons to session storage
-      saveAddOnsToSession()
+      // Save add-ons and game data to session storage
+      saveDataToSession()
 
       // Show user-friendly message about login requirement
       alert("Please log in to proceed with payment. Your registration details will be saved.")
@@ -750,19 +634,24 @@ export default function RegisterEventClientPage() {
       router.push(`/login?returnUrl=${encodeURIComponent('/register-event?step=payment')}`)
     } else {
       // User is authenticated, proceed to payment step
-      saveAddOnsToSession()
+      saveDataToSession()
       setStep(3)
     }
   }
 
-  // Save add-ons to session storage
-  const saveAddOnsToSession = () => {
+  // Save add-ons and game data to session storage
+  const saveDataToSession = () => {
+    // Save add-ons data
     const addOnsData = selectedAddOns.map(item => ({
       addOnId: item.addOn.id,
       quantity: item.quantity,
       variantId: item.variantId
     }))
     sessionStorage.setItem('selectedAddOns', JSON.stringify(addOnsData))
+    
+    // Save eligible games data to preserve price information
+    sessionStorage.setItem('eligibleGames', JSON.stringify(eligibleGames))
+    console.log('Saved eligible games to session:', eligibleGames)
   }
 
   // Handle continue to payment - now includes authentication check
@@ -770,16 +659,138 @@ export default function RegisterEventClientPage() {
     handleProceedToPayment()
   }
 
-  // Handle payment and booking registration
+  // Fetch applicable promocodes for selected event and games
+  const fetchApplicablePromocodes = async (eventId: number, gameIds: number[]) => {
+    if (!eventId || !gameIds.length) return;
+    
+    try {
+      setIsLoadingPromocodes(true);
+      setPromocodeError(null);
+      
+      console.log(`Fetching promocodes for event ID: ${eventId} and game IDs: ${gameIds.join(', ')}`);
+      const promocodes = await getPromoCodesByEventAndGames(eventId, gameIds);
+      
+      console.log('Available promocodes:', promocodes);
+      setAvailablePromocodes(promocodes);
+      
+      // Reset any applied promocode when fetching new ones
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+    } catch (error) {
+      console.error('Error fetching promocodes:', error);
+      setPromocodeError('Failed to load promocodes');
+      setAvailablePromocodes([]);
+    } finally {
+      setIsLoadingPromocodes(false);
+    }
+  };
+  
+  // Handle applying a promocode
+  const handleApplyPromoCode = async () => {
+    if (!promoCode) return;
+    
+    try {
+      setIsApplyingPromocode(true);
+      setPromocodeError(null);
+      
+      // Get the selected event ID
+      const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+      if (!selectedApiEvent) {
+        throw new Error('Selected event not found');
+      }
+      
+      // Get the total amount before discount
+      const gamesTotal = calculateGamesTotal();
+      const addOnsTotal = calculateAddOnsTotal();
+      const subtotal = gamesTotal + addOnsTotal;
+      
+      // Validate the promocode
+      const result = await validatePromoCodePreview(
+        promoCode,
+        selectedApiEvent.event_id,
+        selectedGames,
+        subtotal
+      );
+      
+      console.log('Promocode validation result:', result);
+      
+      if (result.isValid) {
+        // Find the promocode details from available promocodes
+        const promocodeDetails = availablePromocodes.find(code => code.promo_code === promoCode);
+        
+        if (promocodeDetails) {
+          setAppliedPromoCode(promocodeDetails);
+          setDiscountAmount(result.discountAmount);
+        } else {
+          // If promocode details not found in available promocodes, create a basic object
+          setAppliedPromoCode({
+            promo_code: promoCode,
+            type: result.discountAmount === subtotal * (parseInt(promoCode.split('%')[0]) / 100) ? 'percentage' : 'fixed',
+            value: result.discountAmount === subtotal * (parseInt(promoCode.split('%')[0]) / 100) ? parseInt(promoCode.split('%')[0]) : result.discountAmount
+          });
+          setDiscountAmount(result.discountAmount);
+        }
+      } else {
+        setPromocodeError(result.message || 'Invalid promocode');
+        setAppliedPromoCode(null);
+        setDiscountAmount(0);
+      }
+    } catch (error: any) {
+      console.error('Error applying promocode:', error);
+      setPromocodeError(error.message || 'Failed to apply promocode');
+      setAppliedPromoCode(null);
+      setDiscountAmount(0);
+    } finally {
+      setIsApplyingPromocode(false);
+    }
+  };
+  
+  // Handle removing an applied promocode
+  const handleRemovePromoCode = () => {
+    setPromoCode('');
+    setAppliedPromoCode(null);
+    setDiscountAmount(0);
+    setPromocodeError(null);
+  };
+  
+  // Handle payment initiation - redirect to PhonePe first, booking will be created after successful payment
   const handlePayment = async () => {
     try {
       setIsProcessingPayment(true)
       setPaymentError(null)
 
-      // Get the selected game details
-      const selectedGameObj = eligibleGames.find(game => game.id.toString() === selectedGame)
-      if (!selectedGameObj) {
-        throw new Error("Selected game not found")
+      // Get the selected game details with comprehensive logging
+      console.log("=== GAME ID PROCESSING DEBUG ===")
+      console.log("Selected slot IDs (for UI selection):", selectedGames)
+      console.log("Eligible games:", eligibleGames.map(g => ({
+        slot_id: g.id, // This is the slot_id used for selection
+        game_id: g.game_id, // This is the actual game_id for API
+        title: g.custom_title || g.game_title,
+        time: `${g.start_time} - ${g.end_time}`
+      })))
+
+      // Filter out any undefined games to prevent errors
+      const selectedGamesObj = selectedGames
+        .map(slotId => {
+          const game = eligibleGames.find(game => game.id === slotId)
+          if (!game) {
+            console.error(`❌ Game slot with ID ${slotId} not found in eligible games!`)
+          } else {
+            console.log(`✅ Found game slot: Slot ID ${slotId}, Game ID ${game.game_id}, Title: ${game.custom_title || game.game_title}`)
+          }
+          return game
+        })
+        .filter(game => game !== undefined);
+
+      console.log("Selected games objects:", selectedGamesObj.map(g => ({ id: g?.id, title: g?.custom_title || g?.game_title })))
+
+      if (selectedGamesObj.length === 0) {
+        throw new Error("No valid games selected. Please select at least one game.")
+      }
+
+      if (selectedGamesObj.length !== selectedGames.length) {
+        console.warn(`⚠️ Warning: ${selectedGames.length} games selected but only ${selectedGamesObj.length} found in eligible games`)
       }
 
       // Get the selected event details
@@ -794,51 +805,84 @@ export default function RegisterEventClientPage() {
         throw new Error("User ID not found. Please log in again.")
       }
 
-      // Format the booking data for the API
-      const bookingData = formatBookingDataForAPI({
+      // Prepare booking data for database storage
+      // IMPORTANT: Extract actual game_id values for API, not slot_id values
+      const gameIds = selectedGamesObj.map(game => game?.game_id).filter(Boolean)
+      const gamePrices = selectedGamesObj.map(game => game?.slot_price || game?.custom_price || 0)
+      const slotIds = selectedGamesObj.map(game => game?.id).filter(Boolean) // Keep slot IDs for reference
+
+      console.log("=== BOOKING DATA PREPARATION ===")
+      console.log("Slot IDs (selected by user):", slotIds)
+      console.log("Game IDs (for API):", gameIds)
+      console.log("Game prices for booking:", gamePrices)
+      console.log("Event ID:", selectedApiEvent.event_id)
+
+      // Use validation utility to ensure game data is correct
+      const totalAmount = calculateTotalPrice()
+      const validationResult = validateGameData(gameIds, gamePrices, totalAmount)
+
+      if (!validationResult.isValid || validationResult.validGames.length === 0) {
+        console.error("Game validation failed:", validationResult.errors)
+        throw new Error("Invalid game selection. Please select valid games and try again.")
+      }
+
+      const validGameIds = validationResult.validGames.map(game => game.gameId)
+      const validGamePrices = validationResult.validGames.map(game => game.gamePrice)
+
+      console.log("Validated Game IDs:", validGameIds)
+      console.log("Validated Game Prices:", validGamePrices)
+
+      const bookingData = {
         userId,
         parentName,
         email,
         phone,
         childName,
-        childDob: dob!,
+        childDob: dob!.toISOString(),
         schoolName,
         gender,
         eventId: selectedApiEvent.event_id,
-        gameId: selectedGameObj.id,
-        gamePrice: selectedGameObj.custom_price || selectedGameObj.slot_price || 0,
+        // Store both slot IDs and game IDs for proper handling
+        slotId: slotIds,  // Array of selected slot IDs (for reference)
+        gameId: validGameIds,  // Array of actual game IDs (for API)
+        gamePrice: validGamePrices,  // Array of game prices
         totalAmount: calculateTotalPrice(),
-        paymentMethod: "PhonePe", // Using PhonePe as the payment method
-        paymentStatus: "Pending", // Set to pending initially
-        termsAccepted
-      })
-
-      console.log("Formatted booking data:", bookingData)
-
-      // Register the booking
-      const response = await registerBooking(bookingData)
-      console.log("Booking registration response:", response)
-
-      if (!response || response.length === 0) {
-        throw new Error("Failed to create booking. Please try again.")
+        paymentMethod: "PhonePe",
+        termsAccepted,
+        addOns: selectedAddOns.map(item => ({
+          addOnId: item.addOn.id,
+          quantity: item.quantity,
+          variantId: item.variantId
+        })),
+        ...(appliedPromoCode && { promoCode: promoCode })
       }
 
-      const bookingId = response[0].booking_id.toString()
-      setBookingReference(bookingId)
+      console.log("=== STORING BOOKING DATA IN LOCAL STORAGE ===")
+      console.log("Booking data for local storage:", JSON.stringify(bookingData, null, 2))
+
+      // Generate a transaction ID with format NIBOG_<userId>_<timestamp>
+      const timestamp = new Date().getTime()
+      const transactionId = `NIBOG_${userId}_${timestamp}`
+      
+      // Store complete booking data in localStorage
+      localStorage.setItem('nibog_booking_data', JSON.stringify({
+        ...bookingData,
+        transactionId,
+        timestamp
+      }))
+
+      console.log("✅ Booking data stored in localStorage with transaction ID:", transactionId)
 
       console.log("=== PHONEPE PAYMENT INITIATION ===")
-      console.log("Booking ID:", bookingId)
+      console.log("Transaction ID:", transactionId)
       console.log("User ID:", userId)
       console.log("Phone:", phone)
-
-      // Get the total amount in rupees
-      const totalAmount = calculateTotalPrice()
       console.log("Total Amount (₹):", totalAmount)
 
-      // Initiate the payment
+      // Initiate the payment with the stored transaction ID
       console.log("🚀 Calling initiatePhonePePayment...")
       const paymentUrl = await initiatePhonePePayment(
-        bookingId,
+        transactionId, // Use the transaction ID from pending booking
         userId,
         totalAmount,
         phone
@@ -847,9 +891,8 @@ export default function RegisterEventClientPage() {
       console.log("✅ PhonePe payment URL received:", paymentUrl)
       console.log("🔄 Redirecting to PhonePe payment page...")
 
-      // Clear saved registration data since we're proceeding to payment
-      sessionStorage.removeItem('registrationData')
-      sessionStorage.removeItem('selectedAddOns')
+      // Don't remove registration data yet as we might need it if payment fails
+      // We'll clear it after successful payment completion
 
       // Redirect to the PhonePe payment page
       window.location.href = paymentUrl
@@ -943,7 +986,7 @@ export default function RegisterEventClientPage() {
         setSelectedCity(data.selectedCity || cityParam || '')
         setSelectedEventType(data.selectedEventType || '')
         setSelectedEvent(data.selectedEvent || '')
-        setSelectedGame(data.selectedGame || '')
+        setSelectedGames(data.selectedGames || [])
         setChildAgeMonths(data.childAgeMonths || null)
         setTermsAccepted(data.termsAccepted || false)
 
@@ -955,6 +998,28 @@ export default function RegisterEventClientPage() {
         // Load available dates from saved data
         if (data.availableDates && Array.isArray(data.availableDates)) {
           setAvailableDates(data.availableDates.map((dateStr: string) => new Date(dateStr)))
+        }
+        
+        // Load eligible games with price information
+        const savedEligibleGames = sessionStorage.getItem('eligibleGames')
+        if (savedEligibleGames) {
+          try {
+            const eligibleGamesData = JSON.parse(savedEligibleGames)
+            console.log('Restored eligible games from session:', eligibleGamesData)
+            setEligibleGames(eligibleGamesData)
+            
+            // If we have a selected event type and child age, but no eligible games loaded,
+            // try to fetch them again
+            if (data.selectedEventType && data.childAgeMonths && eligibleGamesData.length === 0) {
+              const selectedApiEvent = apiEvents.find(event => event.event_title === data.selectedEventType);
+              if (selectedApiEvent) {
+                console.log('Re-fetching games for event and age')
+                fetchGamesByEventAndAge(selectedApiEvent.event_id, data.childAgeMonths);
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing saved eligible games data:', error)
+          }
         }
 
         // Load saved add-ons if available
@@ -1025,7 +1090,22 @@ export default function RegisterEventClientPage() {
               <CalendarIcon className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-2xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">Register for NIBOG Event</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                <span className="relative">
+                  <span 
+                    className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-[length:200%_auto] animate-gradient"
+                    style={{
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                    }}
+                  >
+                    Register for NIBOG Event
+                  </span>
+                  <span className="absolute inset-0 z-0 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-[length:200%_auto] animate-gradient opacity-70 blur-sm">
+                    Register for NIBOG Event
+                  </span>
+                </span>
+              </CardTitle>
               <CardDescription>
                 {selectedCity
                   ? `Register your child for exciting baby games in ${selectedCity}`
@@ -1124,151 +1204,6 @@ export default function RegisterEventClientPage() {
           {step === 1 && (
             <>
               {/* City Selection - Moved to the top */}
-              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
-                <h3 className="text-sm font-medium text-primary flex items-center gap-2">
-                  <div className="bg-primary/10 p-1 rounded-full">
-                    <MapPin className="h-4 w-4 text-primary" />
-                  </div>
-                  Select Your City
-                </h3>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
-                    <span>City</span>
-                    <span className="text-xs text-primary/70">(Required)</span>
-                  </Label>
-                  {isLoadingCities ? (
-                    <div className="flex h-10 items-center rounded-md border border-input px-3 py-2 text-sm">
-                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                      <span className="text-muted-foreground">Loading cities...</span>
-                    </div>
-                  ) : cityError ? (
-                    <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
-                      {cityError}
-                    </div>
-                  ) : (
-                    <Select value={selectedCity} onValueChange={handleCityChange} disabled={cities.length === 0}>
-                      <SelectTrigger className={cn(
-                        "border-dashed transition-all duration-200",
-                        selectedCity ? "border-primary/40 bg-primary/5" : "border-muted-foreground/40 text-muted-foreground"
-                      )}>
-                        <SelectValue placeholder={cities.length === 0 ? "No cities available" : "Select your city"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[300px] overflow-y-auto border-2 border-primary/10 shadow-xl">
-                        <div className="p-2 bg-gradient-to-r from-primary/5 to-purple-500/5 border-b border-primary/10 sticky top-0 z-10">
-                          <h3 className="text-sm font-medium text-primary">Select Your City</h3>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1">
-                          {cities.map((city) => (
-                            <SelectItem key={city.id} value={city.name} className="rounded-md hover:bg-primary/5 transition-colors duration-200">
-                              {city.name}
-                            </SelectItem>
-                          ))}
-                        </div>
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                {selectedCity && (
-                  <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
-                    <Label className="flex items-center gap-1">
-                      <span>Event</span>
-                      <span className="text-xs text-primary/70">(Required)</span>
-                    </Label>
-                    {isLoadingEvents ? (
-                      <div className="flex h-10 items-center rounded-md border border-input px-3 py-2 text-sm">
-                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                        <span className="text-muted-foreground">Loading events...</span>
-                      </div>
-                    ) : eventError ? (
-                      <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
-                        {eventError}
-                      </div>
-                    ) : getUniqueEventTypes().length > 0 ? (
-                      <Select
-                        value={selectedEventType}
-                        onValueChange={handleEventTypeChange}
-                        disabled={getUniqueEventTypes().length === 0}
-                      >
-                        <SelectTrigger className={cn(
-                          "border-dashed transition-all duration-200",
-                          selectedEventType ? "border-primary/40 bg-primary/5" : "border-muted-foreground/40 text-muted-foreground"
-                        )}>
-                          <SelectValue placeholder="Select an event" />
-                        </SelectTrigger>
-                        <SelectContent className="border-2 border-primary/10 shadow-xl">
-                          <div className="p-2 bg-gradient-to-r from-primary/5 to-purple-500/5 border-b border-primary/10 sticky top-0 z-10">
-                            <h3 className="text-sm font-medium text-primary">Select an Event</h3>
-                          </div>
-                          {getUniqueEventTypes().map((eventType) => (
-                            <SelectItem key={eventType} value={eventType} className="rounded-md hover:bg-primary/5 transition-colors duration-200">
-                              {eventType}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
-                        No events found for this city
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedCity && selectedEventType && (
-                  <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
-                    <Label className="flex items-center gap-1">
-                      <span>Event Details</span>
-                      <span className="text-xs text-primary/70">(Required)</span>
-                    </Label>
-                    {eligibleEvents.length > 0 ? (
-                      <div className="grid gap-3 sm:grid-cols-1">
-                        {eligibleEvents.map((event) => (
-                          <div
-                            key={event.id}
-                            className="flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 border-primary/30 bg-primary/5 shadow-md"
-                          >
-                            <div className="space-y-1 flex-1">
-                              <div className="font-medium text-lg">
-                                {format(new Date(event.date), "PPP")}
-                              </div>
-                              <p className="text-sm text-muted-foreground">{event.venue}</p>
-                              <div className="flex justify-between items-center mt-2">
-                                <div className="text-sm">
-                                  <span className="font-medium text-primary">₹{event.price}</span> • {event.city}
-                                </div>
-                                <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                  Age: {event.minAgeMonths}-{event.maxAgeMonths} months
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:from-yellow-950 dark:to-amber-950 border border-yellow-100 dark:border-yellow-900 shadow-inner">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-1">
-                            <Info className="h-5 w-5 text-yellow-500 dark:text-yellow-400" aria-hidden="true" />
-                          </div>
-                          <div className="ml-3">
-                            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                              No event details available
-                            </h3>
-                            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
-                              <p>
-                                Could not load details for {selectedEventType} in {selectedCity}.
-                                Please try a different event or city.
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
               <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
                 <h3 className="text-sm font-medium text-primary flex items-center gap-2">
                   <div className="bg-primary/10 p-1 rounded-full">
@@ -1412,6 +1347,31 @@ export default function RegisterEventClientPage() {
                 </div>
               </div>
 
+              {/* Display child's age in months when DOB is selected */}
+              {dob && childAgeMonths !== null && (
+                <div className="mt-3 mb-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 shadow-sm">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0 bg-blue-100 rounded-full p-1 mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                        <path d="M12 2v6.5l3-3"></path>
+                        <path d="M12 2v6.5l-3-3"></path>
+                        <path d="M12 22v-6.5l3 3"></path>
+                        <path d="M12 22v-6.5l-3 3"></path>
+                        <path d="M2 12h6.5l-3 3"></path>
+                        <path d="M2 12h6.5l-3-3"></path>
+                        <path d="M22 12h-6.5l3 3"></path>
+                        <path d="M22 12h-6.5l3-3"></path>
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="text-sm font-medium text-blue-800">Child's Age: </span>
+                      <span className="text-sm font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{childAgeMonths} months</span>
+                      <span className="text-xs text-blue-600 ml-2">({Math.floor(childAgeMonths / 12)} years, {childAgeMonths % 12} months)</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <span>Gender</span>
@@ -1433,6 +1393,238 @@ export default function RegisterEventClientPage() {
                 </RadioGroup>
               </div>
 
+              <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-50">
+                <h3 className="text-sm font-medium text-primary flex items-center gap-2">
+                  <div className="bg-primary/10 p-1 rounded-full">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </div>
+                  Select Your City
+                </h3>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <span>City</span>
+                    <span className="text-xs text-primary/70">(Required)</span>
+                  </Label>
+                  {isLoadingCities ? (
+                    <div className="flex h-10 items-center rounded-md border border-input px-3 py-2 text-sm">
+                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      <span className="text-muted-foreground">Loading cities...</span>
+                    </div>
+                  ) : cityError ? (
+                    <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
+                      {cityError}
+                    </div>
+                  ) : (
+                    <Select value={selectedCity} onValueChange={handleCityChange} disabled={cities.length === 0}>
+                      <SelectTrigger className={cn(
+                        "border-dashed transition-all duration-200",
+                        selectedCity ? "border-primary/40 bg-primary/5" : "border-muted-foreground/40 text-muted-foreground"
+                      )}>
+                        <SelectValue placeholder={cities.length === 0 ? "No cities available" : "Select your city"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px] overflow-y-auto border-2 border-primary/10 shadow-xl">
+                        <div className="p-2 bg-gradient-to-r from-primary/5 to-purple-500/5 border-b border-primary/10 sticky top-0 z-10">
+                          <h3 className="text-sm font-medium text-primary">Select Your City</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-1">
+                          {cities.map((city) => (
+                            <SelectItem key={city.id} value={city.name} className="rounded-md hover:bg-primary/5 transition-colors duration-200">
+                              {city.name}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                {selectedCity && (
+                  <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
+                    <Label className="flex items-center gap-1">
+                      <span>Event</span>
+                      <span className="text-xs text-primary/70">(Required)</span>
+                    </Label>
+                    {isLoadingEvents ? (
+                      <div className="flex h-10 items-center rounded-md border border-input px-3 py-2 text-sm">
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                        <span className="text-muted-foreground">Loading events...</span>
+                      </div>
+                    ) : eventError ? (
+                      <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
+                        {eventError}
+                      </div>
+                    ) : getUniqueEventTypes().length > 0 ? (
+                      <Select
+                        value={selectedEventType}
+                        onValueChange={handleEventTypeChange}
+                        disabled={getUniqueEventTypes().length === 0}
+                      >
+                        <SelectTrigger className={cn(
+                          "border-dashed transition-all duration-200",
+                          selectedEventType ? "border-primary/40 bg-primary/5" : "border-muted-foreground/40 text-muted-foreground"
+                        )}>
+                          <SelectValue placeholder="Select an event" />
+                        </SelectTrigger>
+                        <SelectContent className="border-2 border-primary/10 shadow-xl">
+                          <div className="p-2 bg-gradient-to-r from-primary/5 to-purple-500/5 border-b border-primary/10 sticky top-0 z-10">
+                            <h3 className="text-sm font-medium text-primary">Select an Event</h3>
+                          </div>
+                          {getUniqueEventTypes().map((eventType) => (
+                            <SelectItem key={eventType} value={eventType} className="rounded-md hover:bg-primary/5 transition-colors duration-200">
+                              {eventType}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex h-10 items-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
+                        No events found for this city
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedCity && selectedEventType && (
+                  <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
+                    <Label className="flex items-center gap-1">
+                      <span>Event Details</span>
+                    </Label>
+                    {eligibleEvents.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-1">
+                        {eligibleEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 border-primary/30 bg-primary/5 shadow-md"
+                          >
+                            <div className="space-y-1 flex-1">
+                              <div className="font-medium text-lg">
+                                {format(new Date(event.date), "PPP")}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{event.venue}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:from-yellow-950 dark:to-amber-950 border border-yellow-100 dark:border-yellow-900 shadow-inner">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-1">
+                            <Info className="h-5 w-5 text-yellow-500 dark:text-yellow-400" aria-hidden="true" />
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                              No event details available
+                            </h3>
+                            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                              <p>
+                                Could not load details for {selectedEventType} in {selectedCity}.
+                                Please try a different event or city.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Games Section - Only shown when child age and event are selected */}
+                {selectedCity && selectedEventType && childAgeMonths !== null && (
+                  <div className="space-y-2 mt-4 pt-4 border-t border-dashed border-primary/10">
+                    <Label className="flex items-center gap-1">
+                      <span>Available Games</span>
+                      <span className="text-xs text-primary/70">(Required)</span>
+                    </Label>
+                    
+                    {isLoadingGames ? (
+                      <div className="flex items-center justify-center p-6">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading games...</span>
+                      </div>
+                    ) : gameError ? (
+                      <div className="rounded-lg bg-gradient-to-r from-red-50 to-rose-50 p-4 dark:from-red-950 dark:to-rose-950 border border-red-100 dark:border-red-900 shadow-inner">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 bg-red-100 dark:bg-red-900 rounded-full p-1">
+                            <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400" aria-hidden="true" />
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+                              Error loading games
+                            </h3>
+                            <div className="mt-2 text-sm text-red-700 dark:text-red-400">
+                              <p>{gameError}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : eligibleGames.length > 0 ? (
+                      <div className="grid gap-3 sm:grid-cols-1">
+                        {eligibleGames.map((game) => (
+                          <div
+                            key={game.id}
+                            className={cn(
+                              "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 cursor-pointer",
+                              selectedGames.includes(game.id)
+                                ? "border-primary bg-primary/10 shadow-md"
+                                : "border-muted hover:border-primary/30 hover:bg-primary/5"
+                            )}
+                            onClick={() => handleGameSelection(game.id)}
+                          >
+                            <div className="flex items-start space-x-3 flex-1">
+                              <Checkbox
+                                id={`game-${game.id}`}
+                                className="mt-1"
+                                checked={selectedGames.includes(game.id)}
+                                onCheckedChange={() => handleGameSelection(game.id)}
+                              />
+                                <div className="space-y-1 flex-1">
+                                  <Label htmlFor={`game-${game.id}`} className="font-medium cursor-pointer">
+                                    {game.custom_title || game.game_title}
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground">{game.custom_description || game.game_description}</p>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                                      {game.start_time} {game.end_time ? `- ${game.end_time}` : ''}
+                                    </div>
+                                    <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                                      {game.game_duration_minutes} min
+                                    </div>
+                                    <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                                      Age: {game.min_age}-{game.max_age} months
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 text-sm">
+                                    <span className="font-medium text-primary">₹{game.slot_price || game.custom_price || 0}</span>
+                                  </div>
+                                </div>
+                              </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:from-yellow-950 dark:to-amber-950 border border-yellow-100 dark:border-yellow-900 shadow-inner">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-1">
+                            <Info className="h-5 w-5 text-yellow-500 dark:text-yellow-400" aria-hidden="true" />
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                              No games available
+                            </h3>
+                            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                              <p>
+                                No games found for {selectedEventType} in {selectedCity} for a child of {childAgeMonths} months.
+                                Please try a different event or contact support for assistance.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {dob && selectedCity && (
                 <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:from-blue-950 dark:to-indigo-950 border border-blue-100 dark:border-blue-900 shadow-inner">
                   <div className="flex items-start">
@@ -1452,96 +1644,7 @@ export default function RegisterEventClientPage() {
                 </div>
               )}
 
-              {/* Games based on child's age */}
-              {dob && childAgeMonths !== null && (
-                <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
-                  <h3 className="text-sm font-medium text-primary flex items-center gap-2">
-                    <div className="bg-primary/10 p-1 rounded-full">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-                        <path d="M12 2v6.5l3-3"></path>
-                        <path d="M12 2v6.5l-3-3"></path>
-                        <path d="M12 22v-6.5l3 3"></path>
-                        <path d="M12 22v-6.5l-3 3"></path>
-                        <path d="M2 12h6.5l-3 3"></path>
-                        <path d="M2 12h6.5l-3-3"></path>
-                        <path d="M22 12h-6.5l3 3"></path>
-                        <path d="M22 12h-6.5l3-3"></path>
-                      </svg>
-                    </div>
-                    Games for {childAgeMonths} Months
-                  </h3>
-
-                  {isLoadingGames ? (
-                    <div className="flex h-20 items-center justify-center rounded-md border border-input px-3 py-2">
-                      <div className="animate-spin mr-2 h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-                      <span className="text-muted-foreground">Loading games for your child's age...</span>
-                    </div>
-                  ) : gameError ? (
-                    <div className="flex h-20 items-center justify-center rounded-md border border-destructive px-3 py-2 text-sm text-destructive">
-                      {gameError}
-                    </div>
-                  ) : eligibleGames.length > 0 ? (
-                    <RadioGroup value={selectedGame} onValueChange={handleGameSelection} className="grid gap-3 sm:grid-cols-1 md:grid-cols-2">
-                      {eligibleGames.map((game) => (
-                        <div
-                          key={game.id}
-                          className={cn(
-                            "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200",
-                            selectedGame === game.id.toString()
-                              ? "border-primary/30 bg-primary/5 shadow-md"
-                              : "border-dashed border-muted-foreground/20 hover:border-primary/20 hover:bg-primary/5"
-                          )}
-                        >
-                          <RadioGroupItem value={game.id.toString()} id={`game-${game.id}`} className="mt-1" />
-                          <div className="space-y-1 flex-1">
-                            <Label htmlFor={`game-${game.id}`} className="font-medium text-lg">
-                              {game.game_title}
-                            </Label>
-                            <p className="text-sm text-muted-foreground">{game.game_description}</p>
-                            <div className="flex flex-wrap justify-between items-center mt-2 gap-2">
-                              <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                Age: {game.min_age}-{game.max_age} months
-                              </div>
-                              <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
-                                Duration: {game.game_duration_minutes} min
-                              </div>
-                              {(game.custom_price || game.slot_price) && (
-                                <div className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                                  Price: ₹{game.custom_price || game.slot_price}
-                                </div>
-                              )}
-                              {game.start_time && game.end_time && (
-                                <div className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
-                                  Time: {game.start_time.substring(0, 5)} - {game.end_time.substring(0, 5)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  ) : (
-                    <div className="rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:from-yellow-950 dark:to-amber-950 border border-yellow-100 dark:border-yellow-900 shadow-inner">
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900 rounded-full p-1">
-                          <Info className="h-5 w-5 text-yellow-500 dark:text-yellow-400" aria-hidden="true" />
-                        </div>
-                        <div className="ml-3">
-                          <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                            No games found
-                          </h3>
-                          <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
-                            <p>
-                              We couldn't find any games suitable for a {childAgeMonths} month old child.
-                              Please try a different age range or contact support.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Child age information is displayed above, no games section needed */}
 
               {/* Event date selection has been integrated into the event selection */}
 
@@ -1572,13 +1675,13 @@ export default function RegisterEventClientPage() {
               <Button
                 className={cn(
                   "w-full relative overflow-hidden group transition-all duration-300",
-                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                  (!selectedCity || !dob || !selectedEventType || !selectedEvent || selectedGames.length === 0 || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                  (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment)
                     ? "opacity-50"
                     : "bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
                 )}
                 onClick={handleRegistration}
-                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || !selectedGame || childAgeMonths === null || !parentName || !email || !phone || !childName ||
+                disabled={!selectedCity || !dob || !selectedEventType || !selectedEvent || selectedGames.length === 0 || childAgeMonths === null || !parentName || !email || !phone || !childName ||
                          (childAgeMonths && childAgeMonths >= 36 && !schoolName) || !termsAccepted || isProcessingPayment}
               >
                 <span className="relative z-10 flex items-center">
@@ -1639,11 +1742,55 @@ export default function RegisterEventClientPage() {
                   Enhance your experience with optional add-ons. You can skip this step and proceed directly to payment if you prefer.
                 </p>
 
-                <AddOnSelector
-                  addOns={addOns}
-                  onAddOnsChange={setSelectedAddOns}
-                  initialSelectedAddOns={selectedAddOns}
-                />
+                <div className="mt-8">
+                  {isLoadingAddOns && (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="ml-2 text-lg">Loading add-ons...</p>
+                    </div>
+                  )}
+                  {addOnError && (
+                    <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                        <p className="text-red-600">{addOnError}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2" 
+                        onClick={() => {
+                          setIsLoadingAddOns(true);
+                          setAddOnError(null);
+                          fetchAllAddOnsFromExternalApi()
+                            .then(data => {
+                              setApiAddOns(data);
+                              setIsLoadingAddOns(false);
+                            })
+                            .catch(error => {
+                              console.error('Failed to load add-ons:', error);
+                              setAddOnError('Failed to load add-ons. Please try again.');
+                              setIsLoadingAddOns(false);
+                            });
+                        }}
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+                  {!isLoadingAddOns && !addOnError && apiAddOns.length > 0 && (
+                    <AddOnSelector
+                      addOns={apiAddOns} 
+                      onAddOnsChange={setSelectedAddOns}
+                      initialSelectedAddOns={selectedAddOns}
+                    />
+                  )}
+                  {!isLoadingAddOns && !addOnError && apiAddOns.length === 0 && (
+                    <div className="p-4 border border-gray-200 rounded-md text-center">
+                      <p className="text-gray-500">No add-ons are currently available.</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Show different messaging based on add-ons selection */}
@@ -1691,7 +1838,7 @@ export default function RegisterEventClientPage() {
                       <span>{selectedEventDetails.venue}, {selectedEventDetails.city}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Child's Age on Event Date:</span>
+                      <span className="text-muted-foreground">Child's Age:</span>
                       <span>{childAgeMonths} months</span>
                     </div>
                     <div className="flex justify-between">
@@ -1700,20 +1847,36 @@ export default function RegisterEventClientPage() {
                     </div>
                     <Separator />
                     <div className="flex justify-between font-medium">
-                      <span>Registration Fee:</span>
-                      <span>₹{selectedEventDetails.price}</span>
+                      <span>Games Subtotal:</span>
+                      <span>₹{calculateGamesTotal()}</span>
                     </div>
                     {selectedAddOns.length > 0 ? (
                     <>
                       {selectedAddOns.map((item) => {
-                        let price = item.addOn.price
+                        // Debug the add-on and variant information
+                        console.log(`Add-on: ${item.addOn.name}`, item);
+                        
+                        // Start with the base add-on price
+                        let price = parseFloat(item.addOn.price || '0')
                         let variantName = ""
 
                         // Check if this is a variant with a different price
                         if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
                           const variant = item.addOn.variants.find(v => v.id === item.variantId)
+                          console.log(`Variant found for ${item.addOn.name}:`, variant);
+                          
                           if (variant) {
-                            price = variant.price
+                            // For variants, we need to use the base price + price_modifier
+                            // If variant has a direct price, use that, otherwise use base price + modifier
+                            if (variant.price) {
+                              price = parseFloat(variant.price || '0');
+                            } else if (variant.price_modifier) {
+                              // Add the price modifier to the base price
+                              const modifier = parseFloat(variant.price_modifier || '0');
+                              price = parseFloat(item.addOn.price || '0') + modifier;
+                            }
+                            
+                            console.log(`Calculated variant price for ${item.addOn.name}: ${price}`);
                             variantName = ` - ${variant.name}`
                           }
                         }
@@ -1722,7 +1885,9 @@ export default function RegisterEventClientPage() {
                         let discountedPrice = price
                         let hasDiscount = false
 
-                        if (item.addOn.bundleDiscount && item.quantity >= item.addOn.bundleDiscount.minQuantity) {
+                        if (item.addOn.bundleDiscount && 
+                            item.quantity >= item.addOn.bundleDiscount.minQuantity && 
+                            item.addOn.bundleDiscount.discountPercentage > 0) { // Only apply if discount > 0%
                           hasDiscount = true
                           const discountMultiplier = 1 - (item.addOn.bundleDiscount.discountPercentage / 100)
                           discountedPrice = price * discountMultiplier
@@ -1764,6 +1929,12 @@ export default function RegisterEventClientPage() {
                       <span>None selected</span>
                     </div>
                   )}
+                  {appliedPromoCode && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promocode Discount:</span>
+                      <span>- ₹{discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-medium">
                     <span>GST (18%):</span>
                     <span>₹{calculateGST()}</span>
@@ -1779,9 +1950,87 @@ export default function RegisterEventClientPage() {
                 <div className="space-y-2 mt-6">
                   <Label htmlFor="promo">Promo Code</Label>
                   <div className="flex space-x-2">
-                    <Input id="promo" placeholder="Enter promo code" />
-                    <Button variant="outline">Apply</Button>
+                    <Input 
+                      id="promo" 
+                      placeholder="Enter promo code" 
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      disabled={isApplyingPromocode || !selectedGames.length}
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleApplyPromoCode}
+                      disabled={isApplyingPromocode || !promoCode || !selectedGames.length}
+                    >
+                      {isApplyingPromocode ? (
+                        <>
+                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                          Applying...
+                        </>
+                      ) : appliedPromoCode ? 'Change' : 'Apply'}
+                    </Button>
                   </div>
+                  
+                  {/* Available promocodes dropdown */}
+                  {availablePromocodes.length > 0 && !appliedPromoCode && (
+                    <div className="mt-2">
+                      <Label htmlFor="available-promocodes" className="text-xs text-muted-foreground">Available Promocodes</Label>
+                      <Select onValueChange={(value) => setPromoCode(value)}>
+                        <SelectTrigger className="w-full mt-1 text-sm">
+                          <SelectValue placeholder="Select a promocode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePromocodes.map((code) => (
+                            <SelectItem key={code.id} value={code.promo_code} className="text-sm">
+                              <div className="flex justify-between items-center w-full">
+                                <span className="font-medium">{code.promo_code}</span>
+                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  {code.type === 'percentage' ? `${code.value}% OFF` : `₹${code.value} OFF`}
+                                </span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">{code.description}</div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  {/* Applied promocode */}
+                  {appliedPromoCode && (
+                    <div className="mt-2 p-2 rounded-md border border-green-200 bg-green-50">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="font-medium text-green-700">{appliedPromoCode.promo_code}</span>
+                          <span className="text-xs text-green-600 ml-2">Applied Successfully</span>
+                        </div>
+                        <Badge className="bg-green-500 hover:bg-green-600">
+                          {appliedPromoCode.type === 'percentage' ? `${appliedPromoCode.value}% OFF` : `₹${appliedPromoCode.value} OFF`}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        Discount: ₹{discountAmount.toFixed(2)}
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-0 h-auto mt-1"
+                        onClick={handleRemovePromoCode}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Promocode error */}
+                  {promocodeError && (
+                    <div className="mt-2 p-2 rounded-md border border-red-200 bg-red-50">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 text-red-500 mr-1" />
+                        <span className="text-xs text-red-600">{promocodeError}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {paymentError && (

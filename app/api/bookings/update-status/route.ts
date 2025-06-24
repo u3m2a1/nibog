@@ -6,12 +6,20 @@ export async function POST(request: Request) {
     console.log("Server API route: Starting booking status update request");
 
     // Parse the request body
-    const { bookingId, transactionId, status } = await request.json();
-    console.log(`Server API route: Updating booking ID: ${bookingId}, status: ${status}, transaction ID: ${transactionId}`);
+    const { bookingId, status } = await request.json();
+    console.log(`Server API route: Updating booking ID: ${bookingId}, status: ${status}`);
 
-    // Forward the request to the external API
-    const apiUrl = BOOKING_API.UPDATE;
-    console.log("Server API route: Calling API URL:", apiUrl);
+    // Validate required fields
+    if (!bookingId || !status) {
+      return NextResponse.json(
+        { error: "Missing required fields: bookingId and status are required" },
+        { status: 400 }
+      );
+    }
+
+    // Call the external API to update the booking status
+    const apiUrl = BOOKING_API.UPDATE_STATUS;
+    console.log("Server API route: Calling external API:", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -20,26 +28,24 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         booking_id: bookingId,
-        payment_status: status,
-        transaction_id: transactionId,
+        status: status
       }),
       cache: "no-store",
     });
 
+    console.log(`External API response status: ${response.status}`);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Server API route: Error response: ${errorText}`);
-      return NextResponse.json(
-        { error: `API returned status: ${response.status}` },
-        { status: response.status }
-      );
+      console.error(`External API error: ${errorText}`);
+      throw new Error(`External API returned error status: ${response.status}`);
     }
 
-    // Get the response data
     const data = await response.json();
-    console.log("Server API route: Booking status update response:", data);
+    console.log("External API response data:", data);
 
-    return NextResponse.json(data);
+    // Return the response from the external API
+    return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     console.error("Server API route: Error updating booking status:", error);
     return NextResponse.json(

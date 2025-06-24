@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -14,10 +14,17 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Plus, Trash, X, Upload, Edit } from "lucide-react"
-import { addOns } from "@/data/add-ons"
-import { AddOn, AddOnVariant } from "@/types"
-import { formatPrice } from "@/lib/utils"
+import { ArrowLeft, Plus, Trash, X, Upload, Edit, Loader2, AlertTriangle, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { getAddOnById, updateAddOn, AddOn, UpdateAddOnRequest } from "@/services/addOnService"
+
+interface AddOnVariant {
+  id: string;
+  name: string;
+  price_modifier: number;
+  sku: string;
+  stock_quantity: number;
+}
 
 type Props = {
   params: { id: string }
@@ -25,13 +32,16 @@ type Props = {
 
 export default function EditAddOnPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const addOnId = unwrappedParams.id
-  
-  const addOnData = addOns.find((a) => a.id === addOnId)
-  
+  const { toast } = useToast()
+  const addOnId = params.id
+
+  const [addOn, setAddOn] = useState<AddOn | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [activeTab, setActiveTab] = useState("details")
+
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState(0)
@@ -42,85 +52,99 @@ export default function EditAddOnPage({ params }: Props) {
   const [hasVariants, setHasVariants] = useState(false)
   const [variants, setVariants] = useState<AddOnVariant[]>([])
   const [images, setImages] = useState<string[]>([])
-  const [bundleDiscount, setBundleDiscount] = useState<{ minQuantity: number; discountPercentage: number } | null>(null)
-  const [isSaved, setIsSaved] = useState(false)
 
   // New variant form state
   const [newVariantName, setNewVariantName] = useState("")
-  const [newVariantPrice, setNewVariantPrice] = useState(0)
+  const [newVariantPriceModifier, setNewVariantPriceModifier] = useState(0)
   const [newVariantSku, setNewVariantSku] = useState("")
   const [newVariantStock, setNewVariantStock] = useState(0)
-  const [newVariantAttributes, setNewVariantAttributes] = useState<Record<string, string>>({})
-  const [newAttributeKey, setNewAttributeKey] = useState("")
-  const [newAttributeValue, setNewAttributeValue] = useState("")
 
   // Bundle discount form state
   const [minQuantity, setMinQuantity] = useState(2)
   const [discountPercentage, setDiscountPercentage] = useState(10)
   const [hasBundleDiscount, setHasBundleDiscount] = useState(false)
 
+  // Retry function
+  const retryFetch = () => {
+    setRetryCount(prev => prev + 1)
+    setError(null)
+  }
+
+  // Fetch add-on data
   useEffect(() => {
-    if (addOnData) {
-      setName(addOnData.name)
-      setDescription(addOnData.description)
-      setPrice(addOnData.price)
-      setCategory(addOnData.category)
-      setIsActive(addOnData.isActive)
-      setHasVariants(addOnData.hasVariants)
-      setImages([...addOnData.images])
-      
-      if (addOnData.hasVariants && addOnData.variants) {
-        setVariants([...addOnData.variants])
-      } else {
-        setSku(addOnData.sku || "")
-        setStockQuantity(addOnData.stockQuantity || 0)
-      }
-      
-      if (addOnData.bundleDiscount) {
-        setHasBundleDiscount(true)
-        setMinQuantity(addOnData.bundleDiscount.minQuantity)
-        setDiscountPercentage(addOnData.bundleDiscount.discountPercentage)
-        setBundleDiscount(addOnData.bundleDiscount)
+    const fetchAddOn = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const data = await getAddOnById(addOnId)
+        setAddOn(data)
+
+        // Populate form fields
+        setName(data.name)
+        setDescription(data.description)
+        setPrice(parseFloat(data.price))
+        setCategory(data.category)
+        setIsActive(data.is_active)
+        setHasVariants(data.has_variants)
+        setImages([...data.images])
+
+        if (data.has_variants && data.variants) {
+          setVariants([...data.variants])
+        } else {
+          setSku(data.sku || "")
+          setStockQuantity(data.stock_quantity || 0)
+        }
+
+        if (data.bundle_min_quantity > 0) {
+          setHasBundleDiscount(true)
+          setMinQuantity(data.bundle_min_quantity)
+          setDiscountPercentage(parseFloat(data.bundle_discount_percentage))
+        }
+      } catch (error: any) {
+        let errorMessage = "Failed to load add-on details"
+
+        if (error.message.includes('timeout') || error.message.includes('Request timeout')) {
+          errorMessage = "The request is taking too long. Please try again or check your connection."
+        } else if (error.message.includes('503') || error.message.includes('504')) {
+          errorMessage = "The add-on service is temporarily unavailable. Please try again later."
+        } else if (error.message.includes('not found')) {
+          errorMessage = "Add-on not found. It may have been deleted or the ID is incorrect."
+        }
+
+        setError(errorMessage)
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [addOnData])
 
-  const handleAddAttribute = () => {
-    if (newAttributeKey.trim() && newAttributeValue.trim()) {
-      setNewVariantAttributes({
-        ...newVariantAttributes,
-        [newAttributeKey.trim()]: newAttributeValue.trim()
-      })
-      setNewAttributeKey("")
-      setNewAttributeValue("")
+    if (addOnId && !addOn) {
+      fetchAddOn()
     }
-  }
-
-  const handleRemoveAttribute = (key: string) => {
-    const updatedAttributes = { ...newVariantAttributes }
-    delete updatedAttributes[key]
-    setNewVariantAttributes(updatedAttributes)
-  }
+  }, [addOnId, retryCount])
 
   const handleAddVariant = () => {
-    if (newVariantName.trim() && newVariantSku.trim() && newVariantPrice > 0) {
+    if (newVariantName.trim() && newVariantSku.trim()) {
       const newVariant: AddOnVariant = {
         id: `variant-${Date.now()}`,
         name: newVariantName.trim(),
-        price: newVariantPrice,
+        price_modifier: newVariantPriceModifier,
         sku: newVariantSku.trim(),
-        stockQuantity: newVariantStock,
-        attributes: { ...newVariantAttributes }
+        stock_quantity: newVariantStock
       }
-      
+
       setVariants([...variants, newVariant])
-      
+
       // Reset form
       setNewVariantName("")
-      setNewVariantPrice(0)
+      setNewVariantPriceModifier(0)
       setNewVariantSku("")
       setNewVariantStock(0)
-      setNewVariantAttributes({})
     }
   }
 
@@ -129,9 +153,47 @@ export default function EditAddOnPage({ params }: Props) {
   }
 
   const handleAddImage = () => {
-    // In a real app, this would open a file picker or media library
-    const newImage = `/placeholder.svg?height=200&width=300&text=Image ${images.length + 1}`
-    setImages([...images, newImage])
+    console.log('🔄 Add Image clicked in edit page');
+    console.log('📷 Current images:', images);
+
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+
+    input.onchange = (e) => {
+      console.log('📁 File input changed');
+      const files = (e.target as HTMLInputElement).files
+      console.log('📁 Files selected:', files?.length);
+
+      if (files) {
+        Array.from(files).forEach(file => {
+          console.log('📄 Processing file:', file.name);
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const result = e.target?.result as string
+            console.log('✅ File read successfully, adding to images');
+            setImages(prev => {
+              const newImages = [...prev, result];
+              console.log('📷 Updated images array length:', newImages.length);
+              return newImages;
+            })
+          }
+          reader.readAsDataURL(file)
+        })
+      }
+    }
+
+    input.click()
+  }
+
+  // Auto-navigate to next tab when hasVariants changes
+  const handleHasVariantsChange = (checked: boolean) => {
+    setHasVariants(checked)
+    if (checked) {
+      // Auto-navigate to images tab when variants is enabled
+      setActiveTab("images")
+    }
   }
 
   const handleRemoveImage = (index: number) => {
@@ -140,50 +202,149 @@ export default function EditAddOnPage({ params }: Props) {
     setImages(updatedImages)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Prepare bundle discount data
-    const bundleDiscountData = hasBundleDiscount ? {
-      minQuantity,
-      discountPercentage
-    } : null
-    
-    // In a real app, this would be an API call
-    const updatedAddOn: Partial<AddOn> = {
-      id: addOnId,
-      name,
-      description,
-      price,
-      category,
-      isActive,
-      hasVariants,
-      images,
-      ...(hasVariants ? { variants } : { sku, stockQuantity }),
-      ...(bundleDiscountData ? { bundleDiscount: bundleDiscountData } : {}),
-      updatedAt: new Date().toISOString()
-    }
-    
-    console.log("Saving add-on:", updatedAddOn)
 
-    // Show saved state
-    setIsSaved(true)
-    setTimeout(() => {
-      setIsSaved(false)
+    // Validation
+    if (!name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on name is required",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (!description.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on description is required",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (price <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Add-on price must be greater than 0",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    if (hasVariants && variants.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one variant or disable 'Has Variants'",
+        variant: "destructive",
+      })
+      setActiveTab("variants")
+      return
+    }
+
+    if (!hasVariants && !sku.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "SKU is required when not using variants",
+        variant: "destructive",
+      })
+      setActiveTab("details")
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+
+      // Prepare the request data
+      const requestData: UpdateAddOnRequest = {
+        id: Number(addOnId),
+        name,
+        description,
+        price,
+        category,
+        images,
+        isActive,
+        hasVariants,
+        stockQuantity: hasVariants ? 0 : stockQuantity,
+        sku: hasVariants ? "" : sku,
+        bundleDiscount: hasBundleDiscount ? {
+          minQuantity,
+          discountPercentage
+        } : {
+          minQuantity: 0,
+          discountPercentage: 0
+        },
+        variants: hasVariants ? variants.map(v => ({
+          name: v.name,
+          price_modifier: v.price_modifier,
+          sku: v.sku,
+          stock_quantity: v.stock_quantity
+        })) : undefined
+      }
+
+      await updateAddOn(requestData)
+
+      toast({
+        title: "Success",
+        description: "Add-on updated successfully",
+      })
+
       // Redirect to the add-on details page
       router.push(`/admin/add-ons/${addOnId}`)
-    }, 1500)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update add-on. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  if (!addOnData) {
+  if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold">Add-on Not Found</h2>
-          <p className="text-muted-foreground">The add-on you're looking for doesn't exist or has been removed.</p>
-          <Button className="mt-4" asChild>
-            <Link href="/admin/add-ons">Back to Add-ons</Link>
-          </Button>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <h2 className="text-xl font-semibold">Loading add-on details...</h2>
+          <p className="text-muted-foreground">
+            {retryCount > 0 ? `Retrying... (Attempt ${retryCount + 1})` : "Please wait while we fetch the add-on information."}
+          </p>
+          <div className="text-xs text-muted-foreground">
+            Add-on ID: {addOnId}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || (!addOn && !isLoading)) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="h-8 w-8 mx-auto text-destructive" />
+          <h2 className="text-xl font-semibold">
+            {error ? "Error loading add-on" : "Add-on not found"}
+          </h2>
+          <p className="text-muted-foreground max-w-md">
+            {error || "The add-on you are looking for does not exist."}
+          </p>
+          <div className="flex gap-2 justify-center">
+            {error && (
+              <Button variant="outline" onClick={retryFetch}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+            )}
+            <Button onClick={() => router.push("/admin/add-ons")}>
+              Back to Add-ons
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -200,12 +361,12 @@ export default function EditAddOnPage({ params }: Props) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Edit Add-on</h1>
-          <p className="text-muted-foreground">Update the details for {addOnData.name}</p>
+          <p className="text-muted-foreground">Update the details for {addOn?.name}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Tabs defaultValue="details" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="details">Basic Details</TabsTrigger>
             <TabsTrigger value="images">Images</TabsTrigger>
@@ -279,7 +440,7 @@ export default function EditAddOnPage({ params }: Props) {
                     <Switch
                       id="has-variants"
                       checked={hasVariants}
-                      onCheckedChange={setHasVariants}
+                      onCheckedChange={handleHasVariantsChange}
                     />
                   </div>
                   
@@ -315,6 +476,16 @@ export default function EditAddOnPage({ params }: Props) {
                   <Label htmlFor="active">Active</Label>
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <div></div>
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("images")}
+                  variant="outline"
+                >
+                  Next: Images →
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -357,6 +528,22 @@ export default function EditAddOnPage({ params }: Props) {
                   </Button>
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab("details")}
+                  variant="outline"
+                >
+                  ← Back: Details
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setActiveTab(hasVariants ? "variants" : "pricing")}
+                  variant="outline"
+                >
+                  {hasVariants ? "Next: Variants →" : "Next: Pricing →"}
+                </Button>
+              </CardFooter>
             </Card>
           </TabsContent>
           
@@ -374,9 +561,9 @@ export default function EditAddOnPage({ params }: Props) {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>SKU</TableHead>
-                        <TableHead>Price</TableHead>
+                        <TableHead>Price Modifier</TableHead>
+                        <TableHead>Final Price</TableHead>
                         <TableHead>Stock</TableHead>
-                        <TableHead>Attributes</TableHead>
                         <TableHead className="w-[80px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -385,17 +572,19 @@ export default function EditAddOnPage({ params }: Props) {
                         <TableRow key={variant.id}>
                           <TableCell className="font-medium">{variant.name}</TableCell>
                           <TableCell>{variant.sku}</TableCell>
-                          <TableCell>{formatPrice(variant.price)}</TableCell>
-                          <TableCell>{variant.stockQuantity}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(variant.attributes).map(([key, value]) => (
-                                <Badge key={key} variant="outline">
-                                  {key}: {value}
-                                </Badge>
-                              ))}
-                            </div>
+                            {variant.price_modifier === 0 ? (
+                              <span className="text-muted-foreground">Base price</span>
+                            ) : (
+                              <span className={variant.price_modifier > 0 ? "text-green-600" : "text-red-600"}>
+                                {variant.price_modifier > 0 ? "+" : ""}₹{variant.price_modifier}
+                              </span>
+                            )}
                           </TableCell>
+                          <TableCell>
+                            ₹{(price + variant.price_modifier).toFixed(2)}
+                          </TableCell>
+                          <TableCell>{variant.stock_quantity}</TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -444,15 +633,18 @@ export default function EditAddOnPage({ params }: Props) {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="variant-price">Price (₹)</Label>
+                        <Label htmlFor="variant-price-modifier">Price Modifier (₹)</Label>
                         <Input
-                          id="variant-price"
+                          id="variant-price-modifier"
                           type="number"
-                          min="0"
                           step="0.01"
-                          value={newVariantPrice || ""}
-                          onChange={(e) => setNewVariantPrice(parseFloat(e.target.value) || 0)}
+                          value={newVariantPriceModifier || ""}
+                          onChange={(e) => setNewVariantPriceModifier(parseFloat(e.target.value) || 0)}
+                          placeholder="0 for base price"
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Amount to add/subtract from base price (use negative for discount)
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="variant-stock">Stock Quantity</Label>
@@ -466,53 +658,13 @@ export default function EditAddOnPage({ params }: Props) {
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Attributes</Label>
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {Object.entries(newVariantAttributes).map(([key, value]) => (
-                          <Badge key={key} variant="secondary" className="flex items-center gap-1">
-                            {key}: {value}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 p-0"
-                              onClick={() => handleRemoveAttribute(key)}
-                              type="button"
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex gap-2">
-                        <Input
-                          placeholder="Key (e.g., Size)"
-                          value={newAttributeKey}
-                          onChange={(e) => setNewAttributeKey(e.target.value)}
-                          className="w-1/3"
-                        />
-                        <Input
-                          placeholder="Value (e.g., Medium)"
-                          value={newAttributeValue}
-                          onChange={(e) => setNewAttributeValue(e.target.value)}
-                          className="w-1/3"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleAddAttribute}
-                          disabled={!newAttributeKey.trim() || !newAttributeValue.trim()}
-                        >
-                          Add Attribute
-                        </Button>
-                      </div>
-                    </div>
+
                   </CardContent>
                   <CardFooter>
                     <Button
                       type="button"
                       onClick={handleAddVariant}
-                      disabled={!newVariantName.trim() || !newVariantSku.trim() || newVariantPrice <= 0}
+                      disabled={!newVariantName.trim() || !newVariantSku.trim()}
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Add Variant
@@ -584,8 +736,15 @@ export default function EditAddOnPage({ params }: Props) {
           <Button type="button" variant="outline" onClick={() => router.push(`/admin/add-ons/${addOnId}`)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSaved}>
-            {isSaved ? "Saved!" : "Save Changes"}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </div>
       </form>

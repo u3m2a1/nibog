@@ -19,8 +19,11 @@ export default function Home() {
       <div className="flex flex-col gap-12 pb-8">
       {/* Hero Section */}
       <section className="relative">
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Continuous scrolling row of images */}
+        {/* Semi-transparent overlay - adjusted for better balance */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/50 to-white/20 dark:from-black/50 dark:to-black/30 -z-10" />
+        
+        {/* Background image overlay */}
+        <div className="absolute inset-0 overflow-hidden -z-20">
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             <div className="absolute inset-y-0 left-0 flex w-[400%] animate-slide-slow">
               {[
@@ -39,7 +42,7 @@ export default function Home() {
                   <img 
                     src={src} 
                     alt="Children playing" 
-                    className="w-full h-full object-cover opacity-30 dark:opacity-20"
+                    className="w-full h-full object-cover opacity-40 dark:opacity-25"
                     loading="lazy"
                   />
                 </div>
@@ -47,16 +50,31 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <div className="container relative flex flex-col items-center justify-center gap-6 py-16 text-center md:py-24 lg:py-32">
+        <div className="container relative z-10 flex flex-col items-center justify-center gap-6 py-16 text-center md:py-24 lg:py-32">
           <Badge className="px-3.5 py-1.5 text-sm font-medium" variant="secondary">
             New India Baby Olympics Games
           </Badge>
-          <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
-            NIBOG -{" "}
-            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              From Crawling to Racing
-            </span>
-          </h1>
+          <div className="relative z-20">
+            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
+              NIBOG -{" "}
+              <span className="relative">
+                <span 
+                  className="relative z-10 font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 dark:from-purple-400 dark:via-pink-300 dark:to-purple-400 bg-[length:200%_auto] animate-gradient"
+                  style={{
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  From Crawling to Racing
+                </span>
+                <span className="absolute inset-0 z-0 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-300 to-purple-400 dark:from-purple-600 dark:via-pink-500 dark:to-purple-600 bg-[length:200%_auto] animate-gradient opacity-70 blur-sm">
+                  From Crawling to Racing
+                </span>
+              </span>
+            </h1>
+          </div>
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
             India's biggest baby Olympic games, executing in 21 cities of India. Join us for exciting baby games including crawling races, baby walker, running race, and more for children aged 5-84 months.
           </p>

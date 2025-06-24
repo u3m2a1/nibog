@@ -75,8 +75,6 @@ export interface Booking {
  */
 export async function getAllBookings(): Promise<Booking[]> {
   try {
-    console.log("Fetching all bookings...");
-
     // Use our internal API route to avoid CORS issues
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
@@ -91,19 +89,14 @@ export async function getAllBookings(): Promise<Booking[]> {
       });
 
       clearTimeout(timeoutId);
-      console.log(`Get all bookings response status: ${response.status}`);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error response: ${errorText}`);
         throw new Error(`API returned error status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`Retrieved ${data.length} bookings`);
 
       if (!Array.isArray(data)) {
-        console.warn("API did not return an array for bookings:", data);
         return [];
       }
 
@@ -111,15 +104,38 @@ export async function getAllBookings(): Promise<Booking[]> {
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.error("Fetch request timed out");
         throw new Error("Request timed out. The server took too long to respond.");
       }
       throw fetchError;
     }
   } catch (error: any) {
-    console.error("Error fetching bookings:", error);
     throw error;
   }
+}
+
+// Interface for status update request
+export interface UpdateStatusRequest {
+  booking_id: number;
+  status: string;
+}
+
+// Interface for status update response
+export interface UpdateStatusResponse {
+  booking_id: number;
+  booking_ref: string;
+  user_id: number;
+  parent_id: number;
+  event_id: number;
+  status: string;
+  total_amount: string;
+  payment_method: string;
+  payment_status: string;
+  terms_accepted: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
 }
 
 /**
@@ -128,83 +144,147 @@ export async function getAllBookings(): Promise<Booking[]> {
  * @param status New status
  * @returns Promise with updated booking data
  */
-export async function updateBookingStatus(bookingId: number, status: string): Promise<Booking> {
+export async function updateBookingStatus(bookingId: number, status: string): Promise<UpdateStatusResponse> {
   try {
-    console.log(`Updating booking ${bookingId} status to ${status}`);
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/bookings/update-status', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookingId,
+        status
+      }),
+    });
 
-    // For now, just simulate the API call
-    // In a real implementation, you would call the API to update the booking status
-    return {
-      booking_id: bookingId,
-      booking_status: status,
-      // Add other required fields with placeholder values
-      booking_ref: "",
-      total_amount: "",
-      payment_method: "",
-      payment_status: "",
-      terms_accepted: false,
-      booking_is_active: true,
-      booking_created_at: new Date().toISOString(),
-      booking_updated_at: new Date().toISOString(),
-      cancelled_at: null,
-      completed_at: null,
-      parent_id: 0,
-      parent_name: "",
-      parent_email: "",
-      parent_additional_phone: "",
-      parent_is_active: true,
-      parent_created_at: "",
-      parent_updated_at: "",
-      child_id: 0,
-      child_full_name: "",
-      child_date_of_birth: "",
-      child_school_name: "",
-      child_gender: "",
-      child_is_active: true,
-      child_created_at: "",
-      child_updated_at: "",
-      game_name: "",
-      game_description: "",
-      game_min_age: 0,
-      game_max_age: 0,
-      game_duration_minutes: 0,
-      game_categories: [],
-      game_is_active: true,
-      game_created_at: "",
-      game_updated_at: "",
-      event_title: "",
-      event_description: "",
-      event_event_date: "",
-      event_status: "",
-      event_created_at: "",
-      event_updated_at: "",
-      user_full_name: "",
-      user_email: "",
-      user_phone: "",
-      user_city_id: 0,
-      user_accepted_terms: false,
-      user_terms_accepted_at: null,
-      user_is_active: true,
-      user_is_locked: false,
-      user_locked_until: null,
-      user_deactivated_at: null,
-      user_created_at: "",
-      user_updated_at: "",
-      user_last_login_at: null,
-      city_name: "",
-      city_state: "",
-      city_is_active: true,
-      city_created_at: "",
-      city_updated_at: "",
-      venue_name: "",
-      venue_address: "",
-      venue_capacity: 0,
-      venue_is_active: true,
-      venue_created_at: "",
-      venue_updated_at: ""
-    };
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `API returned error status: ${response.status}`;
+
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status code
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+
+    // The API returns an array with a single booking object
+    if (Array.isArray(data) && data.length > 0) {
+      return data[0];
+    } else if (!Array.isArray(data)) {
+      return data;
+    }
+
+    throw new Error("Invalid response format from status update API");
   } catch (error: any) {
-    console.error(`Error updating booking ${bookingId} status:`, error);
     throw error;
   }
 }
+
+/**
+ * Get booking by ID
+ * @param bookingId Booking ID
+ * @returns Promise with booking data
+ */
+export async function getBookingById(bookingId: string | number): Promise<Booking> {
+  try {
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch(`/api/bookings/get/${bookingId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // If it's a 404, the booking doesn't exist
+      if (response.status === 404) {
+        throw new Error(`Booking with ID ${bookingId} not found`);
+      }
+
+      // For other errors, throw immediately without fallback to prevent loops
+      throw new Error(`Failed to fetch booking: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    // Handle timeout errors
+    if (error.name === 'AbortError') {
+      throw new Error('Request timeout - the booking service is taking too long to respond');
+    }
+
+    // Re-throw the error without fallback to prevent infinite loops
+    throw error;
+  }
+}
+
+/**
+ * Create a new booking
+ * @param bookingData The booking data to create
+ * @returns Promise with the created booking data
+ */
+export async function createBooking(bookingData: {
+  parent: {
+    user_id: number;
+    parent_name: string;
+    email: string;
+    additional_phone: string;
+  };
+  children: {
+    full_name: string;
+    date_of_birth: string;
+    school_name: string;
+    gender: string;
+  };
+  booking: {
+    user_id: number;
+    event_id: number;
+    total_amount: number;
+    payment_method: string;
+    payment_status: string;
+    terms_accepted: boolean;
+  };
+  booking_games: {
+    game_id: number;
+    child_index: number;
+    game_price: number;
+  };
+}): Promise<any> {
+  try {
+    // Use our internal API route to avoid CORS issues
+    const response = await fetch('/api/bookings/create', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(bookingData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned error status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+

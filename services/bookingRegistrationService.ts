@@ -1,32 +1,42 @@
 // Booking registration service for handling booking API calls
 import { BOOKING_API } from '@/config/api';
+import { validateGameData, formatGamesForAPI, createFallbackGame } from '@/utils/gameIdValidation';
+
+export interface BookingVariant {
+  variant_id: number;
+  quantity: number;
+}
+
+export interface BookingAddon {
+  addon_id: number;
+  quantity?: number;
+  variants?: BookingVariant[];
+}
 
 export interface BookingRegistrationData {
+  user_id: number;
   parent: {
-    user_id: number;
     parent_name: string;
     email: string;
     additional_phone: string;
   };
-  children: {
+  child: {
     full_name: string;
     date_of_birth: string;
     school_name: string;
     gender: string;
   };
   booking: {
-    user_id: number;
     event_id: number;
-    total_amount: number;
     payment_method: string;
     payment_status: string;
     terms_accepted: boolean;
   };
   booking_games: {
     game_id: number;
-    child_index: number;
-    game_price: number;
-  };
+  }[];
+  booking_addons?: BookingAddon[];
+  promo_code?: string;
 }
 
 export interface BookingRegistrationResponse {
@@ -45,37 +55,34 @@ export interface BookingRegistrationResponse {
  * @param bookingData The booking data to register
  * @returns Promise with the booking registration response
  */
-export async function registerBooking(bookingData: BookingRegistrationData): Promise<BookingRegistrationResponse[]> {
-  console.log("=== BOOKING REGISTRATION (TEST MODE) ===");
-  console.log("Booking data to be registered:", JSON.stringify(bookingData, null, 2));
-  console.log("=== SKIPPING API CALL FOR PHONEPE TESTING ===");
+export async function registerBooking(bookingData: BookingRegistrationData): Promise<any> {
+  try {
+    console.log("=== BOOKING REGISTRATION (PRODUCTION MODE) ===");
+    console.log("Booking data to be registered:", JSON.stringify(bookingData, null, 2));
 
-  // Generate a mock booking ID for testing
-  const mockBookingId = Math.floor(Math.random() * 10000) + 1000;
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bookingData),
+    });
 
-  console.log(`Generated mock booking ID: ${mockBookingId}`);
-
-  // Return mock response data to simulate successful booking creation
-  const mockResponse: BookingRegistrationResponse[] = [
-    {
-      booking_game_id: Math.floor(Math.random() * 10000) + 1000,
-      booking_id: mockBookingId,
-      child_id: Math.floor(Math.random() * 10000) + 1000,
-      game_id: bookingData.booking_games.game_id,
-      game_price: bookingData.booking_games.game_price.toString(),
-      attendance_status: "registered",
-      is_active: true,
-      created_at: new Date().toISOString()
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Booking registration failed:", errorData);
+      throw new Error(errorData.message || 'Failed to create booking');
     }
-  ];
 
-  console.log("Mock booking registration response:", JSON.stringify(mockResponse, null, 2));
-  console.log("=== PROCEEDING TO PHONEPE PAYMENT INITIATION ===");
+    const responseData = await response.json();
+    console.log("Booking registration successful:", JSON.stringify(responseData, null, 2));
+    console.log("=== PROCEEDING TO PHONEPE PAYMENT INITIATION ===");
 
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  return mockResponse;
+    return responseData;
+  } catch (error) {
+    console.error("Error registering booking:", error);
+    throw error;
+  }
 }
 
 /**
@@ -93,44 +100,116 @@ export function formatBookingDataForAPI(formData: {
   schoolName: string;
   gender: string;
   eventId: number;
-  gameId: number;
-  gamePrice: number;
+  gameId: number[] | number; // Updated to accept both array and single number
+  gamePrice: number[] | number; // Updated to accept both array and single number
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: string;
   termsAccepted: boolean;
+  selectedAddOns?: { addOn: any; quantity: number; variantId?: string }[];
+  promoCode?: string;
 }): BookingRegistrationData {
   // Format the date of birth to YYYY-MM-DD
   const dob = formData.childDob.toISOString().split('T')[0];
 
+  console.log("=== FORMATTING BOOKING DATA FOR API ===");
+  console.log("Input gameId:", formData.gameId);
+  console.log("Input gamePrice:", formData.gamePrice);
+  console.log("gameId type:", typeof formData.gameId);
+  console.log("gamePrice type:", typeof formData.gamePrice);
+
+  // Format booking add-ons if present
+  const bookingAddons: BookingAddon[] = [];
+  
+  if (formData.selectedAddOns && formData.selectedAddOns.length > 0) {
+    formData.selectedAddOns.forEach(item => {
+      const addonId = parseInt(item.addOn.id);
+      
+      // Check if this addon has variants
+      if (item.variantId) {
+        // Look for existing addon entry in our array
+        const existingAddonIndex = bookingAddons.findIndex(addon => addon.addon_id === addonId);
+        
+        if (existingAddonIndex >= 0) {
+          // Add variant to existing addon
+          if (!bookingAddons[existingAddonIndex].variants) {
+            bookingAddons[existingAddonIndex].variants = [];
+          }
+          
+          bookingAddons[existingAddonIndex].variants?.push({
+            variant_id: parseInt(item.variantId),
+            quantity: item.quantity
+          });
+        } else {
+          // Create new addon with variant
+          bookingAddons.push({
+            addon_id: addonId,
+            variants: [{
+              variant_id: parseInt(item.variantId),
+              quantity: item.quantity
+            }]
+          });
+        }
+      } else {
+        // No variant - simple addon
+        bookingAddons.push({
+          addon_id: addonId,
+          quantity: item.quantity
+        });
+      }
+    });
+  }
+
   // Create the formatted booking data
   const formattedBooking: BookingRegistrationData = {
+    user_id: formData.userId,
     parent: {
-      user_id: formData.userId,
       parent_name: formData.parentName,
       email: formData.email,
       additional_phone: formData.phone,
     },
-    children: {
+    child: {
       full_name: formData.childName,
       date_of_birth: dob,
       school_name: formData.schoolName,
       gender: formData.gender,
     },
     booking: {
-      user_id: formData.userId,
       event_id: formData.eventId,
-      total_amount: formData.totalAmount,
       payment_method: formData.paymentMethod,
       payment_status: formData.paymentStatus,
       terms_accepted: formData.termsAccepted,
     },
-    booking_games: {
-      game_id: formData.gameId,
-      child_index: 0, // Default to 0 for single child
-      game_price: formData.gamePrice,
-    },
+    booking_games: (() => {
+      // Ensure gameId is always treated as an array for consistent processing
+      const gameIds = Array.isArray(formData.gameId) ? formData.gameId : [formData.gameId];
+      const gamePrices = Array.isArray(formData.gamePrice) ? formData.gamePrice : [formData.gamePrice];
+
+      console.log("Processing game IDs:", gameIds);
+      console.log("Processing game prices:", gamePrices);
+
+      // Use validation utility to process game data
+      const validationResult = validateGameData(gameIds, gamePrices, formData.totalAmount);
+
+      if (validationResult.isValid && validationResult.validGames.length > 0) {
+        console.log("Successfully validated games for booking registration");
+        return formatGamesForAPI(validationResult.validGames);
+      } else {
+        console.error("Game validation failed for booking registration:", validationResult.errors);
+        console.log("Using fallback game");
+        return [createFallbackGame(formData.totalAmount)];
+      }
+    })()
   };
+
+  // Add optional fields if present
+  if (bookingAddons.length > 0) {
+    formattedBooking.booking_addons = bookingAddons;
+  }
+  
+  if (formData.promoCode) {
+    formattedBooking.promo_code = formData.promoCode;
+  }
 
   return formattedBooking;
 }

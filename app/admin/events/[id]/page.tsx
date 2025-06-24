@@ -142,7 +142,7 @@ export default function EventDetailPage({ params }: Props) {
     }
 
     fetchEventData()
-  }, [eventId, toast])
+  }, [eventId])
 
   // Handle pause event
   const handlePauseEvent = () => {
@@ -420,18 +420,7 @@ export default function EventDetailPage({ params }: Props) {
                 Add-on Collections
               </Link>
             </Button>
-            <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/admin/events/${event.event_id}/waiting-list`}>
-                <ClipboardList className="mr-2 h-4 w-4" />
-                Waiting List
-              </Link>
-            </Button>
-            <Button className="w-full justify-start" variant="outline" asChild>
-              <Link href={`/events/${event.event_id}`} target="_blank">
-                <Eye className="mr-2 h-4 w-4" />
-                View Public Page
-              </Link>
-            </Button>
+
           </CardContent>
         </Card>
       </div>

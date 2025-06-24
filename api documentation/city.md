@@ -51,7 +51,7 @@ Response (200 OK)
 
 ## get city
 
-GET https://ai.alviongs.com/webhook/v1/nibog/city/get
+POST https://ai.alviongs.com/webhook/v1/nibog/city/get
 {
     "id": 1
 }
@@ -66,9 +66,6 @@ Response (200 OK)
     "updated_at": "2025-04-27T00:18:06.563Z"
   }
 ]
-
-
-
 
 
 ## get all city
@@ -95,15 +92,9 @@ Response (200 OK)
     }
 ]
 
-
-
-
-
-
-
 ## delete city
 
-DELETE https://ai.alviongs.com/webhook/v1/nibog/city/delete
+POST https://ai.alviongs.com/webhook/v1/nibog/city/delete
 {
     "id": 1
 }

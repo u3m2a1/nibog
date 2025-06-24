@@ -71,20 +71,18 @@ export async function GET() {
 
     // Get the response data
     const responseText = await response.text();
-    console.log(`Server API route: Raw response: ${responseText}`);
-    
+
     try {
       // Try to parse the response as JSON
       const responseData = JSON.parse(responseText);
-      console.log("Server API route: Retrieved email settings:", responseData);
-      
+
       return NextResponse.json(responseData, { status: 200 });
     } catch (parseError) {
       console.error("Server API route: Error parsing response:", parseError);
       // If parsing fails, return the error
       return NextResponse.json(
-        { 
-          error: "Failed to parse API response", 
+        {
+          error: "Failed to parse API response",
           rawResponse: responseText.substring(0, 500) // Limit the size of the raw response
         },
         { status: 500 }

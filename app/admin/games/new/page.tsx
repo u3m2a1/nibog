@@ -21,7 +21,7 @@ export default function NewGameTemplate() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [minAge, setMinAge] = useState(0)
-  const [maxAge, setMaxAge] = useState(36)
+  const [maxAge, setMaxAge] = useState(90) // Support games up to 90 months
   const [duration, setDuration] = useState(60)
   const [isActive, setIsActive] = useState(true)
   const [newCategory, setNewCategory] = useState("")
@@ -59,24 +59,19 @@ export default function NewGameTemplate() {
 
     try {
       // Format the data for the API
-      // Based on the API response, we need to use these exact field names
+      // Based on the API documentation, we need to use these exact field names
       const gameData = {
         game_name: name,
-        description: description,     // Use description directly
-        min_age: minAge,              // Use min_age directly
-        max_age: maxAge,              // Use max_age directly
+        description: description,
+        min_age_months: minAge,       // API expects min_age_months
+        max_age_months: maxAge,       // API expects max_age_months
         duration_minutes: duration,
         categories: categories,
         is_active: isActive
       }
 
-      // Log the data to verify it's being sent correctly
-      console.log("Submitting game data:", JSON.stringify(gameData, null, 2))
-
       // Call the API to create the game
       const result = await createBabyGame(gameData)
-
-      console.log("Game created successfully:", result)
 
       // Show success message
       toast({
@@ -88,7 +83,6 @@ export default function NewGameTemplate() {
       // Redirect to the game templates list
       router.push("/admin/games")
     } catch (error: any) {
-      console.error("Error creating game:", error)
       setError(error.message || "Failed to create game. Please try again.")
 
       toast({
@@ -179,13 +173,13 @@ export default function NewGameTemplate() {
                         value={maxAge}
                         onChange={(e) => {
                           const value = parseInt(e.target.value);
-                          if (!isNaN(value) && value >= minAge && value <= 36) {
+                          if (!isNaN(value) && value >= minAge && value <= 90) {
                             setMaxAge(value);
                           }
                         }}
                         className="w-16 h-8"
                         min={minAge}
-                        max={36}
+                        max={90}
                       />
                       <span>months</span>
                     </div>
@@ -194,7 +188,7 @@ export default function NewGameTemplate() {
                     <Slider
                       value={[minAge, maxAge]}
                       min={0}
-                      max={36}
+                      max={90}
                       step={1}
                       onValueChange={(value) => {
                         setMinAge(value[0])
@@ -284,7 +278,7 @@ export default function NewGameTemplate() {
                 </Button>
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                {categories.map((category) => (
+                {categories.map((category: string) => (
                   <Badge key={category} variant="secondary">
                     {category}
                     <button
