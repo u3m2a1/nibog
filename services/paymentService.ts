@@ -591,6 +591,126 @@ export async function exportPayments(filters: {
   }
 }
 
+// ============ MANUAL PAYMENT RECORDING FUNCTIONS ============
+
+/**
+ * Interface for manual payment recording data
+ */
+export interface ManualPaymentData {
+  booking_id: number;
+  amount: number;
+  payment_method: string;
+  payment_status: 'successful' | 'pending' | 'failed';
+  payment_date?: string;
+  transaction_id?: string;
+  admin_notes?: string;
+  reference_number?: string; // For cash, cheque, bank transfer reference
+}
+
+/**
+ * Create a manual payment record for admin use
+ * @param paymentData Manual payment data
+ * @returns Created payment record
+ */
+export async function createManualPayment(paymentData: ManualPaymentData): Promise<{
+  success: boolean;
+  payment_id?: number;
+  message: string;
+  error?: string;
+}> {
+  try {
+    console.log('📝 Creating manual payment record:', paymentData);
+
+    // Generate transaction ID if not provided
+    const transactionId = paymentData.transaction_id || generateUniqueTransactionId("MANUAL");
+
+    // Prepare payment payload for API (matching the API specification)
+    const paymentPayload = {
+      booking_id: paymentData.booking_id,
+      transaction_id: transactionId,
+      phonepe_transaction_id: `MANUAL_${paymentData.booking_id}_${Date.now()}`, // Generate unique PhonePe-style ID for manual payments
+      amount: paymentData.amount,
+      payment_method: paymentData.payment_method,
+      payment_status: paymentData.payment_status,
+      payment_date: paymentData.payment_date || new Date().toISOString(),
+      gateway_response: {
+        code: "MANUAL_PAYMENT",
+        merchantId: "NIBOGONLINE",
+        transactionId: transactionId,
+        amount: Math.round(paymentData.amount * 100), // Convert to paise
+        state: paymentData.payment_status.toUpperCase(),
+        method: paymentData.payment_method,
+        reference: paymentData.reference_number || transactionId,
+        admin_notes: paymentData.admin_notes || `Manual payment recorded by admin - ${paymentData.payment_method}`
+      }
+    };
+
+    console.log('💳 Creating manual payment with payload:', JSON.stringify(paymentPayload, null, 2));
+
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(paymentPayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Failed to create manual payment:', errorText);
+      return {
+        success: false,
+        message: 'Failed to create manual payment record',
+        error: `API returned status: ${response.status} - ${errorText}`
+      };
+    }
+
+    const result = await response.json();
+    console.log('✅ Manual payment created successfully:', result);
+
+    // Extract payment ID from response (API might return array or object)
+    const paymentId = Array.isArray(result) ? result[0]?.payment_id : result.payment_id;
+
+    // Now update the booking payment status
+    try {
+      console.log('📋 Updating booking payment status...');
+      const { updateBookingPaymentStatus } = await import('./bookingService');
+
+      await updateBookingPaymentStatus(paymentData.booking_id, paymentData.payment_status);
+      console.log('✅ Booking payment status updated successfully');
+    } catch (bookingUpdateError) {
+      console.error('⚠️ Failed to update booking payment status:', bookingUpdateError);
+      // Don't fail the entire operation if booking update fails
+      // The payment record was created successfully
+    }
+
+    return {
+      success: true,
+      payment_id: paymentId,
+      message: 'Manual payment recorded and booking status updated successfully'
+    };
+
+  } catch (error) {
+    console.error('Error creating manual payment:', error);
+    return {
+      success: false,
+      message: 'Failed to create manual payment record',
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+/**
+ * Generate unique transaction ID for manual payments
+ * @param prefix Transaction ID prefix
+ * @returns Unique transaction ID
+ */
+function generateUniqueTransactionId(prefix: string = "MANUAL"): string {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `${prefix}_${timestamp}_${random}`;
+}
+
 /**
  * Convert payments data to CSV format
  * Handles both client-side Payment objects and server-side export API responses

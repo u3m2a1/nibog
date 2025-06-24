@@ -5,6 +5,7 @@
 export interface ValidatedGameData {
     gameId: number;
     gamePrice: number;
+    slotId?: number; // Add slot ID for proper game details lookup
   }
   
   export interface GameValidationResult {
@@ -102,20 +103,23 @@ export interface ValidatedGameData {
   }
   
   /**
-   * Validates and pairs game IDs with their prices
+   * Validates and pairs game IDs with their prices and slot IDs
    * @param gameIds Array of game IDs
    * @param gamePrices Array of game prices
    * @param totalAmount Total amount for fallback price calculation
+   * @param slotIds Optional array of slot IDs
    * @returns Validation result with paired game data
    */
   export function validateGameData(
-    gameIds: any[], 
-    gamePrices: any[], 
-    totalAmount: number = 0
+    gameIds: any[],
+    gamePrices: any[],
+    totalAmount: number = 0,
+    slotIds?: any[]
   ): GameValidationResult {
     console.log('=== VALIDATING GAME DATA ===');
     console.log('Input game IDs:', gameIds);
     console.log('Input game prices:', gamePrices);
+    console.log('Input slot IDs:', slotIds);
     console.log('Total amount:', totalAmount);
     
     const errors: string[] = [];
@@ -161,9 +165,16 @@ export interface ValidatedGameData {
         }
       }
       
+      // Get corresponding slot ID if available
+      let slotId: number | undefined;
+      if (slotIds && slotIds[index] !== undefined && !isNaN(Number(slotIds[index]))) {
+        slotId = Number(slotIds[index]);
+      }
+
       validGames.push({
         gameId: numericGameId,
-        gamePrice: gamePrice
+        gamePrice: gamePrice,
+        ...(slotId && { slotId })
       });
     });
     
@@ -189,10 +200,11 @@ export interface ValidatedGameData {
    * @param validatedGames Array of validated game data
    * @returns Array formatted for API
    */
-  export function formatGamesForAPI(validatedGames: ValidatedGameData[]): Array<{game_id: number, game_price: number}> {
+  export function formatGamesForAPI(validatedGames: ValidatedGameData[]): Array<{game_id: number, game_price: number, slot_id?: number}> {
     return validatedGames.map(game => ({
       game_id: game.gameId,
-      game_price: game.gamePrice
+      game_price: game.gamePrice,
+      ...(game.slotId && { slot_id: game.slotId }) // Include slot_id if available
     }));
   }
   
