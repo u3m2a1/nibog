@@ -354,12 +354,15 @@ export async function POST(request: Request) {
               payment_method: 'PhonePe',
               payment_status: 'successful',
               payment_date: new Date().toISOString(),
-              gateway_response: JSON.stringify({
+              gateway_response: {
+                // Send as object, not stringified JSON
+                code: "PAYMENT_SUCCESS",
+                merchantId: "NIBOGONLINE", // Your merchant ID
                 merchantTransactionId,
                 transactionId,
                 amount,
-                paymentState,
-              }),
+                state: paymentState,
+              },
             }),
           });
           
@@ -379,26 +382,10 @@ export async function POST(request: Request) {
           
           const paymentResult = await paymentResponse.json();
           console.log(`Server API route: Payment record created successfully:`, paymentResult);
-          
-          // Delete pending booking data
-          try {
-            const deleteResponse = await fetch('/api/pending-bookings/delete', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ transaction_id: transactionId }),
-            });
-            
-            if (deleteResponse.ok) {
-              console.log(`Server API route: Pending booking data cleaned up successfully`);
-            } else {
-              console.warn(`Server API route: Failed to clean up pending booking data: ${deleteResponse.status}`);
-            }
-          } catch (deleteError) {
-            console.error(`Server API route: Error cleaning up pending booking:`, deleteError);
-          }
-          
+
+          // Pending booking cleanup removed - no longer needed since we're not using pending bookings
+          console.log(`Server API route: Booking and payment process completed successfully`);
+
           return NextResponse.json({
             ...responseData,
             bookingCreated: true,

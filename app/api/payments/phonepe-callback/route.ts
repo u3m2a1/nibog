@@ -100,12 +100,15 @@ async function updateExistingBooking(
       payment_method: "PhonePe",
       payment_status: statusValues.payment,
       payment_date: new Date().toISOString(),
-      gateway_response: JSON.stringify({
+      gateway_response: {
+        // Send as object, not stringified JSON
+        code: "PAYMENT_SUCCESS",
+        merchantId: "NIBOGONLINE",
         merchantTransactionId,
         transactionId,
         amount,
-        paymentState,
-      }),
+        state: paymentState,
+      },
     };
 
     console.log(`💳 Creating payment record with payload:`, JSON.stringify(paymentPayload, null, 2));
@@ -328,13 +331,16 @@ async function createBookingAndPaymentDirect(
       payment_method: 'PhonePe',
       payment_status: paymentStatus,
       payment_date: new Date().toISOString(),
-      gateway_response: JSON.stringify({
+      gateway_response: {
+        // Send as object, not stringified JSON
+        code: "PAYMENT_SUCCESS",
+        merchantId: "NIBOGONLINE",
         merchantTransactionId,
         transactionId,
         amount,
-        paymentState,
+        state: paymentState,
         note: 'Created via direct fallback due to missing pending booking data'
-      }),
+      },
     };
 
     console.log(`💳 Creating direct payment record with payload:`, JSON.stringify(paymentPayload, null, 2));
@@ -479,12 +485,15 @@ async function createBookingAndPayment(
         payment_method: 'PhonePe',
         payment_status: paymentStatus,
         payment_date: new Date().toISOString(),
-        gateway_response: JSON.stringify({
+        gateway_response: {
+          // Send as object, not stringified JSON
+          code: "PAYMENT_SUCCESS",
+          merchantId: "NIBOGONLINE",
           merchantTransactionId,
           transactionId,
           amount,
-          paymentState,
-        }),
+          state: paymentState,
+        },
       }),
     });
 
