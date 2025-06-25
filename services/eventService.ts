@@ -774,6 +774,227 @@ export async function getGamesByAgeAndEvent(eventId: number, childAge: number): 
   }
 }
 
+/**
+ * Get event with participants data for the admin participants view
+ * @param id The event ID to fetch participants for
+ * @returns Event with participants data
+ */
+export function getEventWithParticipants(id: string) {
+  // In a production environment, this would make an API call to fetch real data
+  // For now, we're using mock data for demonstration purposes
+  
+  // Mock data for event ID 11
+  if (id === '11') {
+    return {
+      id: '11',
+      title: 'Baby Sensory Play',
+      description: 'A sensory play event for babies aged 6-18 months',
+      date: '2025-07-15',
+      venue: {
+        name: 'Little Explorers Center',
+        city: 'Mumbai'
+      },
+      slots: [
+        { 
+          id: 'S001', 
+          startTime: '10:00 AM', 
+          endTime: '11:30 AM', 
+          price: 799, 
+          maxParticipants: 12, 
+          currentParticipants: 7, 
+          bookings: [
+            { 
+              id: 'B001', 
+              user: { 
+                id: 'U001', 
+                name: 'Priya Sharma', 
+                email: 'priya@example.com', 
+                phone: '+91 9876543210' 
+              }, 
+              child: { 
+                id: 'C001', 
+                name: 'Aryan', 
+                dob: '2023-02-15', 
+                ageAtEvent: '14 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-10',
+            },
+            { 
+              id: 'B002', 
+              user: { 
+                id: 'U002', 
+                name: 'Rahul Verma', 
+                email: 'rahul@example.com', 
+                phone: '+91 9876543211' 
+              }, 
+              child: { 
+                id: 'C002', 
+                name: 'Zara', 
+                dob: '2023-04-10', 
+                ageAtEvent: '12 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-12',
+            },
+            { 
+              id: 'B003', 
+              user: { 
+                id: 'U003', 
+                name: 'Ananya Patel', 
+                email: 'ananya@example.com', 
+                phone: '+91 9876543212' 
+              }, 
+              child: { 
+                id: 'C003', 
+                name: 'Vihaan', 
+                dob: '2023-06-20', 
+                ageAtEvent: '10 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-15',
+            }
+          ]
+        },
+        { 
+          id: 'S002', 
+          startTime: '1:00 PM', 
+          endTime: '2:30 PM', 
+          price: 799, 
+          maxParticipants: 12, 
+          currentParticipants: 4, 
+          bookings: [
+            { 
+              id: 'B004', 
+              user: { 
+                id: 'U004', 
+                name: 'Vikram Singh', 
+                email: 'vikram@example.com', 
+                phone: '+91 9876543213' 
+              }, 
+              child: { 
+                id: 'C004', 
+                name: 'Aarav', 
+                dob: '2022-12-10', 
+                ageAtEvent: '16 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-18',
+            },
+            { 
+              id: 'B005', 
+              user: { 
+                id: 'U005', 
+                name: 'Neha Gupta', 
+                email: 'neha@example.com', 
+                phone: '+91 9876543214' 
+              }, 
+              child: { 
+                id: 'C005', 
+                name: 'Ishaan', 
+                dob: '2023-08-25', 
+                ageAtEvent: '8 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-20',
+            },
+            { 
+              id: 'B006', 
+              user: { 
+                id: 'U006', 
+                name: 'Kiran Reddy', 
+                email: 'kiran@example.com', 
+                phone: '+91 9876543215' 
+              }, 
+              child: { 
+                id: 'C006', 
+                name: 'Aanya', 
+                dob: '2023-05-15', 
+                ageAtEvent: '11 months' 
+              }, 
+              status: 'attended',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-22',
+            },
+            { 
+              id: 'B007', 
+              user: { 
+                id: 'U007', 
+                name: 'Deepak Sharma', 
+                email: 'deepak@example.com', 
+                phone: '+91 9876543216' 
+              }, 
+              child: { 
+                id: 'C007', 
+                name: 'Advika', 
+                dob: '2023-01-20', 
+                ageAtEvent: '15 months' 
+              }, 
+              status: 'no_show',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-25',
+            },
+          ]
+        },
+        { 
+          id: 'S003', 
+          startTime: '4:00 PM', 
+          endTime: '5:30 PM', 
+          price: 799, 
+          maxParticipants: 12, 
+          currentParticipants: 2, 
+          bookings: [
+            { 
+              id: 'B008', 
+              user: { 
+                id: 'U008', 
+                name: 'Arjun Kumar', 
+                email: 'arjun@example.com', 
+                phone: '+91 9876543217' 
+              }, 
+              child: { 
+                id: 'C008', 
+                name: 'Saisha', 
+                dob: '2023-03-05', 
+                ageAtEvent: '13 months' 
+              }, 
+              status: 'cancelled',
+              paymentStatus: 'refunded',
+              bookingDate: '2025-06-23',
+            },
+            { 
+              id: 'B009', 
+              user: { 
+                id: 'U009', 
+                name: 'Meera Joshi', 
+                email: 'meera@example.com', 
+                phone: '+91 9876543218' 
+              }, 
+              child: { 
+                id: 'C009', 
+                name: 'Kabir', 
+                dob: '2023-07-12', 
+                ageAtEvent: '9 months' 
+              }, 
+              status: 'confirmed',
+              paymentStatus: 'paid',
+              bookingDate: '2025-06-24',
+            }
+          ]
+        }
+      ]
+    };
+  }
+  
+  // Return null for events that don't exist or don't have mock data
+  return null;
+}
+
 export async function deleteEvent(id: number): Promise<{ success: boolean } | Array<{ success: boolean }>> {
   console.log(`Attempting to delete event with ID: ${id}`);
 
