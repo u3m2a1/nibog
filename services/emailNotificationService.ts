@@ -7,6 +7,7 @@ import { getEmailSetting } from './emailSettingService';
 
 export interface BookingConfirmationData {
   bookingId: number;
+  bookingRef?: string; // Add optional booking reference property that matches database format
   parentName: string;
   parentEmail: string;
   childName: string;
@@ -80,8 +81,8 @@ function generateBookingConfirmationHTML(confirmationData: BookingConfirmationDa
           <div class="booking-details">
             <h3>📋 Booking Information</h3>
             <div class="detail-row">
-              <span class="detail-label">Booking ID:</span>
-              <span class="detail-value">#${confirmationData.bookingId}</span>
+              <span class="detail-label">Booking Reference:</span>
+              <span class="detail-value">${confirmationData.bookingRef || `B${String(confirmationData.bookingId).padStart(7, '0')}`}</span>
             </div>
             <div class="detail-row">
               <span class="detail-label">Child Name:</span>

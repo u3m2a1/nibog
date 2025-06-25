@@ -234,6 +234,178 @@ export async function getBookingById(bookingId: string | number): Promise<Bookin
   }
 }
 
+// Interface for comprehensive ticket details based on the new API format
+export interface TicketDetails {
+  booking_id: number;
+  booking_ref: string;
+  booking_status: string;
+  total_amount: string;
+  payment_method: string;
+  payment_status: string;
+  terms_accepted: boolean;
+  booking_active: boolean;
+  booking_created_at: string;
+  booking_updated_at: string;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  parent_id: number;
+  parent_name: string;
+  parent_email: string;
+  additional_phone: string;
+  parent_active: boolean;
+  user_id: number;
+  user_full_name: string;
+  user_email: string;
+  phone: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  user_city_id: number;
+  accepted_terms: boolean;
+  terms_accepted_at: string | null;
+  user_active: boolean;
+  is_locked: boolean;
+  locked_until: string | null;
+  deactivated_at: string | null;
+  user_created_at: string;
+  user_updated_at: string;
+  last_login_at: string | null;
+  child_id: number;
+  child_name: string;
+  date_of_birth: string;
+  gender: string;
+  school_name: string;
+  child_active: boolean;
+  event_id: number;
+  event_title: string;
+  event_description: string;
+  event_date: string;
+  event_status: string;
+  event_created_at: string;
+  game_id: number;
+  game_name: string;
+  game_description: string;
+  min_age: number;
+  max_age: number;
+  duration_minutes: number;
+  categories: string[];
+  game_active: boolean;
+  booking_game_id: number;
+  game_price: string;
+  attendance_status: string;
+  game_booking_created_at: string;
+}
+
+/**
+ * Converts booking references between formats
+ * @param ref The booking reference to convert
+ * @param targetFormat The target format for the conversion ('B' or 'PPT')
+ * @returns The converted booking reference
+ */
+export function convertBookingRefFormat(ref: string, targetFormat: 'B' | 'PPT' = 'PPT'): string {
+  if (!ref) return '';
+  
+  // Remove quotes if it's a JSON string
+  let cleanRef = ref;
+  if (cleanRef.startsWith('"') && cleanRef.endsWith('"')) {
+    cleanRef = cleanRef.slice(1, -1);
+  }
+
+  // Extract numeric parts based on current format
+  let numericPart = '';
+  const currentDate = new Date();
+  const year = currentDate.getFullYear().toString().slice(-2);
+  const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+  const day = currentDate.getDate().toString().padStart(2, '0');
+  
+  if (cleanRef.startsWith('B')) {
+    // Extract from B format (B0000123)
+    numericPart = cleanRef.replace(/^B(\d+)$/, '$1');
+    
+    if (targetFormat === 'B') {
+      // Already in B format, just normalize
+      return `B${numericPart.padStart(7, '0')}`;
+    } else {
+      // Convert B -> PPT format
+      // Use current date + numeric part as the identifier
+      return `PPT${year}${month}${day}${numericPart.slice(-3).padStart(3, '0')}`;
+    }
+  } else if (cleanRef.startsWith('PPT')) {
+    // Extract from PPT format (PPTYYMMDDxxx)
+    // PPT format typically has date embedded in it
+    const pptMatch = cleanRef.match(/^PPT(\d{6})(\d{3,})$/);
+    
+    if (pptMatch) {
+      const dateStr = pptMatch[1]; // YYMMDD part
+      const idPart = pptMatch[2];  // xxx part (numeric ID)
+      
+      if (targetFormat === 'PPT') {
+        // Already in PPT format, just normalize
+        return cleanRef;
+      } else {
+        // Convert PPT -> B format
+        // Use the numeric part as is, pad to 7 digits
+        return `B${idPart.padStart(7, '0')}`;
+      }
+    } else {
+      // Malformed PPT reference
+      numericPart = cleanRef.replace(/\D/g, '');
+      return targetFormat === 'B' ? 
+        `B${numericPart.slice(-7).padStart(7, '0')}` : 
+        `PPT${year}${month}${day}${numericPart.slice(-3).padStart(3, '0')}`;
+    }
+  } else {
+    // Unknown format, extract any numeric parts
+    numericPart = cleanRef.replace(/\D/g, '');
+    return targetFormat === 'B' ? 
+      `B${numericPart.slice(-7).padStart(7, '0')}` : 
+      `PPT${year}${month}${day}${numericPart.slice(-3).padStart(3, '0')}`;
+  }
+}
+
+// New function to fetch detailed ticket information using booking reference
+export async function getTicketDetails(bookingRef: string): Promise<TicketDetails[]> {
+  try {
+    console.log('Fetching ticket details with booking reference:', bookingRef);
+    
+    // API expects booking_ref_id in PPT format for this specific endpoint
+    // Convert from our standard B format if necessary
+    let formattedRef = convertBookingRefFormat(bookingRef, 'PPT');
+    console.log(`Converted booking reference to API format: ${bookingRef} -> ${formattedRef}`);
+    
+    // Strip any JSON formatting if it was stored as JSON string
+    if (formattedRef.startsWith('"') && formattedRef.endsWith('"')) {
+      formattedRef = formattedRef.slice(1, -1);
+      console.log('Stripped JSON quotes from booking reference:', formattedRef);
+    }
+    
+    console.log('Making API call with formatted booking reference:', formattedRef);
+    
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/tickect/booking_ref/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        booking_ref_id: formattedRef  // Using exact parameter name expected by the API
+      })
+    });
+
+    if (!response.ok) {
+      console.error(`API returned error status: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error response body:', errorText);
+      throw new Error(`Failed to fetch ticket details: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Received ticket details:', data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching ticket details:', error);
+    throw error;
+  }
+}
+
 /**
  * Get event game slot details by slot ID (preferred method)
  * @param slotId Slot ID

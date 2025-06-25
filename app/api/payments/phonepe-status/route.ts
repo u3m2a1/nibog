@@ -4,6 +4,29 @@ import { BOOKING_API } from '@/config/api';
 import { validateGameData, formatGamesForAPI, createFallbackGame } from '@/utils/gameIdValidation';
 
 /**
+ * Generates a SINGLE booking reference ID in PPT format that should be used CONSISTENTLY
+ * throughout the entire system without any reformatting or conversion
+ */
+function generateDefinitiveBookingRef(transactionId: string): string {
+  // Use the transaction ID as the base for the booking reference
+  // This ensures the same reference is used throughout the system
+  const cleanTxnId = transactionId.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  
+  // If the transaction ID is too short, pad it with random characters
+  let reference = cleanTxnId;
+  if (cleanTxnId.length < 12) {
+    const randomSuffix = Math.random().toString(36).substring(2, 12 - cleanTxnId.length + 2);
+    reference = cleanTxnId + randomSuffix.toUpperCase();
+  }
+  
+  // Ensure the reference is exactly 12 characters long
+  reference = reference.substring(0, 12);
+  
+  console.log(`✅ Generated consistent booking reference: ${reference}`);
+  return reference;
+}
+
+/**
  * Maps user-provided gender values to database-allowed values
  * Database constraint requires specific values like 'Male', 'Female', 'Other'
  */
@@ -199,7 +222,9 @@ export async function POST(request: Request) {
                 terms_accepted: true,
                 transaction_id: transactionId,
                 merchant_transaction_id: merchantTransactionId,
-                booking_ref: bookingData.bookingRef || `PP${transactionId.substring(0, 10)}`.substring(0, 12),  // Ensure it fits VARCHAR(12)
+                // Use the transaction ID directly as the booking reference
+                // This ensures the same reference is used throughout the system
+                booking_ref: transactionId,
                 status: "Confirmed" // Always set status to Confirmed for successful payments
               },
               booking_games: (() => {
@@ -267,7 +292,9 @@ export async function POST(request: Request) {
                 terms_accepted: true,
                 transaction_id: transactionId,
                 merchant_transaction_id: merchantTransactionId,
-                booking_ref: `PP${transactionId.substring(0, 10)}`.substring(0, 12),  // Ensure it fits VARCHAR(12)
+                // Use the transaction ID directly as the booking reference
+                // This ensures the same reference is used throughout the system
+                booking_ref: transactionId,
                 status: "Confirmed" // Always set status to Confirmed for successful payments
               },
               booking_games: [
@@ -438,7 +465,8 @@ async function sendBookingConfirmationWithExistingData(
   bookingId: string | number,
   bookingData: any,
   transactionId: string,
-  totalAmount: number
+  totalAmount: number,
+  bookingRef: string
 ) {
   try {
     console.log(`📧 Preparing booking confirmation email with existing data...`);
@@ -447,8 +475,20 @@ async function sendBookingConfirmationWithExistingData(
     // Use the event and venue data we already have from the booking process
     // No need to make additional API calls - we have everything we need!
 
+    // Define interface for game details
+    interface GameDetail {
+      gameName: string;
+      gameDescription: string;
+      gamePrice: number;
+      gameDuration: number;
+      gameTime: string;
+      slotPrice: number;
+      maxParticipants: number;
+      customPrice: number;
+    }
+    
     // Extract game details from the rich booking data - no API calls needed!
-    const gameDetails = [];
+    const gameDetails: GameDetail[] = [];
 
     console.log(`📧 Available booking data keys:`, Object.keys(bookingData || {}));
     console.log(`📧 Selected games objects:`, bookingData?.selectedGamesObj);
@@ -491,8 +531,6 @@ async function sendBookingConfirmationWithExistingData(
       console.log(`📧 Used fallback game data for ${gameDetails.length} games`);
     }
 
-    console.log(`📧 Prepared ${gameDetails.length} games for email:`, gameDetails);
-
     // Prepare email data using the rich booking data - now with real event and game details!
     const emailData = {
       bookingId: parseInt(bookingId.toString()),
@@ -508,7 +546,7 @@ async function sendBookingConfirmationWithExistingData(
       transactionId: transactionId,
       gameDetails: gameDetails,
       addOns: bookingData?.addOns || [],
-      bookingRef: `NIBOG_${bookingId}_${Date.now()}`, // Generate a booking reference
+      bookingRef: bookingRef, // Use the consistent booking reference format
       bookingStatus: 'Confirmed',
       paymentStatus: 'Paid'
     };

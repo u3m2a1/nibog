@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
+import { convertBookingRefFormat } from "@/services/bookingService"
 import { checkPhonePePaymentStatus } from "@/services/paymentService"
 import { sendBookingConfirmationFromClient } from "@/services/emailNotificationService"
 
@@ -15,7 +17,7 @@ export default function PaymentCallbackPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [paymentStatus, setPaymentStatus] = useState<'SUCCESS' | 'FAILED' | 'PENDING' | 'CANCELLED' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [bookingId, setBookingId] = useState<string | null>(null)
+  const [bookingRef, setBookingRef] = useState<string | null>(null)
   const [transactionId, setTransactionId] = useState<string | null>(null)
   const [processingBooking, setProcessingBooking] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
@@ -70,13 +72,22 @@ export default function PaymentCallbackPage() {
             // In the server-first approach, the booking should already be created by the server callback
             // We just need to verify and show success, plus send backup email if needed
 
-            // Extract booking ID from transaction ID if available
-            let extractedBookingId = null
-            const bookingMatch = txnId.match(/NIBOG_(\d+)_/)
-            if (bookingMatch) {
-              extractedBookingId = bookingMatch[1]
-              setBookingId(extractedBookingId)
-              console.log(`📋 Extracted booking ID from transaction: ${extractedBookingId}`)
+            if (txnId) {
+              // Use the transaction ID directly as the booking reference
+              const bookingRef = txnId;
+              
+              // Update state with the booking reference
+              setBookingRef(bookingRef);
+              setTransactionId(bookingRef);
+              
+              console.log(`📋 Using transaction ID as booking reference: ${bookingRef}`);
+              
+              // Store the reference for later use
+              localStorage.setItem('lastBookingRef', bookingRef);
+              
+              // Redirect to booking confirmation with the exact same reference
+              router.push(`/booking-confirmation?ref=${encodeURIComponent(bookingRef)}`);
+              return;
             }
 
             // Retrieve booking data from localStorage
@@ -88,61 +99,74 @@ export default function PaymentCallbackPage() {
                 const bookingData = JSON.parse(storedData)
                 console.log('✅ Retrieved booking data from localStorage:', JSON.stringify(bookingData, null, 2))
                 
-                if (extractedBookingId) {
-                  console.log('📧 Sending confirmation email with complete data...')
-
-                  // Use rich data from localStorage for a detailed email
-                  const emailResult = await sendBookingConfirmationFromClient({
-                    bookingId: parseInt(extractedBookingId),
-                    parentName: bookingData.parentName || 'Valued Customer',
-                    parentEmail: bookingData.email || '',
-                    childName: bookingData.childName || '',
-                    eventTitle: bookingData.eventTitle || `Event ${bookingData.eventId || 'Unknown'}`,
-                    eventDate: bookingData.eventDate || 'TBD',
-                    eventVenue: bookingData.eventVenue ?
-                      (bookingData.eventCity ? `${bookingData.eventVenue}, ${bookingData.eventCity}` : bookingData.eventVenue)
-                      : 'TBD',
-                    totalAmount: bookingData.totalAmount || 0,
-                    paymentMethod: 'PhonePe',
-                    transactionId: txnId,
-                    gameDetails: bookingData.selectedGamesObj?.map((game: any, index: number) => ({
-                      gameName: game.custom_title || game.game_title || `Game ${game.game_id || game.id}`,
-                      gameDescription: game.custom_description || game.game_description || '',
-                      gameTime: game.start_time && game.end_time ?
-                        `${game.start_time} - ${game.end_time}` : 'TBD',
-                      gamePrice: bookingData.gamePrice?.[index] || game.slot_price || game.custom_price || 0,
-                    })) || bookingData.gameId?.map((gameId: number, index: number) => ({
-                      gameName: `Game ${gameId}`,
-                      gameTime: 'TBD',
-                      gamePrice: bookingData.gamePrice?.[index] || 0,
-                    })) || [],
-                    addOns: bookingData.addOns?.map((addon: any) => ({
-                      name: `Add-on ${addon.addOnId}`,
-                      quantity: addon.quantity,
-                      price: 0,
-                    })) || []
-                  })
-
-                  if (emailResult.success) {
-                    console.log('✅ Confirmation email sent successfully')
-                  } else {
-                    console.error('❌ Failed to send confirmation email:', emailResult.error)
+                if (bookingRef) {
+                  console.log('📧 Preparing to send confirmation email with complete data...');
+                  
+                  // Use the booking reference from state
+                  const emailBookingRef = bookingRef;
+                  console.log(`📧 Using booking reference for email: ${emailBookingRef}`);
+                  
+                  // Store the reference in localStorage for consistency
+                  try {
+                    localStorage.setItem('lastBookingRef', emailBookingRef);
+                  } catch (error) {
+                    console.error('Error storing booking reference in localStorage:', error);
+                  }
+                  
+                  // Verify booking exists via API
+                  try {
+                    const bookingVerifyResponse = await fetch(`/api/booking/verify?bookingRef=${emailBookingRef}`)
+                    
+                    if (bookingVerifyResponse.ok) {
+                      const bookingVerifyData = await bookingVerifyResponse.json()
+                      console.log('✅ Booking verification successful:', bookingVerifyData)
+                      
+                      // Send confirmation email
+                      await sendBookingConfirmationFromClient({
+                        ...bookingData,
+                        bookingRef: emailBookingRef
+                      })
+                      console.log('📧 Confirmation email sent successfully')
+                      
+                      // Update the booking reference in state
+                      setBookingRef(emailBookingRef)
+                      
+                      // Redirect to booking confirmation page after a short delay
+                      setTimeout(() => {
+                        router.push(`/booking-confirmation?ref=${emailBookingRef}`)
+                      }, 2000)
+                    } else {
+                      console.error('❌ Booking verification failed')
+                      setError('Unable to verify your booking. Please contact support.')
+                    }
+                  } catch (error) {
+                    console.error('Error verifying booking:', error)
+                    setError('An error occurred while verifying your booking. Please contact support.')
                   }
                 } else {
                   console.log('⚠️ No booking ID available for email')
                 }
                 
                 // Clear localStorage after successful payment and email
-                localStorage.removeItem('nibog_booking_data')
+                try {
+                  localStorage.removeItem('nibog_booking_data')
+                } catch (error) {
+                  console.error('Error clearing booking data from localStorage:', error);
+                }
                 console.log('🧹 Cleared booking data from localStorage')
               } else {
                 console.log('⚠️ No booking data found in localStorage')
                 
                 // Fall back to minimal email if needed
-                if (extractedBookingId) {
+                if (bookingRef) {
                   console.log('📧 Sending minimal confirmation email...')
+                  // Create booking reference in B0000123 format
+                  const minimalBookingRef = `B${String(bookingRef).padStart(7, '0')}`;
+                  console.log(`📝 Generated minimal booking reference: ${minimalBookingRef}`);
+                  
                   const minimalEmailResult = await sendBookingConfirmationFromClient({
-                    bookingId: parseInt(extractedBookingId),
+                    bookingId: parseInt(bookingRef),
+                    bookingRef: minimalBookingRef,
                     parentName: 'Valued Customer',
                     parentEmail: '',
                     childName: '',
@@ -169,16 +193,106 @@ export default function PaymentCallbackPage() {
             }
 
             // Clear any remaining session storage data
-            sessionStorage.removeItem('pendingBookingData')
-            sessionStorage.removeItem('registrationData')
-            sessionStorage.removeItem('selectedAddOns')
+            try {
+              sessionStorage.removeItem('pendingBookingData')
+              sessionStorage.removeItem('registrationData')
+              sessionStorage.removeItem('selectedAddOns')
+            } catch (error) {
+              console.error('Error clearing session storage:', error);
+            }
 
             // Redirect to booking confirmation page
             setTimeout(() => {
-              if (extractedBookingId) {
-                router.push(`/booking-confirmation?ref=${extractedBookingId}`)
+              // Try to get the booking reference from verified API data first
+              let bookingRefForRedirect = bookingRef;
+              
+              try {
+                // Check if we have a transaction ID to use as booking reference
+                if (txnId) {
+                  bookingRefForRedirect = txnId;
+                  console.log(`Using transaction ID as booking reference for redirect: ${bookingRefForRedirect}`);
+                  // Update state for consistency
+                  setBookingRef(bookingRefForRedirect);
+                }
+              } catch (e) {
+                console.error('Error processing booking reference:', e);
+              }
+              
+              // Fallback if we still don't have a booking reference
+              if (!bookingRefForRedirect) {
+                // If we have a booking reference in state, use that
+                if (bookingRef) {
+                  bookingRefForRedirect = bookingRef;
+                  console.log(`Using booking reference from state for redirect: ${bookingRefForRedirect}`);
+                } else {
+                  // Last resort: generate a timestamp-based reference
+                  const timestamp = Date.now().toString();
+                  bookingRefForRedirect = `TEMP${timestamp}`;
+                  console.warn(`Generated temporary booking reference: ${bookingRefForRedirect}`);
+                }
+              }
+              
+              // Always store the booking reference and ID in localStorage as plain strings (not as JSON)
+              // This helps with retrieving booking details if redirect fails
+              if (bookingRefForRedirect) {
+                console.log(`Storing booking reference in localStorage: ${bookingRefForRedirect}`);
+                try {
+                  localStorage.setItem('lastBookingRef', bookingRefForRedirect); // Store as plain string, not JSON
+                } catch (error) {
+                  console.error('Error storing booking reference in localStorage:', error);
+                }
+                
+                // Store the booking reference in localStorage for future reference
+                try {
+                  localStorage.setItem('lastBookingRef', bookingRefForRedirect);
+                } catch (error) {
+                  console.error('Error storing booking reference in localStorage:', error);
+                }
+                
+                // Make one final API check to verify the booking exists
+                try {
+                  fetch('https://ai.alviongs.com/webhook/v1/nibog/tickect/booking_ref/details', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      booking_ref_id: bookingRefForRedirect
+                    })
+                  }).then(response => {
+                    if (response.ok) {
+                      return response.json().then(data => {
+                        if (data && data.length > 0) {
+                          console.log('✅ Final API check successful - booking found:', data);
+                          // Store complete booking data for the confirmation page
+                          try {
+                            localStorage.setItem('verifiedBookingData', JSON.stringify(data));
+                          } catch (error) {
+                            console.error('Error storing verified booking data in localStorage:', error);
+                          }
+                        } else {
+                          console.warn('⚠️ Final API check - empty result');
+                        }
+                      });
+                    } else {
+                      console.error('❌ Final API check failed:', response.status);
+                    }
+                  }).catch(error => {
+                    console.error('❌ Final API check error:', error);
+                  });
+                } catch (apiError) {
+                  console.error('❌ Exception in final API check:', apiError);
+                  // We don't fail the whole process if this check fails
+                }
+              }
+              
+              if (bookingRefForRedirect) {
+                console.log(`Redirecting to booking confirmation: /booking-confirmation?ref=${bookingRefForRedirect}`);
+                router.push(`/booking-confirmation?ref=${bookingRefForRedirect}`);
               } else {
-                router.push('/bookings') // Fallback to bookings list
+                console.error('No booking reference available for redirect');
+                // If all else fails, go to homepage
+                router.push('/');
               }
             }, 3000)
 
@@ -269,10 +383,24 @@ export default function PaymentCallbackPage() {
                 <XCircle className="h-16 w-16 text-gray-500" />
               )}
 
-              {bookingId && (
-                <p className="text-sm text-muted-foreground">
-                  Booking Reference: <span className="font-medium">{bookingId}</span>
-                </p>
+              {bookingRef && (
+                <>
+                  {bookingRef && (
+                    <p className="text-sm text-muted-foreground">
+                      Booking Reference: <span className="font-medium">{bookingRef}</span>
+                    </p>
+                  )}
+                  {bookingRef && (
+                    <p className="text-sm mt-2">
+                      <Link 
+                        href={`/booking-confirmation?ref=${encodeURIComponent(bookingRef)}`}
+                        className="text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Click here to view your booking confirmation
+                      </Link>
+                    </p>
+                  )}
+                </>
               )}
 
               {transactionId && (
@@ -291,7 +419,7 @@ export default function PaymentCallbackPage() {
           {paymentStatus === 'SUCCESS' ? (
             <Button
               className="w-full"
-              onClick={() => router.push(`/booking-confirmation?ref=${bookingId}`)}
+              onClick={() => bookingRef && router.push(`/booking-confirmation?ref=${encodeURIComponent(bookingRef)}`)}
             >
               View Booking Details
             </Button>
