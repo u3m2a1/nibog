@@ -75,11 +75,11 @@ export function generateConsistentBookingRef(identifier: string): string {
       // Extract from PPT format (PPTYYMMDDxxx)
       // PPT format typically has date embedded in it
       const pptMatch = cleanRef.match(/^PPT(\d{6})(\d{3,})$/);
-      
+
       if (pptMatch) {
         const dateStr = pptMatch[1]; // YYMMDD part
         const idPart = pptMatch[2];  // xxx part (numeric ID)
-        
+
         if (targetFormat === 'PPT') {
           // Already in PPT format, just normalize
           return cleanRef;
@@ -89,11 +89,15 @@ export function generateConsistentBookingRef(identifier: string): string {
           return `B${idPart.padStart(7, '0')}`;
         }
       } else {
-        // Malformed PPT reference
-        numericPart = cleanRef.replace(/\D/g, '');
-        return targetFormat === 'B' ? 
-          `B${numericPart.slice(-7).padStart(7, '0')}` : 
-          `PPT${year}${month}${day}${numericPart.slice(-3).padStart(3, '0')}`;
+        // For PPT references that don't match the strict pattern,
+        // preserve the original if target format is PPT
+        if (targetFormat === 'PPT') {
+          return cleanRef; // Preserve original PPT reference
+        } else {
+          // Only convert to B format if explicitly requested
+          numericPart = cleanRef.replace(/\D/g, '');
+          return `B${numericPart.slice(-7).padStart(7, '0')}`;
+        }
       }
     } else {
       // Unknown format, extract any numeric parts

@@ -4,6 +4,7 @@
  */
 
 import { TicketDetails } from './bookingService';
+import QRCode from 'qrcode';
 
 export interface TicketEmailData {
   bookingId: number;
@@ -27,32 +28,38 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
     console.log(`🎫 Starting ticket email process for booking ID: ${ticketData.bookingId}`);
     console.log(`🎫 Recipient: ${ticketData.parentEmail}`);
 
-    // Get email settings by calling the API function directly
+    // Get email settings by calling the API function directly (same as booking email service)
     const { GET: getEmailSettings } = await import('@/app/api/emailsetting/get/route');
     const emailSettingsResponse = await getEmailSettings();
 
     if (!emailSettingsResponse.ok) {
       console.error('🎫 Failed to get email settings');
-      throw new Error('Email settings not configured');
+      return {
+        success: false,
+        error: "Email settings not configured"
+      };
     }
 
     const emailSettings = await emailSettingsResponse.json();
     if (!emailSettings || emailSettings.length === 0) {
       console.error('🎫 No email settings found');
-      throw new Error('No email settings found');
+      return {
+        success: false,
+        error: "No email settings found"
+      };
     }
 
     const settings = emailSettings[0];
+
     console.log('🎫 Email settings retrieved successfully');
 
     // Generate ticket HTML content
-    const htmlContent = generateTicketHTML(ticketData);
+    const htmlContent = await generateTicketHTML(ticketData);
 
-    console.log(`🎫 HTML content generated, sending ticket email...`);
+    console.log(`🎫 HTML content generated with embedded QR code, sending ticket email...`);
 
-    // Send email using existing send-receipt-email API function directly
-    const { POST: sendReceiptEmail } = await import('@/app/api/send-receipt-email/route');
-    const emailRequest = new Request('http://localhost:3000/api/send-receipt-email', {
+    // Send email using regular email API since QR code is now embedded in HTML
+    const emailResponse = await fetch('http://localhost:3000/api/send-receipt-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,8 +71,6 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
         settings: settings
       }),
     });
-
-    const emailResponse = await sendReceiptEmail(emailRequest);
 
     if (!emailResponse.ok) {
       const errorData = await emailResponse.json();
@@ -91,19 +96,27 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
 /**
  * Generate HTML content for ticket email with QR code
  */
-function generateTicketHTML(ticketData: TicketEmailData): string {
-  // Generate QR code data URL (base64 encoded SVG)
-  const qrCodeSvg = generateQRCodeSVG(ticketData.qrCodeData);
+async function generateTicketHTML(ticketData: TicketEmailData): Promise<string> {
+  // Generate QR code as base64 data URL directly in the HTML for better email client compatibility
+  console.log('🎫 Generating ticket HTML with embedded QR code');
+  const qrCodeDataURL = await generateQRCodeDataURL(ticketData.qrCodeData);
   
   // Generate ticket details HTML
-  const ticketDetailsHtml = ticketData.ticketDetails.map((ticket, index) => `
+  const ticketDetailsHtml = ticketData.ticketDetails.map((ticket, index) => {
+    // Determine the game/slot name with proper fallbacks
+    const gameName = ticket.custom_title || ticket.slot_title || ticket.game_name || `Game ${ticket.booking_game_id || ticket.game_id || index + 1}`;
+
+    // Determine the price with proper fallbacks
+    const gamePrice = Number(ticket.custom_price || ticket.slot_price || ticket.game_price || 0).toFixed(2);
+
+    return `
     <div style="background: white; border: 2px dashed #007bff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
         <div style="flex: 1;">
           <h3 style="margin: 0 0 10px 0; color: #007bff; font-size: 18px; font-weight: bold;">
-            🎮 ${ticket.custom_title || ticket.game_name || `Game ${ticket.game_id}`}
+            🎮 ${gameName}
           </h3>
-          ${ticket.custom_description ? `<p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${ticket.custom_description}</p>` : ''}
+          ${ticket.custom_description || ticket.slot_description ? `<p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">${ticket.custom_description || ticket.slot_description}</p>` : ''}
           ${ticket.start_time && ticket.end_time ? `
             <p style="margin: 0 0 5px 0; color: #28a745; font-weight: bold;">
               ⏰ ${ticket.start_time} - ${ticket.end_time}
@@ -115,20 +128,21 @@ function generateTicketHTML(ticketData: TicketEmailData): string {
             </p>
           ` : ''}
           <p style="margin: 0; color: #28a745; font-weight: bold; font-size: 16px;">
-            💰 ₹${(ticket.custom_price || ticket.slot_price || 0).toFixed(2)}
+            💰 ₹${gamePrice}
           </p>
         </div>
         <div style="text-align: center; margin-left: 20px;">
           <div style="background: white; padding: 10px; border: 1px solid #ddd; border-radius: 8px; display: inline-block;">
-            ${qrCodeSvg}
+            <img src="${qrCodeDataURL}" width="200" height="200" alt="QR Code for ${ticketData.bookingRef}" style="display: block; max-width: 200px; max-height: 200px; border: none;" />
           </div>
-          <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">Scan at venue</p>
+          <p style="margin: 8px 0 0 0; font-size: 12px; color: #666; font-weight: bold;">📱 Scan this QR code at the venue</p>
+          <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Booking: ${ticketData.bookingRef}</p>
           <p style="margin: 2px 0 0 0; font-size: 11px; font-weight: bold; color: #007bff; font-family: monospace;">
             ${ticketData.bookingRef}
           </p>
         </div>
       </div>
-      
+
       <div style="border-top: 1px dashed #ddd; padding-top: 15px; margin-top: 15px;">
         <div style="display: flex; justify-content: space-between; font-size: 14px;">
           <div>
@@ -142,7 +156,8 @@ function generateTicketHTML(ticketData: TicketEmailData): string {
         </div>
       </div>
     </div>
-  `).join('');
+    `
+  }).join('');
 
   return `<!DOCTYPE html>
 <html>
@@ -222,25 +237,33 @@ function generateTicketHTML(ticketData: TicketEmailData): string {
 }
 
 /**
- * Generate QR Code as SVG string (simple implementation)
- * In production, you would use a proper QR code library like 'qrcode' npm package
+ * Generate QR Code as base64 data URL using the qrcode library
  */
-function generateQRCodeSVG(data: string): string {
-  // Simple placeholder QR code representation
-  // In a real implementation, you would use:
-  // import QRCode from 'qrcode'
-  // const qrCodeDataURL = await QRCode.toDataURL(data)
-  // return `<img src="${qrCodeDataURL}" width="80" height="80" alt="QR Code" />`
-
-  const encodedData = encodeURIComponent(data);
-
-  return `<svg width="80" height="80" viewBox="0 0 80 80" style="border: 1px solid #ddd;">
-    <rect width="80" height="80" fill="white"/>
-    <rect x="10" y="10" width="60" height="60" fill="none" stroke="#333" stroke-width="2"/>
-    <rect x="15" y="15" width="10" height="10" fill="#333"/>
-    <rect x="55" y="15" width="10" height="10" fill="#333"/>
-    <rect x="15" y="55" width="10" height="10" fill="#333"/>
-    <rect x="30" y="30" width="20" height="20" fill="none" stroke="#333" stroke-width="1"/>
-    <text x="40" y="45" text-anchor="middle" font-size="6" fill="#333">TICKET</text>
-  </svg>`;
+async function generateQRCodeDataURL(data: string): Promise<string> {
+  try {
+    console.log('🎫 Generating QR code for data:', data);
+    const qrCodeDataURL = await QRCode.toDataURL(data, {
+      width: 120,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    console.log('🎫 QR code generated successfully, length:', qrCodeDataURL.length);
+    console.log('🎫 QR code starts with:', qrCodeDataURL.substring(0, 50));
+    return qrCodeDataURL;
+  } catch (error) {
+    console.error('🎫 Error generating QR code:', error);
+    // Fallback to a simple placeholder that should definitely work
+    const fallbackSvg = `<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <rect width="120" height="120" fill="white" stroke="#ddd" stroke-width="2"/>
+        <rect x="20" y="20" width="80" height="80" fill="none" stroke="#333" stroke-width="2"/>
+        <text x="60" y="65" text-anchor="middle" font-size="12" fill="#333">QR CODE</text>
+        <text x="60" y="80" text-anchor="middle" font-size="8" fill="#666">PLACEHOLDER</text>
+      </svg>`;
+    const fallbackDataURL = 'data:image/svg+xml;base64,' + Buffer.from(fallbackSvg).toString('base64');
+    console.log('🎫 Using fallback QR code placeholder');
+    return fallbackDataURL;
+  }
 }

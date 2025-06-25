@@ -353,14 +353,22 @@ export function convertBookingRefFormat(ref: string, targetFormat: 'B' | 'PPT' =
   } else if (cleanRef.startsWith('PPT')) {
     // Extract from PPT format (PPTYYMMDDxxx)
     // PPT format typically has date embedded in it
-    const pptMatch = cleanRef.match(/^PPT(\d{6})(\d{3,})$/);
-    
+    console.log(`Converting PPT reference: ${cleanRef}`);
+    console.log(`PPT reference length: ${cleanRef.length}`);
+    console.log(`PPT reference characters:`, cleanRef.split('').map(c => `${c}(${c.charCodeAt(0)})`));
+
+    // More flexible regex that handles various PPT formats
+    const pptMatch = cleanRef.match(/^PPT(\d{6})(\d+)$/);
+    console.log(`PPT regex match result:`, pptMatch);
+
     if (pptMatch) {
       const dateStr = pptMatch[1]; // YYMMDD part
       const idPart = pptMatch[2];  // xxx part (numeric ID)
-      
+      console.log(`PPT matched - dateStr: ${dateStr}, idPart: ${idPart}`);
+
       if (targetFormat === 'PPT') {
-        // Already in PPT format, just normalize
+        // Already in PPT format, return as-is to preserve original date
+        console.log(`Returning PPT as-is: ${cleanRef}`);
         return cleanRef;
       } else {
         // Convert PPT -> B format
@@ -368,11 +376,40 @@ export function convertBookingRefFormat(ref: string, targetFormat: 'B' | 'PPT' =
         return `B${idPart.padStart(7, '0')}`;
       }
     } else {
-      // Malformed PPT reference
-      numericPart = cleanRef.replace(/\D/g, '');
-      return targetFormat === 'B' ? 
-        `B${numericPart.slice(-7).padStart(7, '0')}` : 
-        `PPT${year}${month}${day}${numericPart.slice(-3).padStart(3, '0')}`;
+      // Try alternative patterns for PPT references
+      console.log(`Primary PPT regex failed, trying alternative patterns...`);
+
+      // Check if it's a valid PPT format with any number of digits after the date
+      const altMatch = cleanRef.match(/^PPT(\d+)$/);
+      if (altMatch && altMatch[1].length >= 9) { // At least YYMMDD + 3 digits
+        const fullNumber = altMatch[1];
+        const dateStr = fullNumber.substring(0, 6); // First 6 digits as date
+        const idPart = fullNumber.substring(6);     // Rest as ID
+
+        console.log(`Alternative PPT pattern matched - dateStr: ${dateStr}, idPart: ${idPart}`);
+
+        if (targetFormat === 'PPT') {
+          // Already in PPT format, return as-is to preserve original date
+          console.log(`Returning PPT as-is: ${cleanRef}`);
+          return cleanRef;
+        } else {
+          // Convert PPT -> B format
+          return `B${idPart.padStart(7, '0')}`;
+        }
+      }
+
+      // Last resort - if target format is PPT and input is already PPT, preserve it
+      if (targetFormat === 'PPT') {
+        console.log(`PPT reference considered malformed but preserving original: ${cleanRef}`);
+        return cleanRef; // Preserve original PPT reference to avoid date changes
+      } else {
+        // Only convert to B format if explicitly requested
+        console.log(`PPT reference considered malformed, converting to B format`);
+        numericPart = cleanRef.replace(/\D/g, '');
+        const fallbackResult = `B${numericPart.slice(-7).padStart(7, '0')}`;
+        console.log(`Fallback result: ${fallbackResult}`);
+        return fallbackResult;
+      }
     }
   } else {
     // Unknown format, extract any numeric parts
@@ -389,9 +426,14 @@ export async function getTicketDetails(bookingRef: string): Promise<TicketDetail
     console.log('Fetching ticket details with booking reference:', bookingRef);
     
     // API expects booking_ref_id in PPT format for this specific endpoint
-    // Convert from our standard B format if necessary
-    let formattedRef = convertBookingRefFormat(bookingRef, 'PPT');
-    console.log(`Converted booking reference to API format: ${bookingRef} -> ${formattedRef}`);
+    // If already in PPT format, use as-is. Otherwise convert from B format.
+    let formattedRef = bookingRef;
+    if (!bookingRef.startsWith('PPT')) {
+      formattedRef = convertBookingRefFormat(bookingRef, 'PPT');
+      console.log(`Converted booking reference to API format: ${bookingRef} -> ${formattedRef}`);
+    } else {
+      console.log(`Booking reference already in PPT format: ${bookingRef}`);
+    }
     
     // Strip any JSON formatting if it was stored as JSON string
     if (formattedRef.startsWith('"') && formattedRef.endsWith('"')) {
