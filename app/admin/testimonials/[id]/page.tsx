@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -19,65 +19,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Loader2 } from "lucide-react"
 
-// Mock data - in a real app, this would come from an API
-const testimonials = [
-  {
-    id: "1",
-    name: "Harikrishna",
-    city: "Hyderabad",
-    event: "Baby Crawling",
-    rating: 5,
-    testimonial:
-      "The annual NIBOG game has been a huge hit with my kids. They love competing in different challenges and games, and it's been great for their confidence and self-esteem. I love that they're learning important life skills like perseverance and determination while they're having fun.",
-    status: "published",
-    date: "2025-10-15",
-  },
-  {
-    id: "2",
-    name: "Durga Prasad",
-    city: "Bangalore",
-    event: "Baby Walker",
-    rating: 5,
-    testimonial:
-      "New India Baby Olympic games has been a great experience for my kids. They love competing with other kids and showing off their skills, and it's been great for their hand-eye coordination and fine motor skills. I love that they're learning important life skills like teamwork and sportsmanship while they're having fun.",
-    status: "published",
-    date: "2025-10-16",
-  },
-  {
-    id: "3",
-    name: "Srujana",
-    city: "Vizag",
-    event: "Running Race",
-    rating: 4,
-    testimonial:
-      "My kids love participating in games. It's been great for their problem-solving skills, as they get to tackle different challenges and puzzles. They've also developed their critical thinking skills.",
-    status: "published",
-    date: "2025-10-17",
-  },
-  {
-    id: "4",
-    name: "Ramesh Kumar",
-    city: "Chennai",
-    event: "Hurdle Toddle",
-    rating: 5,
-    testimonial:
-      "NIBOG events are well-organized and the staff is very professional. My child had a great time participating in the hurdle toddle event. We'll definitely be back for more events!",
-    status: "pending",
-    date: "2025-03-10",
-  },
-  {
-    id: "5",
-    name: "Suresh Reddy",
-    city: "Mumbai",
-    event: "Cycle Race",
-    rating: 4,
-    testimonial:
-      "The cycle race was a fantastic experience for my child. The venue was great and the event was well-organized. Looking forward to more NIBOG events in the future.",
-    status: "pending",
-    date: "2025-08-10",
-  },
-]
+interface Testimonial {
+  id: number;
+  name: string;
+  city: string;
+  event_id: number;
+  rating: number;
+  testimonial: string;
+  submitted_at: string;
+  status: string;
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -111,53 +64,166 @@ type Props = {
 
 export default function TestimonialDetailPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const testimonialId = unwrappedParams.id
-  
-  const testimonial = testimonials.find((t) => t.id === testimonialId)
+  const [testimonial, setTestimonial] = useState<Testimonial | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchTestimonial = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/get', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: parseInt(params.id)
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch testimonial')
+        }
+
+        const data = await response.json()
+        if (data && data.length > 0) {
+          setTestimonial(data[0])
+        } else {
+          throw new Error('Testimonial not found')
+        }
+      } catch (error) {
+        console.error('Error fetching testimonial:', error)
+        setError(error instanceof Error ? error.message : 'An error occurred')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTestimonial()
+  }, [params.id])
   
   // Handle delete testimonial
-  const handleDeleteTestimonial = () => {
-    setIsProcessing("delete")
-    
-    // Simulate API call to delete the testimonial
-    setTimeout(() => {
-      console.log(`Deleting testimonial ${testimonialId}`)
-      setIsProcessing(null)
-      // In a real app, you would delete the testimonial and then redirect
+  const handleDeleteTestimonial = async () => {
+    try {
+      setIsProcessing("delete")
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: testimonial?.id })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete testimonial')
+      }
+
+      const data = await response.json()
+      if (!data[0]?.success) {
+        throw new Error('Delete operation failed')
+      }
+
       router.push("/admin/testimonials")
-    }, 1000)
+    } catch (error) {
+      console.error('Error deleting testimonial:', error)
+      setError(error instanceof Error ? error.message : 'Failed to delete testimonial')
+    } finally {
+      setIsProcessing(null)
+    }
   }
   
   // Handle approve testimonial
-  const handleApproveTestimonial = () => {
-    setIsProcessing("approve")
-    
-    // Simulate API call to approve the testimonial
-    setTimeout(() => {
-      console.log(`Approving testimonial ${testimonialId}`)
-      setIsProcessing(null)
-      // In a real app, you would update the testimonial status and refresh the page
+  const handleApproveTestimonial = async () => {
+    try {
+      if (!testimonial) return;
+      
+      setIsProcessing("approve")
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...testimonial,
+          status: "Published"
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to approve testimonial')
+      }
+
       router.refresh()
-    }, 1000)
+    } catch (error) {
+      console.error('Error approving testimonial:', error)
+      setError(error instanceof Error ? error.message : 'Failed to approve testimonial')
+    } finally {
+      setIsProcessing(null)
+    }
   }
   
   // Handle reject testimonial
-  const handleRejectTestimonial = () => {
-    setIsProcessing("reject")
-    
-    // Simulate API call to reject the testimonial
-    setTimeout(() => {
-      console.log(`Rejecting testimonial ${testimonialId}`)
-      setIsProcessing(null)
-      // In a real app, you would update the testimonial status and refresh the page
+  const handleRejectTestimonial = async () => {
+    try {
+      if (!testimonial) return;
+      
+      setIsProcessing("reject")
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...testimonial,
+          status: "Rejected"
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to reject testimonial')
+      }
+
       router.refresh()
-    }, 1000)
+    } catch (error) {
+      console.error('Error rejecting testimonial:', error)
+      setError(error instanceof Error ? error.message : 'Failed to reject testimonial')
+    } finally {
+      setIsProcessing(null)
+    }
   }
   
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <h2 className="text-xl font-semibold">Loading testimonial...</h2>
+          <p className="text-muted-foreground">Please wait while we fetch the testimonial data.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Error loading testimonial</h2>
+          <p className="text-muted-foreground">{error}</p>
+          <Button className="mt-4" onClick={() => router.push("/admin/testimonials")}>
+            Back to Testimonials
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (!testimonial) {
     return (
       <div className="flex h-[400px] items-center justify-center">
@@ -184,7 +250,7 @@ export default function TestimonialDetailPage({ params }: Props) {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Testimonial</h1>
-            <p className="text-muted-foreground">From {testimonial.name} - {testimonial.event}</p>
+            <p className="text-muted-foreground">From {testimonial.name}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -291,11 +357,11 @@ export default function TestimonialDetailPage({ params }: Props) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Event</span>
-                    <span>{testimonial.event}</span>
+                    <span>Event ID: {testimonial.event_id}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Date</span>
-                    <span>{testimonial.date}</span>
+                    <span>{new Date(testimonial.submitted_at).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>

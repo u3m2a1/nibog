@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -13,59 +13,146 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Save, Star } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
-// Events
-const events = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
-]
+// Define interfaces to match API response
+interface Event {
+  id: number;
+  title: string;
+  description: string;
+  city_id: number;
+  venue_id: number;
+  event_date: string;
+  status: string;
+}
 
-// Cities
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-]
+interface City {
+  id: number;
+  city_name: string;
+  state: string;
+  is_active: boolean;
+}
 
 export default function NewTestimonialPage() {
   const router = useRouter()
   const [name, setName] = useState("")
-  const [city, setCity] = useState("")
-  const [event, setEvent] = useState("")
+  const [selectedCityName, setSelectedCityName] = useState("")
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState("")
   const [rating, setRating] = useState("5")
   const [testimonialText, setTestimonialText] = useState("")
   const [date, setDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isDataLoading, setIsDataLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [events, setEvents] = useState<Event[]>([])
+  const [cities, setCities] = useState<City[]>([])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch games and cities data
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsDataLoading(true)
+      try {
+        setError(null)
+        console.log('Fetching data...')
+        
+        // Fetch events from API
+        const eventsResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event/get-all')
+        if (!eventsResponse.ok) {
+          throw new Error('Failed to fetch events')
+        }
+        const eventsData = await eventsResponse.json()
+        console.log('Events data:', eventsData)
+        setEvents(eventsData)
+
+        // Fetch cities from cities API
+        const citiesResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/city/get-all')
+        if (!citiesResponse.ok) {
+          throw new Error('Failed to fetch cities')
+        }
+        const citiesData = await citiesResponse.json()
+        console.log('Cities data:', citiesData)
+        setCities(citiesData)
+
+      } catch (error) {
+        console.error('Error fetching data:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load required data'
+        console.error('Error details:', error)
+        setError(errorMessage)
+      } finally {
+        setIsDataLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call to create the testimonial
-    setTimeout(() => {
-      // In a real app, this would be an API call to create the testimonial
-      console.log({
-        name,
-        city,
-        event,
+    try {
+      setError(null)
+
+      // Validate required fields
+      if (!selectedEventId) {
+        throw new Error('Please select an event')
+      }
+      if (!selectedCityName || !selectedCityId) {
+        throw new Error('Please select a city')
+      }
+
+      // Format date to match API requirement (YYYY-MM-DD)
+      const formattedDate = new Date(date).toISOString().split('T')[0];
+
+      // Prepare payload exactly as per API documentation
+      const payload = {
+        name: name.trim(),
+        city: selectedCityName.trim(), // Send city name directly
+        event_id: parseInt(selectedEventId),
         rating: parseInt(rating),
-        testimonial: testimonialText,
-        status: "pending",
+        testimonial: testimonialText.trim(),
+        date: formattedDate,
+        status: "Published"
+      }
+
+      // Extensive debug logging
+      console.log('Form Data:', {
+        name,
+        selectedCityName,
+        selectedEventId,
+        rating,
+        testimonialText,
         date
+      });
+      
+      console.log('Payload for API:', payload);
+
+      // Make API call to create testimonial
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       })
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('API error response:', errorData);
+        throw new Error('Failed to create testimonial: ' + errorData);
+      }
+
+      const data = await response.json()
       
       setIsLoading(false)
       
-      // Redirect to the testimonials list
+      // Redirect to the testimonials list on success
       router.push("/admin/testimonials")
-    }, 1000)
+
+    } catch (error) {
+      console.error('Error creating testimonial:', error)
+      setIsLoading(false)
+      setError(error instanceof Error ? error.message : 'An error occurred while creating the testimonial')
+    }
   }
 
   return (
@@ -106,32 +193,66 @@ export default function NewTestimonialPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
-                <Select value={city} onValueChange={setCity} required>
+                <Select
+                  value={selectedCityName}
+                  onValueChange={(cityName) => {
+                    console.log('Selected city name:', cityName);
+                    setSelectedCityName(cityName);
+                    
+                    // Find the corresponding city ID for the selected city name
+                    const selectedCity = cities.find(c => c.city_name === cityName);
+                    if (selectedCity) {
+                      console.log('Found city ID:', selectedCity.id);
+                      setSelectedCityId(selectedCity.id);
+                    } else {
+                      console.log('City ID not found for:', cityName);
+                      setSelectedCityId(null);
+                    }
+                  }}
+                  required
+                  disabled={isDataLoading}
+                >
                   <SelectTrigger id="city">
-                    <SelectValue placeholder="Select city" />
+                    <SelectValue placeholder={isDataLoading ? "Loading cities..." : "Select city"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>
-                        {c.name}
+                    {cities && cities.length > 0 ? (
+                      cities.map((c) => (
+                        <SelectItem
+                          key={c.id}
+                          value={c.city_name}
+                        >
+                          {c.city_name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="_empty" disabled>
+                        {isDataLoading ? "Loading..." : "No cities available"}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
+                {error && <p className="text-sm text-red-500">{error}</p>}
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="event">Event</Label>
-                <Select value={event} onValueChange={setEvent} required>
+                <Select value={selectedEventId} onValueChange={setSelectedEventId} required disabled={isDataLoading}>
                   <SelectTrigger id="event">
-                    <SelectValue placeholder="Select event" />
+                    <SelectValue placeholder={isDataLoading ? "Loading events..." : "Select event"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {events.map((e) => (
-                      <SelectItem key={e.id} value={e.name}>
-                        {e.name}
+                    {events && events.length > 0 ? (
+                      events.map((event) => (
+                        <SelectItem key={event.id} value={event.id.toString()}>
+                          {event.title}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="_empty" disabled>
+                        {isDataLoading ? "Loading..." : "No events available"}
                       </SelectItem>
-                    ))}
+                    )}
                   </SelectContent>
                 </Select>
               </div>

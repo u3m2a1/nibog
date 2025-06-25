@@ -1,4 +1,4 @@
-// Testimonial type definition
+// Testimonial type definition based on API documentation
 export interface Testimonial {
   id: number;
   name: string;
@@ -7,6 +7,29 @@ export interface Testimonial {
   rating: number;
   testimonial: string;
   submitted_at: string;
+  status: string;
+}
+
+// Create testimonial payload interface
+export interface CreateTestimonialPayload {
+  name: string;
+  city: string;
+  event_id: number;
+  rating: number;
+  testimonial: string;
+  date: string;
+  status: string;
+}
+
+// Update testimonial payload interface
+export interface UpdateTestimonialPayload {
+  id: number;
+  name: string;
+  city: string;
+  event_id: number;
+  rating: number;
+  testimonial: string;
+  date: string;
   status: string;
 }
 
@@ -93,15 +116,7 @@ export async function getTestimonialById(testimonialId: string | number): Promis
  * @param testimonialData The testimonial data to create
  * @returns Promise with the created testimonial data
  */
-export async function createTestimonial(testimonialData: {
-  name: string;
-  city: string;
-  event_id: number;
-  rating: number;
-  testimonial: string;
-  date: string;
-  status: string;
-}): Promise<Testimonial> {
+export async function createTestimonial(testimonialData: CreateTestimonialPayload): Promise<Testimonial> {
   try {
     console.log("Creating testimonial with data:", testimonialData);
 
@@ -138,16 +153,7 @@ export async function createTestimonial(testimonialData: {
  * @param testimonialData The testimonial data to update
  * @returns Promise with the updated testimonial data
  */
-export async function updateTestimonial(testimonialData: {
-  id: number;
-  name: string;
-  city: string;
-  event_id: number;
-  rating: number;
-  testimonial: string;
-  date: string;
-  status: string;
-}): Promise<Testimonial> {
+export async function updateTestimonial(testimonialData: UpdateTestimonialPayload): Promise<Testimonial> {
   try {
     console.log("Updating testimonial with data:", testimonialData);
 
@@ -190,7 +196,7 @@ export async function deleteTestimonial(testimonialId: number): Promise<{ succes
 
     // Use our internal API route to avoid CORS issues
     const response = await fetch('/api/testimonials/delete', {
-      method: "DELETE",
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
@@ -229,9 +235,19 @@ export async function updateTestimonialStatus(testimonialId: number, status: str
     // First get the current testimonial data
     const currentTestimonial = await getTestimonialById(testimonialId);
     
-    // Update with new status
-    const updatedData = {
-      ...currentTestimonial,
+    // Convert submitted_at to date format for the update API
+    const submittedDate = new Date(currentTestimonial.submitted_at);
+    const dateString = submittedDate.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    
+    // Update with new status and proper date format
+    const updatedData: UpdateTestimonialPayload = {
+      id: currentTestimonial.id,
+      name: currentTestimonial.name,
+      city: currentTestimonial.city,
+      event_id: currentTestimonial.event_id,
+      rating: currentTestimonial.rating,
+      testimonial: currentTestimonial.testimonial,
+      date: dateString,
       status: status
     };
 

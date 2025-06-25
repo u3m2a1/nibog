@@ -13,65 +13,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Save, Star } from "lucide-react"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
-// Mock data - in a real app, this would come from an API
-const testimonials = [
-  {
-    id: "1",
-    name: "Harikrishna",
-    city: "Hyderabad",
-    event: "Baby Crawling",
-    rating: 5,
-    testimonial:
-      "The annual NIBOG game has been a huge hit with my kids. They love competing in different challenges and games, and it's been great for their confidence and self-esteem. I love that they're learning important life skills like perseverance and determination while they're having fun.",
-    status: "published",
-    date: "2025-10-15",
-  },
-  {
-    id: "2",
-    name: "Durga Prasad",
-    city: "Bangalore",
-    event: "Baby Walker",
-    rating: 5,
-    testimonial:
-      "New India Baby Olympic games has been a great experience for my kids. They love competing with other kids and showing off their skills, and it's been great for their hand-eye coordination and fine motor skills. I love that they're learning important life skills like teamwork and sportsmanship while they're having fun.",
-    status: "published",
-    date: "2025-10-16",
-  },
-  {
-    id: "3",
-    name: "Srujana",
-    city: "Vizag",
-    event: "Running Race",
-    rating: 4,
-    testimonial:
-      "My kids love participating in games. It's been great for their problem-solving skills, as they get to tackle different challenges and puzzles. They've also developed their critical thinking skills.",
-    status: "published",
-    date: "2025-10-17",
-  },
-  {
-    id: "4",
-    name: "Ramesh Kumar",
-    city: "Chennai",
-    event: "Hurdle Toddle",
-    rating: 5,
-    testimonial:
-      "NIBOG events are well-organized and the staff is very professional. My child had a great time participating in the hurdle toddle event. We'll definitely be back for more events!",
-    status: "pending",
-    date: "2025-03-10",
-  },
-  {
-    id: "5",
-    name: "Suresh Reddy",
-    city: "Mumbai",
-    event: "Cycle Race",
-    rating: 4,
-    testimonial:
-      "The cycle race was a fantastic experience for my child. The venue was great and the event was well-organized. Looking forward to more NIBOG events in the future.",
-    status: "pending",
-    date: "2025-08-10",
-  },
-]
-
 // Testimonial statuses
 const statuses = [
   { id: "1", name: "published", label: "Published" },
@@ -79,37 +20,15 @@ const statuses = [
   { id: "3", name: "rejected", label: "Rejected" },
 ]
 
-// Events
-const events = [
-  { id: "1", name: "Baby Crawling" },
-  { id: "2", name: "Baby Walker" },
-  { id: "3", name: "Running Race" },
-  { id: "4", name: "Hurdle Toddle" },
-  { id: "5", name: "Cycle Race" },
-  { id: "6", name: "Ring Holding" },
-]
-
-// Cities
-const cities = [
-  { id: "1", name: "Hyderabad" },
-  { id: "2", name: "Bangalore" },
-  { id: "3", name: "Chennai" },
-  { id: "4", name: "Vizag" },
-  { id: "5", name: "Mumbai" },
-  { id: "6", name: "Delhi" },
-  { id: "7", name: "Kolkata" },
-]
-
 type Props = {
-  params: { id: string }
+  params: {
+    id: string;
+  }
 }
 
 export default function EditTestimonialPage({ params }: Props) {
   const router = useRouter()
-  
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const testimonialId = unwrappedParams.id
+  const testimonialId = params.id
   
   const [testimonial, setTestimonial] = useState<any>(null)
   const [name, setName] = useState("")
@@ -121,50 +40,165 @@ export default function EditTestimonialPage({ params }: Props) {
   const [date, setDate] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [cities, setCities] = useState<Array<{id: number, city_name: string}>>([])
+  const [events, setEvents] = useState<Array<{id: number, title: string}>>([])
 
   useEffect(() => {
-    // In a real app, this would be an API call to fetch the testimonial data
-    const foundTestimonial = testimonials.find(t => t.id === testimonialId)
-    if (foundTestimonial) {
-      setTestimonial(foundTestimonial)
-      setName(foundTestimonial.name)
-      setCity(foundTestimonial.city)
-      setEvent(foundTestimonial.event)
-      setRating(foundTestimonial.rating.toString())
-      setTestimonialText(foundTestimonial.testimonial)
-      setStatus(foundTestimonial.status)
-      setDate(foundTestimonial.date)
+    // Fetch cities
+    const fetchCities = async () => {
+      try {
+        const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/city/get-all')
+        if (!response.ok) {
+          throw new Error('Failed to fetch cities')
+        }
+        const data = await response.json()
+        setCities(data)
+      } catch (error) {
+        console.error('Error fetching cities:', error)
+      }
     }
-  }, [testimonialId])
+    
+    // Fetch events
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event/get-all')
+        if (!response.ok) {
+          throw new Error('Failed to fetch events')
+        }
+        const data = await response.json()
+        setEvents(data)
+      } catch (error) {
+        console.error('Error fetching events:', error)
+      }
+    }
+    
+    fetchCities()
+    fetchEvents()
+  }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchTestimonial = async () => {
+      try {
+        const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/get', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: parseInt(testimonialId)
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch testimonial')
+        }
+
+        const data = await response.json()
+        if (data && data.length > 0) {
+          const testimonialData = data[0]
+          
+          // Find event name from event_id
+          let eventName = ''
+          if (events.length > 0) {
+            const matchedEvent = events.find(e => e.id === testimonialData.event_id)
+            eventName = matchedEvent ? matchedEvent.title : ''
+          }
+
+          setTestimonial(testimonialData)
+          setName(testimonialData.name)
+          setCity(testimonialData.city)
+          setEvent(eventName)
+          setRating(testimonialData.rating.toString())
+          setTestimonialText(testimonialData.testimonial)
+          setStatus(testimonialData.status.toLowerCase()) // Convert to lowercase for frontend
+          setDate(testimonialData.submitted_at.split('T')[0]) // Extract date from ISO string
+        }
+      } catch (error) {
+        console.error('Error fetching testimonial:', error)
+        setError('Failed to fetch testimonial data')
+      }
+    }
+
+    if (testimonialId && events.length > 0) {
+      fetchTestimonial()
+    }
+  }, [testimonialId, events])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
-    // Simulate API call to update the testimonial
-    setTimeout(() => {
-      // In a real app, this would be an API call to update the testimonial
-      console.log({
-        id: testimonialId,
+    try {
+      // Find event ID from event title
+      const selectedEvent = events.find(e => e.title === event)
+      if (!selectedEvent) {
+        throw new Error('Invalid event selected')
+      }
+
+      // Prepare update data
+      const updateData = {
+        id: parseInt(testimonialId),
         name,
         city,
-        event,
+        event_id: parseInt(selectedEvent.id),
         rating: parseInt(rating),
         testimonial: testimonialText,
-        status,
-        date
+        date,
+        status: status.charAt(0).toUpperCase() + status.slice(1) // Capitalize first letter
+      }
+
+      console.log('Submitting update with data:', updateData)
+
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
       })
-      
+
+      const responseData = await response.text();
+      let parsedData;
+      try {
+        parsedData = JSON.parse(responseData);
+      } catch (e) {
+        console.error('Response is not JSON:', responseData);
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        console.error('Error response:', parsedData);
+        throw new Error(parsedData.message || 'Failed to update testimonial');
+      }
+
       setIsLoading(false)
       setIsSaved(true)
 
-      // Reset the saved state after 3 seconds
+      // Reset the saved state after 1.5 seconds
       setTimeout(() => {
         setIsSaved(false)
         // Redirect to the testimonial details page
         router.push(`/admin/testimonials/${testimonialId}`)
       }, 1500)
-    }, 1000)
+
+    } catch (error) {
+      console.error('Error updating testimonial:', error)
+      setIsLoading(false)
+      setError(error instanceof Error ? error.message : 'An error occurred while updating the testimonial')
+    }
+  }
+
+  const renderError = () => {
+    if (error) {
+      return (
+        <div className="mb-4 p-4 text-sm text-red-800 bg-red-50 rounded-lg">
+          {error}
+        </div>
+      )
+    }
+    return null
   }
 
   if (!testimonial) {
@@ -198,6 +232,7 @@ export default function EditTestimonialPage({ params }: Props) {
         </div>
       </div>
 
+      {renderError()}
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
@@ -225,8 +260,8 @@ export default function EditTestimonialPage({ params }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>
-                        {c.name}
+                      <SelectItem key={c.id} value={c.city_name}>
+                        {c.city_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -241,8 +276,8 @@ export default function EditTestimonialPage({ params }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {events.map((e) => (
-                      <SelectItem key={e.id} value={e.name}>
-                        {e.name}
+                      <SelectItem key={e.id} value={e.title}>
+                        {e.title}
                       </SelectItem>
                     ))}
                   </SelectContent>

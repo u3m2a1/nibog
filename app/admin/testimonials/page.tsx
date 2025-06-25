@@ -160,7 +160,23 @@ export default function TestimonialsPage() {
     try {
       setIsProcessing(String(id))
 
-      await deleteTestimonial(id)
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/testimonials/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete testimonial')
+      }
+
+      const data = await response.json()
+      
+      if (!data[0]?.success) {
+        throw new Error('Delete operation failed')
+      }
 
       // Remove from local state
       setTestimonialsList(testimonialsList.filter(testimonial => testimonial.id !== id))
@@ -173,7 +189,7 @@ export default function TestimonialsPage() {
       console.error("Failed to delete testimonial:", error)
       toast({
         title: "Error",
-        description: "Failed to delete testimonial. Please try again.",
+        description: error.message || "Failed to delete testimonial. Please try again.",
         variant: "destructive",
       })
     } finally {
