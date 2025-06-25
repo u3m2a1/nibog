@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BOOKING_API } from '@/config/api';
 import { PHONEPE_CONFIG, generateSHA256Hash } from '@/config/phonepe';
-import { sendBookingConfirmationFromServer, BookingConfirmationData } from '@/services/emailNotificationService';
 
 // Cache successful transaction IDs to prevent duplicate processing
 let processedTransactions: Set<string> = new Set();
@@ -594,50 +593,8 @@ export async function POST(request: Request) {
       if (bookingResult.success && bookingResult.bookingId) {
         console.log(`✅ Booking and payment successfully created for ID: ${bookingResult.bookingId}`);
         
-        // Try to send email notification using the email settings API
-        try {
-          console.log(`📧 Attempting to get email settings to send confirmation for booking ID: ${bookingResult.bookingId}`);
-          // First get email settings
-          const emailSettingsResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/email-settings/get', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (emailSettingsResponse.ok && bookingResult.bookingData) {
-            const emailSettings = await emailSettingsResponse.json();
-            console.log('📧 Retrieved email settings for sending confirmation');
-            
-            const bookingData = bookingResult.bookingData;
-            
-            // Now use these settings to send the email
-            await sendBookingConfirmationFromServer({
-              bookingId: bookingResult.bookingId,
-              parentName: bookingData.parent?.parent_name || 'Customer',
-              parentEmail: bookingData.parent?.email || '',
-              childName: bookingData.child?.full_name || '',
-              eventTitle: `Event ${bookingData.booking?.event_id}`,
-              eventDate: 'TBD',  // Get from event details
-              eventVenue: 'TBD',  // Get from event details
-              totalAmount: amount / 100,
-              paymentMethod: 'PhonePe',
-              transactionId: transactionId,
-              gameDetails: bookingData.booking_games?.map(game => ({
-                gameName: `Game ${game.game_id}`,
-                gameTime: 'TBD',  // Get from game details
-                gamePrice: game.game_price || 0,
-              })) || [],
-              addOns: []
-            });
-            console.log(`✅ Email notification triggered successfully`);
-          } else {
-            console.error(`❌ Could not retrieve email settings: ${emailSettingsResponse.status}`);
-          }
-        } catch (emailError) {
-          console.error(`❌ Failed to send email notification: ${emailError}`);
-          // Don't fail the transaction if email fails
-        }
+        // Email notification is now handled by the PhonePe status route after both booking and payment are created
+        console.log(`📧 Email notification will be handled by PhonePe status route for booking ID: ${bookingResult.bookingId}`);
 
         // Mark this transaction as processed
         processedTransactions.add(transactionId);

@@ -102,6 +102,7 @@ export function formatBookingDataForAPI(formData: {
   eventId: number;
   gameId: number[] | number; // Updated to accept both array and single number
   gamePrice: number[] | number; // Updated to accept both array and single number
+  slotId?: number[] | number; // Add slot IDs for proper game details lookup
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: string;
@@ -184,12 +185,14 @@ export function formatBookingDataForAPI(formData: {
       // Ensure gameId is always treated as an array for consistent processing
       const gameIds = Array.isArray(formData.gameId) ? formData.gameId : [formData.gameId];
       const gamePrices = Array.isArray(formData.gamePrice) ? formData.gamePrice : [formData.gamePrice];
+      const slotIds = formData.slotId ? (Array.isArray(formData.slotId) ? formData.slotId : [formData.slotId]) : undefined;
 
       console.log("Processing game IDs:", gameIds);
       console.log("Processing game prices:", gamePrices);
+      console.log("Processing slot IDs:", slotIds);
 
       // Use validation utility to process game data
-      const validationResult = validateGameData(gameIds, gamePrices, formData.totalAmount);
+      const validationResult = validateGameData(gameIds, gamePrices, formData.totalAmount, slotIds);
 
       if (validationResult.isValid && validationResult.validGames.length > 0) {
         console.log("Successfully validated games for booking registration");

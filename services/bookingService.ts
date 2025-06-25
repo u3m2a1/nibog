@@ -235,6 +235,338 @@ export async function getBookingById(bookingId: string | number): Promise<Bookin
 }
 
 /**
+ * Get event game slot details by slot ID (preferred method)
+ * @param slotId Slot ID
+ * @returns Promise with slot details or null
+ */
+export async function getEventGameSlotDetailsBySlotId(slotId: number) {
+  try {
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event-game-slot/get', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: slotId })
+    });
+
+    if (response.ok) {
+      const slotDataArray = await response.json();
+
+      // The API returns an array, get the first item
+      if (slotDataArray && Array.isArray(slotDataArray) && slotDataArray.length > 0) {
+        const slotData = slotDataArray[0];
+        return {
+          slot_id: slotData.id,
+          custom_title: slotData.custom_title,
+          custom_description: slotData.custom_description,
+          custom_price: slotData.custom_price,
+          slot_price: slotData.slot_price,
+          start_time: slotData.start_time,
+          end_time: slotData.end_time,
+          max_participants: slotData.max_participants,
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching slot details by slot ID:', error);
+  }
+  return null;
+}
+
+/**
+ * Find the most likely slot for a booking based on event and game details
+ * This is a workaround for when booking_games data is not available
+ * @param booking Booking data
+ * @returns Promise with slot details or null
+ */
+export async function findMostLikelySlotForBooking(booking: any) {
+  try {
+    console.log('🔍 Finding most likely slot for booking:', booking.booking_id);
+    console.log('📋 Booking details:', {
+      event_title: booking.event_title,
+      event_date: booking.event_event_date,
+      game_name: booking.game_name,
+      total_amount: booking.total_amount,
+      booking_created_at: booking.booking_created_at
+    });
+
+    // Get all slots first with timeout protection
+    const slotsController = new AbortController();
+    const slotsTimeout = setTimeout(() => slotsController.abort(), 10000); // 10 second timeout
+
+    const slotsResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event-game-slot/get-all', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: slotsController.signal
+    });
+
+    clearTimeout(slotsTimeout);
+
+    if (!slotsResponse.ok) {
+      console.error('❌ Failed to fetch slots:', slotsResponse.status);
+      return null;
+    }
+
+    const allSlots = await slotsResponse.json();
+    console.log(`📊 Total slots available: ${allSlots.length}`);
+
+    // Get all events to find the matching event ID with timeout protection
+    const eventsController = new AbortController();
+    const eventsTimeout = setTimeout(() => eventsController.abort(), 10000); // 10 second timeout
+
+    const eventsResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event/get-all', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: eventsController.signal
+    });
+
+    clearTimeout(eventsTimeout);
+
+    if (!eventsResponse.ok) {
+      console.error('❌ Failed to fetch events:', eventsResponse.status);
+      return null;
+    }
+
+    const allEvents = await eventsResponse.json();
+
+    // Find the event that matches the booking
+    const matchingEvent = allEvents.find((event: any) => {
+      const eventDate = new Date(event.event_date).toDateString();
+      const bookingDate = new Date(booking.event_event_date).toDateString();
+      return event.title === booking.event_title && eventDate === bookingDate;
+    });
+
+    if (!matchingEvent) {
+      console.log('❌ No matching event found for:', booking.event_title);
+      return null;
+    }
+
+    console.log('✅ Found matching event:', matchingEvent.id, matchingEvent.title);
+
+    // Get all games to find the matching game ID with timeout protection
+    const gamesController = new AbortController();
+    const gamesTimeout = setTimeout(() => gamesController.abort(), 10000); // 10 second timeout
+
+    const gamesResponse = await fetch('https://ai.alviongs.com/webhook/v1/nibog/baby-games/get-all', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: gamesController.signal
+    });
+
+    clearTimeout(gamesTimeout);
+
+    if (!gamesResponse.ok) {
+      console.error('❌ Failed to fetch games:', gamesResponse.status);
+      return null;
+    }
+
+    const allGames = await gamesResponse.json();
+
+    // Find the game that matches the booking
+    const matchingGame = allGames.find((game: any) =>
+      game.game_title === booking.game_name ||
+      game.name === booking.game_name ||
+      game.title === booking.game_name
+    );
+
+    if (!matchingGame) {
+      console.log('❌ No matching game found for:', booking.game_name);
+      return null;
+    }
+
+    console.log('✅ Found matching game:', matchingGame.id, matchingGame.game_title || matchingGame.name);
+
+    // Find slots that match both event and game
+    const matchingSlots = allSlots.filter((slot: any) =>
+      slot.event_id === matchingEvent.id && slot.game_id === matchingGame.id
+    );
+
+    console.log(`🎯 Found ${matchingSlots.length} matching slots for event ${matchingEvent.id} + game ${matchingGame.id}`);
+
+    if (matchingSlots.length === 0) {
+      console.log('❌ No matching slots found');
+      return null;
+    }
+
+    // Log all matching slots for debugging
+    matchingSlots.forEach((slot: any, index: number) => {
+      console.log(`  ${index + 1}. Slot ${slot.id}: "${slot.custom_title || 'No custom title'}" - Price: ${slot.slot_price}`);
+    });
+
+    // If there's only one slot, use it
+    if (matchingSlots.length === 1) {
+      const slot = matchingSlots[0];
+      console.log('✅ Using single matching slot:', slot.id, slot.custom_title);
+      return await getEventGameSlotDetailsBySlotId(slot.id);
+    }
+
+    // IMPROVED MATCHING LOGIC for multiple slots:
+
+    // 1. Try to match by price (booking total_amount should match slot_price + any addons)
+    const bookingAmount = parseFloat(booking.total_amount);
+    const priceMatchingSlots = matchingSlots.filter((slot: any) => {
+      const slotPrice = parseFloat(slot.slot_price || slot.custom_price || '0');
+      // Allow for small differences due to addons, taxes, etc.
+      return Math.abs(bookingAmount - slotPrice) <= 2; // Within $2 difference
+    });
+
+    if (priceMatchingSlots.length === 1) {
+      const slot = priceMatchingSlots[0];
+      console.log('✅ Using price-matched slot:', slot.id, slot.custom_title, `(${slot.slot_price})`);
+      return await getEventGameSlotDetailsBySlotId(slot.id);
+    }
+
+    // 2. Try to match by custom title (slots with custom titles are more likely to be the booked ones)
+    const customSlots = matchingSlots.filter((slot: any) =>
+      slot.custom_title &&
+      slot.custom_title.trim() !== '' &&
+      slot.custom_title !== booking.game_name
+    );
+
+    if (customSlots.length === 1) {
+      const slot = customSlots[0];
+      console.log('✅ Using custom-titled slot:', slot.id, slot.custom_title);
+      return await getEventGameSlotDetailsBySlotId(slot.id);
+    }
+
+    // 3. Try to match by creation time (slots created around the same time as booking)
+    if (booking.booking_created_at) {
+      const bookingTime = new Date(booking.booking_created_at);
+      const timeMatchingSlots = matchingSlots.filter((slot: any) => {
+        if (!slot.created_at) return false;
+        const slotTime = new Date(slot.created_at);
+        const timeDiff = Math.abs(bookingTime.getTime() - slotTime.getTime());
+        // Within 24 hours
+        return timeDiff <= 24 * 60 * 60 * 1000;
+      });
+
+      if (timeMatchingSlots.length === 1) {
+        const slot = timeMatchingSlots[0];
+        console.log('✅ Using time-matched slot:', slot.id, slot.custom_title);
+        return await getEventGameSlotDetailsBySlotId(slot.id);
+      }
+    }
+
+    // 4. Fallback: Use the slot with the most recent creation time
+    const sortedSlots = matchingSlots.sort((a: any, b: any) => {
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeB - timeA; // Most recent first
+    });
+
+    const slot = sortedSlots[0];
+    console.log('✅ Using most recent slot as fallback:', slot.id, slot.custom_title);
+    return await getEventGameSlotDetailsBySlotId(slot.id);
+
+  } catch (error) {
+    console.error('❌ Error finding most likely slot:', error);
+    return null;
+  }
+}
+
+/**
+ * Get event game slot details by event and game IDs (fallback method)
+ * @param eventId Event ID
+ * @param gameId Game ID
+ * @returns Promise with slot details or null
+ */
+export async function getEventGameSlotDetails(eventId: number, gameId: number) {
+  try {
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/event-game-slot/get-all', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (response.ok) {
+      const allSlots = await response.json();
+      const matchingSlot = allSlots.find((slot: any) =>
+        slot.event_id === eventId && slot.game_id === gameId
+      );
+
+      if (matchingSlot) {
+        return {
+          slot_id: matchingSlot.id,
+          custom_title: matchingSlot.custom_title,
+          custom_description: matchingSlot.custom_description,
+          custom_price: matchingSlot.custom_price,
+          slot_price: matchingSlot.slot_price,
+          start_time: matchingSlot.start_time,
+          end_time: matchingSlot.end_time,
+          max_participants: matchingSlot.max_participants,
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching slot details:', error);
+  }
+  return null;
+}
+
+/**
+ * Get payment details for a booking
+ * @param bookingId Booking ID
+ * @returns Promise with payment details or null
+ */
+export async function getBookingPaymentDetails(bookingId: number) {
+  try {
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/payments/get-all', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (response.ok) {
+      const allPayments = await response.json();
+      const payment = allPayments.find((p: any) => p.booking_id === bookingId);
+
+      if (payment) {
+        return {
+          payment_id: payment.payment_id,
+          actual_payment_status: payment.payment_status,
+          transaction_id: payment.transaction_id,
+          payment_date: payment.payment_date,
+          payment_method: payment.payment_method,
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching payment details:', error);
+  }
+  return null;
+}
+
+/**
+ * Update booking payment status
+ * @param bookingId Booking ID
+ * @param paymentStatus New payment status
+ * @returns Promise with updated booking data
+ */
+export async function updateBookingPaymentStatus(bookingId: number, paymentStatus: string): Promise<any> {
+  try {
+    console.log(`Updating booking ${bookingId} payment status to: ${paymentStatus}`);
+
+    // Use our internal API route that handles both payment status and booking status updates
+    const response = await fetch('/api/bookings/update-payment-status', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookingId,
+        paymentStatus
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update booking payment status: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error('Error updating booking payment status:', error);
+    throw error;
+  }
+}
+
+/**
  * Create a new booking
  * @param bookingData The booking data to create
  * @returns Promise with the created booking data

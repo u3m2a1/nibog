@@ -91,19 +91,27 @@ export default function PaymentCallbackPage() {
                 if (extractedBookingId) {
                   console.log('📧 Sending confirmation email with complete data...')
 
-                  // Use full data from localStorage for a more detailed email
+                  // Use rich data from localStorage for a detailed email
                   const emailResult = await sendBookingConfirmationFromClient({
                     bookingId: parseInt(extractedBookingId),
                     parentName: bookingData.parentName || 'Valued Customer',
                     parentEmail: bookingData.email || '',
                     childName: bookingData.childName || '',
-                    eventTitle: `Event ${bookingData.eventId || 'Unknown'}`,
-                    eventDate: 'TBD',
-                    eventVenue: 'TBD',
+                    eventTitle: bookingData.eventTitle || `Event ${bookingData.eventId || 'Unknown'}`,
+                    eventDate: bookingData.eventDate || 'TBD',
+                    eventVenue: bookingData.eventVenue ?
+                      (bookingData.eventCity ? `${bookingData.eventVenue}, ${bookingData.eventCity}` : bookingData.eventVenue)
+                      : 'TBD',
                     totalAmount: bookingData.totalAmount || 0,
                     paymentMethod: 'PhonePe',
                     transactionId: txnId,
-                    gameDetails: bookingData.gameId?.map((gameId: number, index: number) => ({
+                    gameDetails: bookingData.selectedGamesObj?.map((game: any, index: number) => ({
+                      gameName: game.custom_title || game.game_title || `Game ${game.game_id || game.id}`,
+                      gameDescription: game.custom_description || game.game_description || '',
+                      gameTime: game.start_time && game.end_time ?
+                        `${game.start_time} - ${game.end_time}` : 'TBD',
+                      gamePrice: bookingData.gamePrice?.[index] || game.slot_price || game.custom_price || 0,
+                    })) || bookingData.gameId?.map((gameId: number, index: number) => ({
                       gameName: `Game ${gameId}`,
                       gameTime: 'TBD',
                       gamePrice: bookingData.gamePrice?.[index] || 0,

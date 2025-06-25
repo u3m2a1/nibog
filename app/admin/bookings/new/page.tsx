@@ -9,20 +9,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Save, Loader2 } from "lucide-react"
+
+
+import { ArrowLeft, Save, Loader2, CreditCard, CheckCircle, Mail, MessageCircle, ExternalLink } from "lucide-react"
 import { format } from "date-fns"
 
 import { useToast } from "@/hooks/use-toast"
 import { BOOKING_API, PAYMENT_API } from "@/config/api"
 import { getAllCities, City } from "@/services/cityService"
 import { getAllAddOns, AddOn, AddOnVariant } from "@/services/addOnService"
-import {
-  getPromoCodesByEventAndGames,
-  validatePromoCodePreview,
-  validatePromoCodeFinal,
-  rollbackPromoCodeUsage,
-  PromoCodeDetail
-} from "@/services/promoCodeService"
+// Promo code functionality simplified for admin panel
+import { getEventsByCityId, getGamesByAgeAndEvent } from "@/services/eventService"
+import { differenceInMonths } from "date-fns"
+import { initiatePhonePePayment, createManualPayment, ManualPaymentData } from "@/services/paymentService"
+import { sendPaymentLinkEmail, generateWhatsAppMessage, PaymentLinkEmailData } from "@/services/paymentLinkEmailService"
 
 
 
@@ -33,57 +33,30 @@ interface SelectedAddon {
   quantity: number;
 }
 
-// Interface for event from API
-interface Event {
-  id: number;
-  title: string;
-  description: string;
+// Interface for event from API (matching user panel structure)
+interface EventListItem {
+  event_id: number;
+  event_title: string;
+  event_description: string;
+  event_date: string;
+  event_status: string;
   city_id: number;
   venue_id: number;
-  event_date: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
 }
 
-// Interface for game from API
-interface Game {
-  id: number;
-  name: string;
+// Interface for game from API (matching user panel structure)
+interface EligibleGame {
+  id: string; // This will be slot_id as string for unique identification
+  title: string;
   description: string;
-  min_age: number;
-  max_age: number;
-  duration_minutes: number;
-  categories: string[];
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-// Interface for event game slot from API
-interface EventGameSlot {
-  id: number;
-  event_id: number;
-  game_id: number;
+  price: number;
+  start_time: string;
+  end_time: string;
   custom_title: string;
   custom_description: string;
-  custom_price: string;
-  start_time: string;
-  end_time: string;
-  slot_price: string;
   max_participants: number;
-  created_at: string;
-  updated_at: string;
-}
-
-// Interface for time slot selection
-interface TimeSlot {
-  id: number;
-  start_time: string;
-  end_time: string;
-  custom_title: string;
-  slot_price: string;
-  max_participants: number;
+  slot_id: number;
+  game_id: number; // Store game_id separately for API calls
 }
 
 // Generate unique transaction ID
@@ -98,6 +71,106 @@ export default function NewBookingPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  // Generate PhonePe payment link for the created booking
+  const handleGeneratePaymentLink = async () => {
+    if (!createdBookingId || !createdBookingAmount || !createdBookingPhone) {
+      toast({
+        title: "Error",
+        description: "Missing booking information for payment link generation",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsGeneratingPaymentLink(true)
+
+    try {
+      console.log("Generating payment link for booking:", {
+        bookingId: createdBookingId,
+        amount: createdBookingAmount,
+        phone: createdBookingPhone
+      })
+
+      // Use admin user ID (4) for payment link generation
+      const paymentUrl = await initiatePhonePePayment(
+        createdBookingId,
+        4, // Admin user ID
+        createdBookingAmount,
+        createdBookingPhone
+      )
+
+      setPaymentLinkGenerated(paymentUrl)
+
+      toast({
+        title: "Success",
+        description: "Payment link generated successfully! You can now share it with the customer.",
+      })
+
+    } catch (error) {
+      console.error("Error generating payment link:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate payment link",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGeneratingPaymentLink(false)
+    }
+  }
+
+  // Send payment link via email
+  const handleSendPaymentEmail = async () => {
+    if (!paymentLinkGenerated || !createdBookingEmail || !createdBookingParentName) {
+      toast({
+        title: "Error",
+        description: "Payment link not generated or missing customer information",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsSendingEmail(true)
+
+    try {
+      const emailData: PaymentLinkEmailData = {
+        parentName: createdBookingParentName,
+        parentEmail: createdBookingEmail,
+        childName: createdBookingChildName,
+        bookingId: createdBookingId!,
+        bookingRef: createdBookingRef,
+        totalAmount: createdBookingAmount,
+        paymentLink: paymentLinkGenerated,
+        expiryHours: 24 // Payment link expires in 24 hours
+      }
+
+      const result = await sendPaymentLinkEmail(emailData)
+
+      if (result.success) {
+        setEmailSent(true)
+        toast({
+          title: "Success",
+          description: `Payment link sent successfully to ${createdBookingEmail}`,
+        })
+      } else {
+        throw new Error(result.error || "Failed to send email")
+      }
+
+    } catch (error) {
+      console.error("Error sending payment link email:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send payment link email",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
+
+
+
+
   // Parent Information
   const [parentName, setParentName] = useState("")
   const [email, setEmail] = useState("")
@@ -109,280 +182,379 @@ export default function NewBookingPage() {
   const [childGender, setChildGender] = useState("")
   const [schoolName, setSchoolName] = useState("")
 
-  // Hierarchical Selection State
-  const [selectedCityId, setSelectedCityId] = useState("")
-  const [selectedEventId, setSelectedEventId] = useState("")
-  const [selectedGameIds, setSelectedGameIds] = useState<string[]>([])
-  const [selectedDate, setSelectedDate] = useState("")
-  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState("")
+  // Selection State (matching user panel structure)
+  const [selectedCityId, setSelectedCityId] = useState<string | number>("")
+  const [selectedEventType, setSelectedEventType] = useState("")
+  const [selectedGames, setSelectedGames] = useState<string[]>([])
+  const [childAgeMonths, setChildAgeMonths] = useState<number | null>(null)
 
-  // Data state
-  const [cities, setCities] = useState<City[]>([])
-  const [events, setEvents] = useState<Event[]>([])
-  const [games, setGames] = useState<Game[]>([])
-  const [eventGameSlots, setEventGameSlots] = useState<EventGameSlot[]>([])
-  const [availableDates, setAvailableDates] = useState<string[]>([])
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<TimeSlot[]>([])
+  // Data state (matching user panel structure)
+  const [cities, setCities] = useState<{ id: string | number; name: string }[]>([])
+  const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
+  const [eligibleGames, setEligibleGames] = useState<EligibleGame[]>([])
   const [addOns, setAddOns] = useState<AddOn[]>([])
-  const [selectedAddOns, setSelectedAddOns] = useState<SelectedAddon[]>([])
+  const [selectedAddOns, setSelectedAddOns] = useState<{ addOn: AddOn; quantity: number; variantId?: string }[]>([])
 
   // Loading states
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const [isLoadingCities, setIsLoadingCities] = useState(false)
   const [isLoadingEvents, setIsLoadingEvents] = useState(false)
   const [isLoadingGames, setIsLoadingGames] = useState(false)
-  const [isLoadingDates, setIsLoadingDates] = useState(false)
-  const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false)
+  const [cityError, setCityError] = useState<string | null>(null)
+  const [eventError, setEventError] = useState<string | null>(null)
+  const [gameError, setGameError] = useState<string | null>(null)
 
-  // Promo code state
-  const [promoCodes, setPromoCodes] = useState<PromoCodeDetail[]>([])
+  // Phase 2: Payment Management States
+  const [bookingCreated, setBookingCreated] = useState(false)
+  const [createdBookingId, setCreatedBookingId] = useState<number | null>(null)
+  const [createdBookingRef, setCreatedBookingRef] = useState<string>("")
+  const [createdBookingAmount, setCreatedBookingAmount] = useState<number>(0)
+  const [createdBookingPhone, setCreatedBookingPhone] = useState<string>("")
+  const [createdBookingEmail, setCreatedBookingEmail] = useState<string>("")
+  const [createdBookingParentName, setCreatedBookingParentName] = useState<string>("")
+  const [createdBookingChildName, setCreatedBookingChildName] = useState<string>("")
+  const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false)
+  const [paymentLinkGenerated, setPaymentLinkGenerated] = useState<string>("")
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+
+
+
+  // Promo code state (matching user panel structure)
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string>("")
+  const [discountAmount, setDiscountAmount] = useState<number>(0)
   const [promoCodeInput, setPromoCodeInput] = useState("")
-  const [promoCodeDiscount, setPromoCodeDiscount] = useState<{
-    discountAmount: number
-    finalAmount: number
-    message: string
-    promoCodeId?: number
-  } | null>(null)
   const [isValidatingPromoCode, setIsValidatingPromoCode] = useState(false)
 
+  // Calculate child's age based on current date (matching user panel logic)
+  const calculateAge = (birthDate: Date) => {
+    const currentDate = new Date()
+    const ageInMonths = differenceInMonths(currentDate, birthDate)
+    return ageInMonths
+  }
 
-  // Fetch initial data on component mount
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setIsLoadingData(true)
+  // Handle DOB change (matching user panel logic)
+  const handleDobChange = (dateString: string) => {
+    setChildDateOfBirth(dateString)
 
-        // Fetch all cities and add-ons in parallel
-        const [citiesData, addOnsData] = await Promise.all([
-          getAllCities(),
-          getAllAddOns()
-        ])
+    if (dateString) {
+      const date = new Date(dateString)
+      // Calculate child's age in months based on the current date
+      const ageInMonths = calculateAge(date)
+      setChildAgeMonths(ageInMonths)
 
-        console.log("Cities data loaded:", citiesData)
-        console.log("Add-ons data loaded:", addOnsData)
+      console.log(`Child's age: ${ageInMonths} months`)
 
-        setCities(citiesData.filter(city => city.is_active))
-        setAddOns(addOnsData.filter(addon => addon.is_active))
+      // If an event is already selected, fetch games for this age
+      if (selectedEventType) {
+        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+        if (selectedApiEvent) {
+          fetchGamesByEventAndAge(selectedApiEvent.event_id, ageInMonths);
+        }
+      }
+    } else {
+      // Reset age if DOB is cleared
+      setChildAgeMonths(null)
+    }
+  }
 
-      } catch (error) {
-        console.error("Error fetching initial data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load initial data",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoadingData(false)
+  // Calculate games total (matching user panel logic)
+  const calculateGamesTotal = () => {
+    let total = 0;
+
+    for (const gameId of selectedGames) {
+      const game = eligibleGames.find(g => g.id === gameId);
+      if (game) {
+        total += game.price;
       }
     }
 
-    fetchInitialData()
-  }, [toast])
+    return total;
+  }
 
-  // Handle city selection - fetch events for selected city
+  // Calculate add-ons subtotal (matching user panel logic)
+  const calculateAddOnsTotal = () => {
+    const total = selectedAddOns.reduce((sum, item) => {
+      let price = parseFloat(item.addOn.price.toString()) || 0;
+
+      // Check if this is a variant with a different price
+      if (item.variantId && item.addOn.has_variants && item.addOn.variants) {
+        const variant = item.addOn.variants.find(v => v.id === item.variantId);
+        if (variant && variant.price_modifier) {
+          const modifier = parseFloat(variant.price_modifier.toString());
+          price = parseFloat(item.addOn.price.toString()) + modifier;
+        }
+      }
+
+      // Round to 2 decimal places for each item's total
+      const itemTotal = price * item.quantity;
+      return sum + parseFloat(itemTotal.toFixed(2));
+    }, 0);
+
+    // Round final total to 2 decimal places
+    return parseFloat(total.toFixed(2));
+  }
+
+  // Calculate total price including add-ons, GST, and promocode discount (matching user panel logic)
+  const calculateTotalPrice = () => {
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+
+    const gst = parseFloat((discountedSubtotal * 0.18).toFixed(2));
+    const total = discountedSubtotal + gst;
+
+    // Ensure final total is rounded to 2 decimal places
+    return parseFloat(total.toFixed(2));
+  }
+
+  // Calculate GST amount (matching user panel logic)
+  const calculateGST = () => {
+    const gamesTotal = calculateGamesTotal();
+    const addOnsTotal = calculateAddOnsTotal();
+    const subtotal = gamesTotal + addOnsTotal;
+
+    // Apply promocode discount if available
+    let discountedSubtotal = subtotal;
+    if (appliedPromoCode) {
+      discountedSubtotal = subtotal - discountAmount;
+    }
+
+    const gst = discountedSubtotal * 0.18;
+
+    // Round to 2 decimal places
+    return parseFloat(gst.toFixed(2));
+  }
+
+  // Fetch cities from API when component mounts (matching user panel logic)
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        setIsLoadingCities(true)
+        setCityError(null)
+
+        console.log("Fetching cities from API...")
+        const citiesData = await getAllCities()
+        console.log("Cities data from API:", citiesData)
+
+        // Map the API response to the format expected by the dropdown
+        const formattedCities = citiesData.map(city => ({
+          id: city.id || 0,
+          name: city.city_name
+        }))
+
+        console.log("Formatted cities for dropdown:", formattedCities)
+        setCities(formattedCities)
+      } catch (error: any) {
+        console.error("Failed to fetch cities:", error)
+        setCityError("Failed to load cities. Please try again.")
+      } finally {
+        setIsLoadingCities(false)
+      }
+    }
+
+    fetchCities()
+  }, [])
+
+  // Fetch add-ons from external API (matching user panel logic)
+  useEffect(() => {
+    async function loadAddOns() {
+      setIsLoadingData(true);
+      try {
+        const addOnData = await getAllAddOns();
+        console.log('Fetched add-ons from external API:', addOnData);
+        setAddOns(addOnData.filter(addon => addon.is_active));
+      } catch (error) {
+        console.error('Failed to load add-ons:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load add-ons. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+
+    loadAddOns();
+  }, [])
+
+  // Handle city change and fetch events for the selected city (matching user panel logic)
   const handleCityChange = async (cityId: string) => {
     setSelectedCityId(cityId)
-    setSelectedEventId("")
-    setSelectedGameIds([])
-    setSelectedDate("")
-    setSelectedTimeSlotId("")
-    setEvents([])
-    setGames([])
-    setEventGameSlots([])
-    setAvailableDates([])
-    setAvailableTimeSlots([])
+    setSelectedEventType("") // Reset event type when city changes
+    setSelectedGames([]) // Reset selected games
+    setEligibleGames([]) // Reset eligible games
 
     if (!cityId) return
 
+    // Fetch events for the selected city
     try {
-      setIsLoadingEvents(true)
+      setIsLoadingEvents(true);
+      setEventError(null);
 
-      // Fetch events for the selected city
-      const response = await fetch('/api/events/get-by-city', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city_id: parseInt(cityId) }),
-      })
+      console.log(`Fetching events for city ID: ${cityId}`);
+      const eventsData = await getEventsByCityId(Number(cityId));
+      console.log("Events data from API:", eventsData);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch events for city")
-      }
+      setApiEvents(eventsData);
 
-      const eventsData = await response.json()
-      console.log("Events for city loaded:", eventsData)
+      // No need to filter events by age anymore - games will be fetched separately
+      // when both event and DOB are selected
 
-      if (!Array.isArray(eventsData) || eventsData.length === 0) {
-        console.log("No events found for this city")
-        setEvents([])
-        setEventGameSlots([])
-        return
-      }
+    } catch (error: any) {
+      console.error(`Failed to fetch events for city ID ${cityId}:`, error);
+      setEventError("Failed to load events. Please try again.");
 
-      // The API returns event-registration data with nested games
-      // Each item in the response represents an event with its games
-      const events: Event[] = eventsData.map((eventData: any) => ({
-        id: eventData.event_id,
-        title: eventData.event_title,
-        description: eventData.event_description,
-        city_id: eventData.city_id,
-        venue_id: eventData.venue_id,
-        event_date: eventData.event_date,
-        status: eventData.event_status,
-        created_at: eventData.event_created_at,
-        updated_at: eventData.event_updated_at
-      }))
-
-      console.log("Processed events:", events)
-      setEvents(events)
-
-      // Store the full event data for later use (contains games data)
-      setEventGameSlots(eventsData)
-
-    } catch (error) {
-      console.error("Error fetching events for city:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load events for selected city",
-        variant: "destructive",
-      })
+      // Clear events on error
+      setApiEvents([]);
     } finally {
-      setIsLoadingEvents(false)
+      setIsLoadingEvents(false);
     }
   }
 
-  // Handle event selection - fetch games for selected event
-  const handleEventChange = async (eventId: string) => {
-    setSelectedEventId(eventId)
-    setSelectedGameIds([])
-    setSelectedDate("")
-    setSelectedTimeSlotId("")
-    setGames([])
-    setAvailableDates([])
-    setAvailableTimeSlots([])
+  // Handle event type selection (matching user panel logic)
+  const handleEventTypeChange = (eventType: string) => {
+    setSelectedEventType(eventType)
+    setSelectedGames([]) // Reset selected games
+    setEligibleGames([]) // Reset eligible games
 
-    if (!eventId) return
+    // Find the selected event from API events
+    const selectedApiEvent = apiEvents.find(event => event.event_title === eventType);
+
+    if (selectedApiEvent) {
+      console.log("Selected event:", selectedApiEvent);
+
+      // If DOB is set, use the already calculated age (based on current date)
+      if (childDateOfBirth && childAgeMonths !== null) {
+        // Fetch games for this event and child age
+        fetchGamesByEventAndAge(selectedApiEvent.event_id, childAgeMonths);
+      }
+    } else {
+      // If no matching event found, clear eligible games
+      setEligibleGames([]);
+    }
+  }
+
+  // Fetch games based on event ID and child age (matching user panel logic)
+  const fetchGamesByEventAndAge = async (eventId: number, childAge: number) => {
+    if (!eventId || childAge === null) return;
+
+    setIsLoadingGames(true);
+    setGameError("");
 
     try {
-      setIsLoadingGames(true)
+      console.log(`Fetching games for event ID: ${eventId} and child age: ${childAge} months`);
 
-      // Find the selected event data from the stored event data
-      const selectedEventData: any = eventGameSlots.find((eventData: any) => eventData.event_id === parseInt(eventId))
-      console.log("Selected event data:", selectedEventData)
+      // Call the new API to get games by age and event
+      const gamesData = await getGamesByAgeAndEvent(eventId, childAge);
 
-      if (!selectedEventData || !selectedEventData.games) {
-        console.log("No games found for this event")
-        setGames([])
-        return
+      if (gamesData && gamesData.length > 0) {
+        console.log(`Found ${gamesData.length} games for event ${eventId} and age ${childAge} months`);
+        console.log('Game data from API:', gamesData);
+
+        // Format games data to match the expected structure (using slot_id as unique identifier)
+        const formattedGames: EligibleGame[] = gamesData.map((game: any) => ({
+          id: String(game.slot_id || game.id), // Use slot_id as unique identifier
+          title: game.title || game.game_title || game.name || '',
+          description: game.description || game.game_description || '',
+          price: parseFloat(game.price || game.slot_price || '0'),
+          start_time: game.start_time || '',
+          end_time: game.end_time || '',
+          custom_title: game.title || '',
+          custom_description: game.description || '',
+          max_participants: game.max_participants || 0,
+          // Store both slot_id and game_id for reference
+          slot_id: Number(game.slot_id || 0),
+          game_id: Number(game.game_id || game.id || 0)
+        }));
+
+        // Set the formatted games (this is separate from eligibleEvents which contains event details)
+        setEligibleGames(formattedGames);
+      } else {
+        console.log(`No games found for event ${eventId} and age ${childAge} months`);
+        setEligibleGames([]);
       }
-
-      // Extract games from the event data
-      const games: Game[] = selectedEventData.games.map((gameData: any) => ({
-        id: gameData.game_id,
-        name: gameData.game_title,
-        description: gameData.game_description,
-        min_age: gameData.min_age,
-        max_age: gameData.max_age,
-        duration_minutes: gameData.game_duration_minutes,
-        categories: gameData.categories || [],
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }))
-
-      console.log("Processed games:", games)
-      setGames(games)
-
-      // Reset promo codes when event changes - will fetch when games are selected
-      setPromoCodes([])
-      setPromoCodeDiscount(null)
-      setPromoCodeInput("")
-
     } catch (error) {
-      console.error("Error processing games for event:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load games for selected event",
-        variant: "destructive",
-      })
+      console.error('Error fetching games:', error);
+      setGameError("Failed to load games. Please try again.");
+      setEligibleGames([]);
     } finally {
-      setIsLoadingGames(false)
+      setIsLoadingGames(false);
     }
   }
 
-  // Fetch promo codes for selected event and games
-  const fetchPromoCodesForEventAndGames = async (eventId: number, gameIds: number[]) => {
-    try {
-      console.log("Fetching promo codes for event:", eventId, "games:", gameIds)
+  // Handle game selection (matching user panel logic)
+  const handleGameToggle = (gameId: string) => {
+    const newSelectedGames = selectedGames.includes(gameId)
+      ? selectedGames.filter(id => id !== gameId)
+      : [...selectedGames, gameId]
 
-      if (gameIds.length === 0) {
-        setPromoCodes([])
-        setPromoCodeDiscount(null)
-        return
-      }
+    setSelectedGames(newSelectedGames)
 
-      const promoCodesData = await getPromoCodesByEventAndGames(eventId, gameIds)
-      console.log("Promo codes loaded for event-games:", promoCodesData)
+    // Find the selected game objects to show both slot_id and game_id in logs
+    const selectedGamesObj = eligibleGames.filter(game => newSelectedGames.includes(game.id))
+    console.log("Selected games (slot_ids):", newSelectedGames)
+    console.log("Selected games details:", selectedGamesObj.map(game => ({
+      slot_id: game.slot_id,
+      game_id: game.game_id,
+      title: game.title
+    })))
+  }
 
-      setPromoCodes(promoCodesData)
-
-      // Reset discount when event/games change
-      setPromoCodeDiscount(null)
-
-    } catch (error) {
-      console.error("Error fetching promo codes for event-games:", error)
-      setPromoCodes([])
-      setPromoCodeDiscount(null)
+  // Handle promo code input change (matching user panel logic)
+  const handlePromoCodeInputChange = (value: string) => {
+    setPromoCodeInput(value)
+    if (!value.trim()) {
+      setAppliedPromoCode("")
+      setDiscountAmount(0)
     }
   }
 
-  // Handle promo code input validation (preview)
+  // Handle promo code validation (simplified for admin panel)
   const handlePromoCodeValidation = async () => {
     if (!promoCodeInput.trim()) {
-      setPromoCodeDiscount(null)
+      setAppliedPromoCode("")
+      setDiscountAmount(0)
       return
     }
 
-    if (!selectedEventId || selectedGameIds.length === 0) {
-      toast({
-        title: "Selection Required",
-        description: "Please select event and games first",
-        variant: "destructive",
-      })
-      return
-    }
+    // For admin panel, we'll implement a simple validation
+    // In a real scenario, you'd call the promo code validation API
+    setIsValidatingPromoCode(true)
 
     try {
-      setIsValidatingPromoCode(true)
-      const originalAmount = calculateOriginalTotalAmount()
+      // Simulate API call - replace with actual validation
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
-      const result = await validatePromoCodePreview(
-        promoCodeInput.trim(),
-        parseInt(selectedEventId),
-        selectedGameIds.map(id => parseInt(id)),
-        originalAmount
-      )
-
-      if (result.isValid) {
-        setPromoCodeDiscount({
-          discountAmount: result.discountAmount,
-          finalAmount: result.finalAmount,
-          message: result.message
-        })
+      // For demo purposes, apply a 10% discount for code "ADMIN10"
+      if (promoCodeInput.trim().toUpperCase() === "ADMIN10") {
+        const subtotal = calculateGamesTotal() + calculateAddOnsTotal()
+        const discount = subtotal * 0.1
+        setAppliedPromoCode(promoCodeInput.trim())
+        setDiscountAmount(discount)
         toast({
-          title: "Promo Code Valid",
-          description: result.message,
+          title: "Promo Code Applied",
+          description: `10% discount applied: ₹${discount.toFixed(2)}`,
         })
       } else {
-        setPromoCodeDiscount(null)
+        setAppliedPromoCode("")
+        setDiscountAmount(0)
         toast({
           title: "Invalid Promo Code",
-          description: result.message,
+          description: "Please enter a valid promo code",
           variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Error validating promo code:", error)
-      setPromoCodeDiscount(null)
       toast({
         title: "Validation Error",
         description: "Failed to validate promo code",
@@ -393,213 +565,40 @@ export default function NewBookingPage() {
     }
   }
 
-  // Clear promo code discount when input changes
-  const handlePromoCodeInputChange = (value: string) => {
-    setPromoCodeInput(value)
-    if (!value.trim()) {
-      setPromoCodeDiscount(null)
-    }
-  }
-
-  // Calculate total amount including add-ons but excluding promo discount
-  const calculateOriginalTotalAmount = () => {
-    let total = 0
-
-    // Add game price
-    const selectedSlot = availableTimeSlots.find(slot => slot.id.toString() === selectedTimeSlotId)
-    if (selectedSlot) {
-      total += parseFloat(selectedSlot.slot_price)
-    }
-
-    // Add add-ons price
-    selectedAddOns.forEach(item => {
-      const basePrice = parseFloat(item.addon.price)
-      const variantModifier = item.variant ? item.variant.price_modifier : 0
-      const itemPrice = basePrice + variantModifier
-      total += itemPrice * item.quantity
-    })
-
-    return total
-  }
-
-  // Handle game selection - support multiple games
-  const handleGameToggle = async (gameId: string) => {
-    const newGameIds = selectedGameIds.includes(gameId)
-      ? selectedGameIds.filter(id => id !== gameId)
-      : [...selectedGameIds, gameId]
-
-    setSelectedGameIds(newGameIds)
-
-    // Reset date and time slot selection when games change
-    setSelectedDate("")
-    setSelectedTimeSlotId("")
-    setAvailableDates([])
-    setAvailableTimeSlots([])
-
-    // Reset promo code selection when games change
-    setPromoCodeDiscount(null)
-    setPromoCodeInput("")
-
-    // Fetch promo codes for the new game selection
-    if (selectedEventId && newGameIds.length > 0) {
-      await fetchPromoCodesForEventAndGames(
-        parseInt(selectedEventId),
-        newGameIds.map(id => parseInt(id))
-      )
-    } else {
-      setPromoCodes([])
-    }
-  }
-
-  // Handle date selection - fetch time slots for selected games
-  const handleDateChange = async (date: string) => {
-    setSelectedDate(date)
-    setSelectedTimeSlotId("")
-    setAvailableTimeSlots([])
-
-    if (!date || selectedGameIds.length === 0 || !selectedEventId) return
-
-    try {
-      setIsLoadingTimeSlots(true)
-
-      // Find the selected event data
-      const selectedEventData: any = eventGameSlots.find((eventData: any) => eventData.event_id === parseInt(selectedEventId))
-
-      if (!selectedEventData || !selectedEventData.games) {
-        console.log("No event or games data found")
-        setAvailableTimeSlots([])
-        return
-      }
-
-      // Create time slots for all selected games
-      const timeSlots: TimeSlot[] = []
-
-      for (const gameId of selectedGameIds) {
-        const selectedGameData = selectedEventData.games.find((gameData: any) => gameData.game_id === parseInt(gameId))
-
-        if (selectedGameData) {
-          const timeSlot: TimeSlot = {
-            id: selectedGameData.game_id, // Using game_id as slot id
-            start_time: selectedGameData.start_time,
-            end_time: selectedGameData.end_time,
-            custom_title: selectedGameData.custom_title,
-            slot_price: selectedGameData.slot_price.toString(),
-            max_participants: selectedGameData.max_participants
-          }
-          timeSlots.push(timeSlot)
-        }
-      }
-
-      console.log("Created time slots for selected games:", timeSlots)
-      setAvailableTimeSlots(timeSlots)
-
-    } catch (error) {
-      console.error("Error processing time slots for date:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load time slots for selected date",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoadingTimeSlots(false)
-    }
-  }
-
-  // Update available dates when games are selected
-  useEffect(() => {
-    if (selectedGameIds.length > 0 && selectedEventId) {
-      try {
-        setIsLoadingDates(true)
-
-        // Find the selected event data
-        const selectedEventData: any = eventGameSlots.find((eventData: any) => eventData.event_id === parseInt(selectedEventId))
-
-        if (!selectedEventData) {
-          console.log("No event data found")
-          setAvailableDates([])
-          return
-        }
-
-        // For the selected games, we'll use the event date
-        // In this structure, each event has a single date
-        const eventDate = selectedEventData.event_date.split('T')[0] // Get YYYY-MM-DD format
-        setAvailableDates([eventDate])
-
-      } catch (error) {
-        console.error("Error processing dates for games:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load dates for selected games",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoadingDates(false)
-      }
-    } else {
-      setAvailableDates([])
-    }
-  }, [selectedGameIds, selectedEventId, eventGameSlots, toast])
-
-  // Clear promo code discount when total amount changes
-  useEffect(() => {
-    if (promoCodeDiscount && promoCodeInput.trim()) {
-      // Re-validate promo code when amount changes
-      handlePromoCodeValidation()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddOns, selectedTimeSlotId])
-
-  // Handle add-on selection
-  const handleAddOnSelect = (addon: AddOn, variant?: AddOnVariant, quantity: number = 1) => {
-    console.log("handleAddOnSelect called:", {
-      addon_id: addon.id,
-      addon_name: addon.name,
-      has_variants: addon.has_variants,
-      variant_id: variant?.id,
-      variant_name: variant?.name,
-      quantity
-    })
-
+  // Handle add-on selection (matching user panel logic)
+  const handleAddOnChange = (addOn: AddOn, quantity: number, variantId?: string) => {
     const existingIndex = selectedAddOns.findIndex(item =>
-      item.addon.id === addon.id &&
-      (variant ? item.variant?.id === variant.id : !item.variant)
+      item.addOn.id === addOn.id && item.variantId === variantId
     )
 
-    if (existingIndex >= 0) {
-      // Update existing selection
-      const updatedAddOns = [...selectedAddOns]
-      if (quantity === 0) {
-        // Remove if quantity is 0
-        updatedAddOns.splice(existingIndex, 1)
-      } else {
-        updatedAddOns[existingIndex].quantity = quantity
+    if (quantity === 0) {
+      // Remove the add-on
+      if (existingIndex !== -1) {
+        setSelectedAddOns(prev => prev.filter((_, index) => index !== existingIndex))
       }
-      setSelectedAddOns(updatedAddOns)
-    } else if (quantity > 0) {
-      // Add new selection
-      setSelectedAddOns([...selectedAddOns, { addon, variant, quantity }])
-    }
+    } else {
+      // Add or update the add-on
+      const newItem = { addOn, quantity, variantId }
 
-    console.log("Updated selectedAddOns:", selectedAddOns)
+      if (existingIndex !== -1) {
+        // Update existing
+        setSelectedAddOns(prev => prev.map((item, index) =>
+          index === existingIndex ? newItem : item
+        ))
+      } else {
+        // Add new
+        setSelectedAddOns(prev => [...prev, newItem])
+      }
+    }
   }
 
-  // Calculate total amount including add-ons
-  const calculateTotalAmount = () => {
-    const originalAmount = calculateOriginalTotalAmount()
 
-    // Apply promo code discount if available
-    if (promoCodeDiscount) {
-      return promoCodeDiscount.finalAmount
-    }
 
-    return originalAmount
-  }
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    let finalPromoValidation: any = null
 
     try {
       // Validate required fields
@@ -607,8 +606,12 @@ export default function NewBookingPage() {
         throw new Error("Please fill in all required fields")
       }
 
-      if (!selectedEventId || selectedGameIds.length === 0 || !selectedTimeSlotId) {
-        throw new Error("Please complete the event selection")
+      if (!selectedEventType || selectedGames.length === 0) {
+        throw new Error("Please complete the event and game selection")
+      }
+
+      if (!childAgeMonths) {
+        throw new Error("Please enter child's date of birth")
       }
 
       // Validate email format
@@ -624,86 +627,38 @@ export default function NewBookingPage() {
         throw new Error("Date of birth must be in the past")
       }
 
-      // Validate addon selections
-      for (const selectedAddon of selectedAddOns) {
-        if (selectedAddon.addon.has_variants && !selectedAddon.variant) {
-          throw new Error(`Please select a variant for ${selectedAddon.addon.name}`)
-        }
-        if (!selectedAddon.addon.has_variants && selectedAddon.variant) {
-          throw new Error(`${selectedAddon.addon.name} does not have variants`)
-        }
+      // Find the selected event from API events
+      const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType)
+      if (!selectedApiEvent) {
+        throw new Error("Selected event not found")
       }
 
-      // Find selected data
-      const selectedEvent = events.find(e => e.id.toString() === selectedEventId)
-      const selectedGames = games.filter(g => selectedGameIds.includes(g.id.toString()))
-      const selectedSlot = availableTimeSlots.find(slot => slot.id.toString() === selectedTimeSlotId)
-
-      if (!selectedEvent || selectedGames.length === 0 || !selectedSlot) {
-        throw new Error("Invalid selection. Please try again.")
+      // Get selected games objects (using slot_id for selection)
+      const selectedGamesObj = eligibleGames.filter(game => selectedGames.includes(game.id))
+      if (selectedGamesObj.length !== selectedGames.length) {
+        console.warn(`⚠️ Warning: ${selectedGames.length} games selected but only ${selectedGamesObj.length} found in eligible games`)
       }
 
-      // Final promo code validation if promo code is applied
-      if (promoCodeInput.trim() && promoCodeDiscount) {
-        const originalAmount = calculateOriginalTotalAmount()
-        finalPromoValidation = await validatePromoCodeFinal(
-          promoCodeInput.trim(),
-          parseInt(selectedEventId),
-          selectedGameIds.map(id => parseInt(id)),
-          originalAmount
-        )
+      // Calculate total amount using frontend logic
+      const totalAmount = calculateTotalPrice()
 
-        if (!finalPromoValidation.isValid) {
-          throw new Error(`Promo code validation failed: ${finalPromoValidation.message}`)
-        }
-
-        // Update discount with final validation result
-        setPromoCodeDiscount({
-          discountAmount: finalPromoValidation.discountAmount,
-          finalAmount: finalPromoValidation.finalAmount,
-          message: finalPromoValidation.message,
-          promoCodeId: finalPromoValidation.promoCodeId
-        })
+      // Generate unique booking reference
+      const generateBookingRef = () => {
+        const timestamp = Date.now().toString().slice(-6)
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+        return `B${timestamp}${random}`
       }
 
-      // Generate unique transaction IDs for payment
-      const transactionId = generateUniqueTransactionId("TXN")
-      const phonepeTransactionId = generateUniqueTransactionId("PHPE")
-
-      // Create booking request (without payment data)
-      const baseBookingRequest = {
-        user_id: 4,
-        parent: {
-          parent_name: parentName,
-          email: email,
-          additional_phone: phone.startsWith('+') ? phone : `+91${phone}`
-        },
-        child: {
-          full_name: childName,
-          date_of_birth: childDateOfBirth,
-          school_name: schoolName || "Not Specified",
-          gender: childGender
-        },
-        booking: {
-          event_id: selectedEvent.id,
-          payment_method: "PhonePe",
-          payment_status: "pending",
-          terms_accepted: true
-        },
-        booking_games: selectedGames.map(game => ({ game_id: game.id }))
-      }
-
-      // Process booking_addons according to API documentation structure
+      // Process booking_addons according to API structure
       const processedAddons: any[] = []
-
       if (selectedAddOns.length > 0) {
         // Group addons by addon_id to handle multiple variants of the same addon
         const addonGroups = new Map<number, any>()
 
         selectedAddOns.forEach(item => {
-          const addonId = Number(item.addon.id)
+          const addonId = Number(item.addOn.id)
 
-          if (item.addon.has_variants && item.variant) {
+          if (item.addOn.has_variants && item.variantId) {
             // For addons with variants, group by addon_id and collect variants
             if (!addonGroups.has(addonId)) {
               addonGroups.set(addonId, {
@@ -712,10 +667,10 @@ export default function NewBookingPage() {
               })
             }
             addonGroups.get(addonId).variants.push({
-              variant_id: Number(item.variant.id),
+              variant_id: Number(item.variantId),
               quantity: item.quantity
             })
-          } else if (!item.addon.has_variants) {
+          } else if (!item.addOn.has_variants) {
             // For addons without variants, simple structure
             addonGroups.set(addonId, {
               addon_id: addonId,
@@ -728,141 +683,79 @@ export default function NewBookingPage() {
         processedAddons.push(...Array.from(addonGroups.values()))
       }
 
-      const bookingRequest = {
-        ...baseBookingRequest,
+      // Create booking data matching the expected API structure
+      const bookingData = {
+        user_id: 4, // Admin user ID
+        parent: {
+          parent_name: parentName,
+          email: email,
+          additional_phone: phone.startsWith('+') ? phone : `+91${phone}`
+        },
+        child: {
+          full_name: childName,
+          date_of_birth: childDateOfBirth, // Keep as YYYY-MM-DD format
+          school_name: schoolName || "Not Specified",
+          gender: childGender
+        },
+        booking: {
+          booking_ref: generateBookingRef(),
+          event_id: selectedApiEvent.event_id,
+          status: "Confirmed",
+          total_amount: totalAmount,
+          payment_method: "Admin Created",
+          payment_status: "pending", // Admin bookings start as pending
+          terms_accepted: true
+        },
+        booking_games: selectedGamesObj.map(game => ({
+          game_id: game.game_id, // Use actual game_id for the API
+          game_price: game.price,
+          slot_id: game.slot_id // Add slot_id for proper game details lookup
+        })),
         booking_addons: processedAddons,
-        ...(finalPromoValidation && {
-          promo_code: promoCodeInput.trim(),
-          promo_code_id: finalPromoValidation.promoCodeId
-        })
+        ...(appliedPromoCode && { promo_code: appliedPromoCode })
       }
 
-      console.log("=== BOOKING CREATION DEBUG ===")
-      console.log("API Endpoint:", BOOKING_API.CREATE)
-      console.log("Selected add-ons count:", selectedAddOns.length)
-      console.log("Processed booking_addons:", processedAddons)
-      console.log("Selected add-ons details:", selectedAddOns.map(item => ({
-        addon_id: item.addon.id,
-        addon_name: item.addon.name,
-        has_variants: item.addon.has_variants,
-        variant_id: item.variant?.id,
-        variant_name: item.variant?.name,
-        quantity: item.quantity
-      })))
-      console.log("Event ID:", selectedEvent.id)
-      console.log("Selected Game IDs:", selectedGames.map(g => g.id))
-      console.log("Full booking payload:")
-      console.log(JSON.stringify(bookingRequest, null, 2))
-      console.log("=== END DEBUG ===")
+      console.log("Creating booking with data:", bookingData)
 
-      // Call the real booking creation API
-      console.log("Making API call to:", BOOKING_API.CREATE)
-      const response = await fetch(BOOKING_API.CREATE, {
+      // Call the booking creation API (using the same endpoint as user panel)
+      const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(bookingRequest),
+        body: JSON.stringify(bookingData),
       })
 
-      console.log("API Response status:", response.status)
-      console.log("API Response statusText:", response.statusText)
-      console.log("API Response headers:", Object.fromEntries(response.headers.entries()))
-
       if (!response.ok) {
-        let errorText = ""
-        let errorData: any = null
-
-        try {
-          errorText = await response.text()
-          console.log("Raw error response:", errorText)
-        } catch (textError) {
-          console.error("Failed to read error response as text:", textError)
-          errorText = "Unable to read error response"
-        }
-
-        console.error("Booking creation failed:", {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: errorText,
-          requestPayload: JSON.stringify(bookingRequest, null, 2)
-        })
-
-        let errorMessage = `Failed to create booking (${response.status}): ${response.statusText}`
-
-        // Try to parse error as JSON
-        if (errorText) {
-          try {
-            errorData = JSON.parse(errorText)
-            console.log("Parsed error data:", errorData)
-
-            if (errorData.error) {
-              errorMessage = errorData.error
-            } else if (errorData.message) {
-              errorMessage = errorData.message
-            } else if (typeof errorData === 'string') {
-              errorMessage = errorData
-            } else {
-              errorMessage = `Failed to create booking: ${errorText}`
-            }
-          } catch (parseError) {
-            console.error("Failed to parse error as JSON:", parseError)
-            // Use raw error text if JSON parsing fails
-            errorMessage = errorText || errorMessage
-          }
-        }
-
-        // Rollback promo code usage if booking failed and promo was validated
-        if (finalPromoValidation?.promoCodeId) {
-          try {
-            await rollbackPromoCodeUsage(finalPromoValidation.promoCodeId)
-            console.log("Promo code usage rolled back due to booking failure")
-          } catch (rollbackError) {
-            console.error("Failed to rollback promo code usage:", rollbackError)
-          }
-        }
-
-        throw new Error(errorMessage)
+        const errorText = await response.text()
+        console.error("Booking creation failed:", errorText)
+        throw new Error(`Failed to create booking: ${response.status} ${response.statusText}`)
       }
 
-      const bookingResult = await response.json()
-      console.log("Booking created successfully:", bookingResult)
+      const result = await response.json()
+      console.log("Booking created successfully:", result)
 
-      // Extract booking_id from the response
-      let bookingId = null
-      if (Array.isArray(bookingResult) && bookingResult.length > 0) {
-        bookingId = bookingResult[0].booking_id
-      } else if (bookingResult.booking_id) {
-        bookingId = bookingResult.booking_id
-      }
-
+      // Extract booking ID from the response (webhook returns an array)
+      const bookingId = Array.isArray(result) ? result[0]?.booking_id : result.booking_id
       if (!bookingId) {
-        console.error("Could not extract booking_id from response:", bookingResult)
-        throw new Error("Booking created but could not get booking ID for payment")
+        throw new Error("Booking created but no booking ID returned")
       }
 
-      console.log("Extracted booking_id:", bookingId)
-
-      // Now create the payment record
-      const totalAmount = calculateTotalAmount()
+      // Create payment record with pending status for admin management
       const paymentData = {
         booking_id: bookingId,
-        transaction_id: transactionId,
-        phonepe_transaction_id: phonepeTransactionId,
+        transaction_id: generateUniqueTransactionId("ADMIN_TXN"),
         amount: totalAmount,
-        payment_method: "PhonePe",
+        payment_method: "Admin Created",
         payment_status: "pending",
-        payment_date: new Date().toISOString().slice(0, 19) + "+05:30",
-        gateway_response: {
-          bank: "XYZ Bank",
-          upi_id: "admin@upi"
-        }
+        created_by_admin: true,
+        notes: "Created by admin - pending manual processing"
       }
 
-      console.log("Creating payment with data:", JSON.stringify(paymentData, null, 2))
+      console.log("Creating payment record:", paymentData)
 
-      // Call payment creation API
-      const paymentResponse = await fetch('/api/payments/create', {
+      // Create payment record
+      const paymentResponse = await fetch(PAYMENT_API.CREATE, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -871,34 +764,30 @@ export default function NewBookingPage() {
       })
 
       if (!paymentResponse.ok) {
-        const paymentErrorText = await paymentResponse.text()
-        console.error("Payment creation failed:", {
-          status: paymentResponse.status,
-          statusText: paymentResponse.statusText,
-          errorText: paymentErrorText,
-          paymentData: paymentData
-        })
-
-        // Don't fail the entire process if payment creation fails
-        // The booking was already created successfully
-        console.warn("Booking created successfully but payment record creation failed")
-        toast({
-          title: "Warning",
-          description: "Booking created successfully but payment record creation failed. Please check the payment manually.",
-          variant: "destructive",
-        })
+        console.warn("Payment record creation failed, but booking was created successfully")
+        // Don't throw error here as booking was successful
       } else {
         const paymentResult = await paymentResponse.json()
-        console.log("Payment created successfully:", paymentResult)
-
-        toast({
-          title: "Success",
-          description: "Booking and payment created successfully",
-        })
+        console.log("Payment record created:", paymentResult)
       }
 
-      // Redirect to the bookings list
-      router.push("/admin/bookings")
+      // Store booking details for payment management
+      setCreatedBookingId(bookingId)
+      setCreatedBookingRef(bookingData.booking.booking_ref)
+      setCreatedBookingAmount(totalAmount)
+      setCreatedBookingPhone(phone.startsWith('+') ? phone : `+91${phone}`)
+      setCreatedBookingEmail(email)
+      setCreatedBookingParentName(parentName)
+      setCreatedBookingChildName(childName)
+      setBookingCreated(true)
+
+      toast({
+        title: "Success",
+        description: "Booking created successfully! You can now generate a payment link.",
+      })
+
+      // Don't redirect immediately - show payment management options
+
 
     } catch (error: any) {
       console.error("Error creating booking:", error)
@@ -940,8 +829,210 @@ export default function NewBookingPage() {
     )
   }
 
+  // Show payment management UI after booking creation
+  if (bookingCreated) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" asChild>
+              <Link href="/admin/bookings">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only">Back to Bookings</span>
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Booking Created Successfully</h1>
+              <p className="text-muted-foreground">Manage payment for booking {createdBookingRef}</p>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Management</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Booking has been created with pending payment status. Generate a payment link to send to the customer.
+            </p>
+            <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              💡 <strong>Testing Tip:</strong> In sandbox mode, avoid entering real UPI details. Look for "Test Payment" or "Simulate Success" buttons on the PhonePe page, or use test card details instead.
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Booking ID</label>
+                <p className="text-lg font-mono">{createdBookingId}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Booking Reference</label>
+                <p className="text-lg font-mono">{createdBookingRef}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Amount</label>
+                <p className="text-lg font-semibold">₹{createdBookingAmount.toLocaleString()}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Customer Phone</label>
+                <p className="text-lg">{createdBookingPhone}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Payment Options</h3>
+
+              {/* Payment Link Generation */}
+              <div className="space-y-2">
+                <Button
+                  onClick={handleGeneratePaymentLink}
+                  disabled={isGeneratingPaymentLink}
+                  className="w-full"
+                >
+                  {isGeneratingPaymentLink ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Payment Link...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Generate PhonePe Payment Link
+                    </>
+                  )}
+                </Button>
+
+                {paymentLinkGenerated && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                    <p className="text-sm font-medium text-green-800">Payment Link Generated Successfully!</p>
+
+                    <div className="flex gap-2">
+                      <Input
+                        value={paymentLinkGenerated}
+                        readOnly
+                        className="font-mono text-xs"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentLinkGenerated)
+                          toast({ title: "Copied!", description: "Payment link copied to clipboard" })
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <Button
+                        onClick={handleSendPaymentEmail}
+                        disabled={isSendingEmail || emailSent}
+                        size="sm"
+                        className="w-full"
+                      >
+                        {isSendingEmail ? (
+                          <>
+                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            Sending...
+                          </>
+                        ) : emailSent ? (
+                          <>
+                            <CheckCircle className="mr-2 h-3 w-3" />
+                            Email Sent
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="mr-2 h-3 w-3" />
+                            Send via Email
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const whatsappMessage = generateWhatsAppMessage({
+                            parentName: createdBookingParentName,
+                            parentEmail: createdBookingEmail,
+                            childName: createdBookingChildName,
+                            bookingId: createdBookingId!,
+                            bookingRef: createdBookingRef,
+                            totalAmount: createdBookingAmount,
+                            paymentLink: paymentLinkGenerated
+                          })
+                          const whatsappUrl = `https://wa.me/${createdBookingPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
+                          window.open(whatsappUrl, '_blank')
+                        }}
+                        className="w-full"
+                      >
+                        <MessageCircle className="mr-2 h-3 w-3" />
+                        WhatsApp
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(paymentLinkGenerated, '_blank')}
+                        className="w-full"
+                      >
+                        <ExternalLink className="mr-2 h-3 w-3" />
+                        Open Link
+                      </Button>
+                    </div>
+
+                    {emailSent && (
+                      <div className="p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                        ✅ Payment link sent to {createdBookingEmail}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Payment Recording */}
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Navigate to manual payment page
+                    router.push(`/admin/bookings/payment/${createdBookingId}?amount=${createdBookingAmount}`)
+                  }}
+                  className="w-full"
+                  disabled={!createdBookingId}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Record Manual Payment
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/admin/bookings">
+                  View All Bookings
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/admin/bookings/new">
+                  Create Another Booking
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
@@ -1025,9 +1116,14 @@ export default function NewBookingPage() {
                     id="childDateOfBirth"
                     type="date"
                     value={childDateOfBirth}
-                    onChange={(e) => setChildDateOfBirth(e.target.value)}
+                    onChange={(e) => handleDobChange(e.target.value)}
                     required
                   />
+                  {childAgeMonths !== null && (
+                    <p className="text-sm text-muted-foreground">
+                      Child's age: {childAgeMonths} months
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -1064,16 +1160,37 @@ export default function NewBookingPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
-                <Select value={selectedCityId} onValueChange={handleCityChange} required>
+                <Select value={selectedCityId.toString()} onValueChange={handleCityChange} required>
                   <SelectTrigger id="city">
-                    <SelectValue placeholder="Select city" />
+                    <SelectValue placeholder={
+                      isLoadingCities
+                        ? "Loading cities..."
+                        : cityError
+                          ? "Error loading cities"
+                          : "Select city"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {cities.map((city) => (
-                      <SelectItem key={city.id} value={city.id!.toString()}>
-                        {city.city_name}, {city.state}
-                      </SelectItem>
-                    ))}
+                    {isLoadingCities ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading cities...
+                      </div>
+                    ) : cityError ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {cityError}
+                      </div>
+                    ) : cities.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No cities available
+                      </div>
+                    ) : (
+                      cities.map((city) => (
+                        <SelectItem key={city.id} value={city.id.toString()}>
+                          {city.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1081,8 +1198,8 @@ export default function NewBookingPage() {
               <div className="space-y-2">
                 <Label htmlFor="event">Event</Label>
                 <Select
-                  value={selectedEventId}
-                  onValueChange={handleEventChange}
+                  value={selectedEventType}
+                  onValueChange={handleEventTypeChange}
                   required
                   disabled={!selectedCityId || isLoadingEvents}
                 >
@@ -1092,9 +1209,11 @@ export default function NewBookingPage() {
                         ? "Select city first"
                         : isLoadingEvents
                           ? "Loading events..."
-                          : events.length === 0
-                            ? "No events available"
-                            : "Select event"
+                          : eventError
+                            ? "Error loading events"
+                            : apiEvents.length === 0
+                              ? "No events available"
+                              : "Select event"
                     } />
                   </SelectTrigger>
                   <SelectContent>
@@ -1103,14 +1222,18 @@ export default function NewBookingPage() {
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading events...
                       </div>
-                    ) : events.length === 0 ? (
+                    ) : eventError ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {eventError}
+                      </div>
+                    ) : apiEvents.length === 0 ? (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
                         No events available for this city
                       </div>
                     ) : (
-                      events.map((event) => (
-                        <SelectItem key={event.id} value={event.id.toString()}>
-                          {event.title}
+                      apiEvents.map((event) => (
+                        <SelectItem key={event.event_id} value={event.event_title}>
+                          {event.event_title}
                         </SelectItem>
                       ))
                     )}
@@ -1120,56 +1243,50 @@ export default function NewBookingPage() {
 
               <div className="space-y-2">
                 <Label>Games (Select multiple based on child's age)</Label>
-                {!selectedEventId ? (
+                {!selectedEventType ? (
                   <p className="text-sm text-muted-foreground">Select event first</p>
+                ) : !childDateOfBirth ? (
+                  <p className="text-sm text-muted-foreground">Enter child's date of birth first</p>
                 ) : isLoadingGames ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm">Loading games...</span>
                   </div>
-                ) : games.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No games available for this event</p>
+                ) : gameError ? (
+                  <p className="text-sm text-muted-foreground text-red-600">{gameError}</p>
+                ) : eligibleGames.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No games available for this event and child's age</p>
                 ) : (
                   <div className="space-y-3">
-                    {games.map((game) => {
-                      // Calculate child age in months for comparison
-                      const childAge = childDateOfBirth ?
-                        Math.floor((new Date().getTime() - new Date(childDateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 30.44)) : 0
-
-                      const isEligible = childAge >= game.min_age && childAge <= game.max_age
-                      const isSelected = selectedGameIds.includes(game.id.toString())
+                    {eligibleGames.map((game) => {
+                      const isSelected = selectedGames.includes(game.id)
 
                       return (
-                        <div key={game.id} className={`flex items-start space-x-3 p-3 border rounded-lg ${
-                          isEligible ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
-                        }`}>
+                        <div key={game.id} className="flex items-start space-x-3 p-3 border rounded-lg border-green-200 bg-green-50">
                           <input
                             type="checkbox"
                             id={`game-${game.id}`}
                             checked={isSelected}
-                            onChange={() => handleGameToggle(game.id.toString())}
-                            disabled={!isEligible}
+                            onChange={() => handleGameToggle(game.id)}
                             className="mt-1"
                           />
                           <div className="flex-1">
                             <label
                               htmlFor={`game-${game.id}`}
-                              className={`block text-sm font-medium cursor-pointer ${
-                                isEligible ? 'text-gray-900' : 'text-gray-400'
-                              }`}
+                              className="block text-sm font-medium cursor-pointer text-gray-900"
                             >
-                              {game.name}
+                              {game.title}
                             </label>
-                            <p className={`text-xs ${isEligible ? 'text-gray-600' : 'text-gray-400'}`}>
-                              Ages {game.min_age}-{game.max_age} months
-                              {childDateOfBirth && (
+                            <p className="text-xs text-gray-600">
+                              Price: ₹{game.price}
+                              {game.start_time && game.end_time && (
                                 <span className="ml-2">
-                                  (Child: {childAge} months - {isEligible ? 'Eligible' : 'Not eligible'})
+                                  Time: {game.start_time} - {game.end_time}
                                 </span>
                               )}
                             </p>
                             {game.description && (
-                              <p className={`text-xs mt-1 ${isEligible ? 'text-gray-500' : 'text-gray-400'}`}>
+                              <p className="text-xs mt-1 text-gray-500">
                                 {game.description}
                               </p>
                             )}
@@ -1177,10 +1294,10 @@ export default function NewBookingPage() {
                         </div>
                       )
                     })}
-                    {selectedGameIds.length > 0 && (
+                    {selectedGames.length > 0 && (
                       <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
                         <p className="text-sm text-blue-800">
-                          Selected {selectedGameIds.length} game{selectedGameIds.length > 1 ? 's' : ''}
+                          Selected {selectedGames.length} game{selectedGames.length > 1 ? 's' : ''}
                         </p>
                       </div>
                     )}
@@ -1188,113 +1305,7 @@ export default function NewBookingPage() {
                 )}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date</Label>
-                  <Select
-                    value={selectedDate}
-                    onValueChange={handleDateChange}
-                    required
-                    disabled={selectedGameIds.length === 0 || isLoadingDates}
-                  >
-                    <SelectTrigger id="date">
-                      <SelectValue placeholder={
-                        selectedGameIds.length === 0
-                          ? "Select games first"
-                          : isLoadingDates
-                            ? "Loading dates..."
-                            : availableDates.length === 0
-                              ? "No dates available"
-                              : "Select date"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingDates ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading dates...
-                        </div>
-                      ) : availableDates.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No dates available for this game
-                        </div>
-                      ) : (
-                        availableDates.map((date) => (
-                          <SelectItem key={date} value={date}>
-                            {format(new Date(date), "PPP")}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="timeSlot">Time Slot</Label>
-                  <Select
-                    value={selectedTimeSlotId}
-                    onValueChange={setSelectedTimeSlotId}
-                    required
-                    disabled={!selectedDate || isLoadingTimeSlots}
-                  >
-                    <SelectTrigger id="timeSlot">
-                      <SelectValue placeholder={
-                        !selectedDate
-                          ? "Select date first"
-                          : isLoadingTimeSlots
-                            ? "Loading time slots..."
-                            : availableTimeSlots.length === 0
-                              ? "No time slots available"
-                              : "Select time slot"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingTimeSlots ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading time slots...
-                        </div>
-                      ) : availableTimeSlots.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No time slots available for this date
-                        </div>
-                      ) : (
-                        availableTimeSlots.map((slot) => (
-                          <SelectItem key={slot.id} value={slot.id.toString()}>
-                            <div className="flex flex-col">
-                              <span>{slot.start_time} - {slot.end_time}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {slot.custom_title} (₹{slot.slot_price})
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {selectedTimeSlotId && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-md">
-                  <div className="text-sm">
-                    <p className="font-medium">Selected Time Slot Details:</p>
-                    {(() => {
-                      const slot = availableTimeSlots.find(s =>
-                        s.id.toString() === selectedTimeSlotId
-                      )
-                      return slot ? (
-                        <div className="mt-1 space-y-1">
-                          <p>Game: {slot.custom_title}</p>
-                          <p>Time: {slot.start_time} - {slot.end_time}</p>
-                          <p>Price: ₹{slot.slot_price}</p>
-                          <p>Max Participants: {slot.max_participants}</p>
-                        </div>
-                      ) : null
-                    })()}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -1352,7 +1363,7 @@ export default function NewBookingPage() {
                               {addon.variants?.map((variant) => {
                                 const finalPrice = parseFloat(addon.price) + variant.price_modifier
                                 const selectedItem = selectedAddOns.find(item =>
-                                  item.addon.id === addon.id && item.variant?.id === variant.id
+                                  item.addOn.id === addon.id && item.variantId === variant.id
                                 )
                                 const currentQuantity = selectedItem?.quantity || 0
 
@@ -1375,7 +1386,7 @@ export default function NewBookingPage() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handleAddOnSelect(addon, variant, Math.max(0, currentQuantity - 1))}
+                                        onClick={() => handleAddOnChange(addon, Math.max(0, currentQuantity - 1), variant.id?.toString())}
                                         disabled={currentQuantity === 0}
                                       >
                                         -
@@ -1385,7 +1396,7 @@ export default function NewBookingPage() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handleAddOnSelect(addon, variant, currentQuantity + 1)}
+                                        onClick={() => handleAddOnChange(addon, currentQuantity + 1, variant.id?.toString())}
                                         disabled={currentQuantity >= variant.stock_quantity}
                                       >
                                         +
@@ -1399,7 +1410,7 @@ export default function NewBookingPage() {
                             <div className="mt-3">
                               {(() => {
                                 const selectedItem = selectedAddOns.find(item =>
-                                  item.addon.id === addon.id && !item.variant
+                                  item.addOn.id === addon.id && !item.variantId
                                 )
                                 const currentQuantity = selectedItem?.quantity || 0
 
@@ -1413,7 +1424,7 @@ export default function NewBookingPage() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handleAddOnSelect(addon, undefined, Math.max(0, currentQuantity - 1))}
+                                        onClick={() => handleAddOnChange(addon, Math.max(0, currentQuantity - 1))}
                                         disabled={currentQuantity === 0}
                                       >
                                         -
@@ -1423,7 +1434,7 @@ export default function NewBookingPage() {
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handleAddOnSelect(addon, undefined, currentQuantity + 1)}
+                                        onClick={() => handleAddOnChange(addon, currentQuantity + 1)}
                                         disabled={currentQuantity >= addon.stock_quantity}
                                       >
                                         +
@@ -1441,31 +1452,97 @@ export default function NewBookingPage() {
                 </div>
               )}
 
-              {selectedAddOns.length > 0 && (
+              {/* Pricing Summary */}
+              {(selectedGames.length > 0 || selectedAddOns.length > 0) && (
                 <div className="mt-6 p-4 bg-muted/50 rounded-md">
-                  <h4 className="font-medium mb-3">Selected Add-ons:</h4>
+                  <h4 className="font-medium mb-3">Booking Summary:</h4>
                   <div className="space-y-2">
-                    {selectedAddOns.map((item, index) => {
-                      const basePrice = parseFloat(item.addon.price)
-                      const variantModifier = item.variant ? item.variant.price_modifier : 0
-                      const itemPrice = basePrice + variantModifier
-                      const totalPrice = itemPrice * item.quantity
-
-                      return (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>
-                            {item.addon.name}
-                            {item.variant && ` - ${item.variant.name}`}
-                            {" "}× {item.quantity}
-                          </span>
-                          <span>₹{totalPrice.toLocaleString()}</span>
+                    {/* Games */}
+                    {selectedGames.length > 0 && (
+                      <>
+                        <div className="text-sm font-medium">Games:</div>
+                        {selectedGames.map((gameId) => {
+                          const game = eligibleGames.find(g => g.id === gameId)
+                          return game ? (
+                            <div key={gameId} className="flex justify-between text-sm ml-4">
+                              <span>{game.title}</span>
+                              <span>₹{game.price.toLocaleString()}</span>
+                            </div>
+                          ) : null
+                        })}
+                        <div className="flex justify-between text-sm font-medium ml-4">
+                          <span>Games Subtotal:</span>
+                          <span>₹{calculateGamesTotal().toLocaleString()}</span>
                         </div>
-                      )
-                    })}
+                      </>
+                    )}
+
+                    {/* Add-ons */}
+                    {selectedAddOns.length > 0 && (
+                      <>
+                        <div className="text-sm font-medium mt-3">Add-ons:</div>
+                        {selectedAddOns.map((item, index) => {
+                          let price = parseFloat(item.addOn.price.toString()) || 0;
+
+                          // Check if this is a variant with a different price
+                          if (item.variantId && item.addOn.has_variants && item.addOn.variants) {
+                            const variant = item.addOn.variants.find(v => v.id === item.variantId);
+                            if (variant && variant.price_modifier) {
+                              const modifier = parseFloat(variant.price_modifier.toString());
+                              price = parseFloat(item.addOn.price.toString()) + modifier;
+                            }
+                          }
+
+                          const totalPrice = price * item.quantity;
+
+                          return (
+                            <div key={index} className="flex justify-between text-sm ml-4">
+                              <span>
+                                {item.addOn.name}
+                                {item.variantId && item.addOn.variants && (
+                                  ` - ${item.addOn.variants.find(v => v.id === item.variantId)?.name || ''}`
+                                )}
+                                {" "}× {item.quantity}
+                              </span>
+                              <span>₹{totalPrice.toLocaleString()}</span>
+                            </div>
+                          )
+                        })}
+                        <div className="flex justify-between text-sm font-medium ml-4">
+                          <span>Add-ons Subtotal:</span>
+                          <span>₹{calculateAddOnsTotal().toLocaleString()}</span>
+                        </div>
+                      </>
+                    )}
+
                     <Separator className="my-2" />
-                    <div className="flex justify-between font-medium">
+
+                    {/* Subtotal */}
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>₹{(calculateGamesTotal() + calculateAddOnsTotal()).toLocaleString()}</span>
+                    </div>
+
+                    {/* Promo Code Discount */}
+                    {appliedPromoCode && discountAmount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Promo Discount ({appliedPromoCode}):</span>
+                        <span>-₹{discountAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {/* GST */}
+                    <div className="flex justify-between text-sm">
+                      <span>GST (18%):</span>
+                      <span>₹{calculateGST().toLocaleString()}</span>
+                    </div>
+
+                    <Separator className="my-2" />
+
+                    {/* Total */}
+                    <div className="flex justify-between font-medium text-lg">
                       <span>Total Amount:</span>
-                      <span>₹{calculateTotalAmount().toLocaleString()}</span>
+                      <span>₹{calculateTotalPrice().toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -1474,7 +1551,7 @@ export default function NewBookingPage() {
           </Card>
 
           {/* Promo Code Section */}
-          {selectedEventId && selectedGameIds.length > 0 && (
+          {selectedEventType && selectedGames.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Promo Code (Optional)</CardTitle>
@@ -1509,48 +1586,29 @@ export default function NewBookingPage() {
                   </div>
                 </div>
 
-                {/* Show discount calculation */}
-                {promoCodeDiscount && (
+                {/* Show applied promo code */}
+                {appliedPromoCode && discountAmount > 0 && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Original Amount:</span>
-                        <span>₹{calculateOriginalTotalAmount().toLocaleString()}</span>
+                        <span>Promo Code Applied:</span>
+                        <span className="font-medium">{appliedPromoCode}</span>
                       </div>
                       <div className="flex justify-between text-sm text-green-600">
-                        <span>Discount ({promoCodeInput}):</span>
-                        <span>-₹{promoCodeDiscount.discountAmount.toLocaleString()}</span>
+                        <span>Discount:</span>
+                        <span>-₹{discountAmount.toLocaleString()}</span>
                       </div>
-                      <Separator />
-                      <div className="flex justify-between font-medium text-green-700">
-                        <span>Final Amount:</span>
-                        <span>₹{promoCodeDiscount.finalAmount.toLocaleString()}</span>
-                      </div>
-                      <p className="text-xs text-green-600 mt-2">{promoCodeDiscount.message}</p>
+                      <p className="text-xs text-green-600 mt-2">Promo code applied successfully!</p>
                     </div>
                   </div>
                 )}
 
-                {/* Show available promo codes hint */}
-                {promoCodes.length > 0 && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800 font-medium mb-2">Available promo codes for this event:</p>
-                    <div className="space-y-1">
-                      {promoCodes.slice(0, 3).map((promo) => (
-                        <div key={promo.id} className="text-xs text-blue-700">
-                          <span className="font-medium">{promo.promo_code}</span> - {' '}
-                          {promo.type === 'percentage'
-                            ? `${promo.value}% off${promo.maximum_discount_amount ? ` (max ₹${promo.maximum_discount_amount})` : ''}`
-                            : `₹${promo.value} off`
-                          }
-                        </div>
-                      ))}
-                      {promoCodes.length > 3 && (
-                        <p className="text-xs text-blue-600">...and {promoCodes.length - 3} more</p>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* Promo code hint */}
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Tip:</strong> Try "ADMIN10" for a 10% discount on your booking.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1578,5 +1636,6 @@ export default function NewBookingPage() {
         </div>
       </form>
     </div>
+
   )
 }

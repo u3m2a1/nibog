@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Eye, Download, RefreshCw, AlertCircle, Edit } from "lucide-react"
+import { Search, Filter, Eye, Download, RefreshCw, AlertCircle, Edit, Plus } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
@@ -262,6 +262,12 @@ export default function PaymentsPage() {
           >
             <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             Refresh
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/admin/payments/record">
+              <Plus className="mr-2 h-4 w-4" />
+              Record Payment
+            </Link>
           </Button>
           <Button onClick={openExportModal}>
             <Download className="mr-2 h-4 w-4" />
