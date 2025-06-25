@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { CompletedEvent, fetchCompletedEvents } from "@/services/completedEventsService"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -27,113 +28,69 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // We'll implement animations without framer-motion
 
-// Mock data - in a real app, this would come from an API
-const completedEvents = [
-  {
-    id: "CE001",
-    title: "Baby Crawling Championship",
-    gameTemplate: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-08-15",
-    registrations: 45,
-    attendance: 42,
-    attendanceRate: 93,
-    revenue: 35955,
-    status: "completed",
-  },
-  {
-    id: "CE002",
-    title: "Baby Walker Race",
-    gameTemplate: "Baby Walker",
-    venue: "Hitex Exhibition Center",
-    city: "Hyderabad",
-    date: "2025-08-10",
-    registrations: 38,
-    attendance: 35,
-    attendanceRate: 92,
-    revenue: 30362,
-    status: "completed",
-  },
-  {
-    id: "CE003",
-    title: "Toddler Running Competition",
-    gameTemplate: "Running Race",
-    venue: "Indoor Stadium",
-    city: "Chennai",
-    date: "2025-08-05",
-    registrations: 42,
-    attendance: 37,
-    attendanceRate: 88,
-    revenue: 33558,
-    status: "completed",
-  },
-  {
-    id: "CE004",
-    title: "Baby Swimming Event",
-    gameTemplate: "Swimming",
-    venue: "Aqua Sports Complex",
-    city: "Mumbai",
-    date: "2025-07-28",
-    registrations: 30,
-    attendance: 28,
-    attendanceRate: 93,
-    revenue: 22372,
-    status: "completed",
-  },
-  {
-    id: "CE005",
-    title: "Baby Art & Craft Workshop",
-    gameTemplate: "Art & Craft",
-    venue: "Creative Kids Center",
-    city: "Delhi",
-    date: "2025-07-20",
-    registrations: 35,
-    attendance: 31,
-    attendanceRate: 89,
-    revenue: 24769,
-    status: "completed",
-  },
-  {
-    id: "CE006",
-    title: "Baby Sensory Play",
-    gameTemplate: "Sensory Play",
-    venue: "Little Explorers Hub",
-    city: "Bangalore",
-    date: "2025-07-15",
-    registrations: 40,
-    attendance: 38,
-    attendanceRate: 95,
-    revenue: 30362,
-    status: "completed",
-  },
-  {
-    id: "CE007",
-    title: "Toddler Obstacle Course",
-    gameTemplate: "Obstacle Course",
-    venue: "Kids Adventure Zone",
-    city: "Pune",
-    date: "2025-07-10",
-    registrations: 32,
-    attendance: 29,
-    attendanceRate: 91,
-    revenue: 23171,
-    status: "completed",
-  },
-  {
-    id: "CE008",
-    title: "Baby Music & Dance",
-    gameTemplate: "Music & Dance",
-    venue: "Rhythm Studio",
-    city: "Kolkata",
-    date: "2025-07-05",
-    registrations: 28,
-    attendance: 25,
-    attendanceRate: 89,
-    revenue: 19975,
-    status: "completed",
-  },
-]
+interface NormalizedEvent {
+  id: string
+  title: string
+  gameTemplate: string
+  venue: string
+  city: string
+  date: string
+  registrations: number
+  attendance: number
+  attendanceRate: number
+  revenue: number
+  status: string
+}
+
+export default function CompletedEventsPage() {
+  const router = useRouter()
+  const [events, setEvents] = useState<CompletedEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCity, setSelectedCity] = useState<string | null>(null)
+  const [selectedVenue, setSelectedVenue] = useState<string | null>(null)
+  const [selectedDateRange, setSelectedDateRange] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"list" | "cities" | "analytics">("list")
+
+  useEffect(() => {
+  const loadEvents = async () => {
+    try {
+      const data = await fetchCompletedEvents()
+      setEvents(data)
+    } catch (error) {
+      console.error('Error loading events:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  loadEvents()
+}, [])
+
+// Convert API data to normalized format for UI
+const normalizeEvent = (event: CompletedEvent): NormalizedEvent => {
+  const revenue = parseFloat(event.revenue.replace(/[^0-9.-]+/g, '')) || 0
+  const registrations = parseInt(event.registrations) || 0
+  const attendance = parseInt(event.attendance_count) || 0
+  const attendanceRate = parseInt(event.attendance_percentage.replace('%', '')) || 0
+  const gameTemplate = event.games ? event.games.map(g => g.name).join(", ") : "No games"
+
+  return {
+    id: event.event_id.toString(),
+    title: event.event_name,
+    gameTemplate,
+    venue: event.venue_name,
+    city: event.city_name,
+    date: event.event_date,
+    registrations,
+    attendance,
+    attendanceRate,
+    revenue,
+    status: "completed"
+  }
+}
+
+const completedEvents = events.map(normalizeEvent)
 
 // Get unique cities from events
 const cities = Array.from(new Set(completedEvents.map(event => event.city)))
@@ -141,13 +98,16 @@ const cities = Array.from(new Set(completedEvents.map(event => event.city)))
 // Get unique venues from events
 const venues = Array.from(new Set(completedEvents.map(event => event.venue)))
 
-export default function CompletedEventsPage() {
-  const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCity, setSelectedCity] = useState<string | null>(null)
-  const [selectedVenue, setSelectedVenue] = useState<string | null>(null)
-  const [selectedDateRange, setSelectedDateRange] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<"list" | "cities" | "analytics">("list")
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    const formatted = amount.toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+    return formatted
+  }
 
   // Filter events based on search query and filters
   const filteredEvents = completedEvents.filter(event => {
@@ -208,14 +168,15 @@ export default function CompletedEventsPage() {
     }
   }).filter(cityData => cityData.events.length > 0)
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN')}`
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {loading ? (
+        <div className="flex h-[400px] items-center justify-center">
+          <div className="text-muted-foreground">Loading events...</div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Completed Events</h1>
           <p className="text-muted-foreground">View and analyze past NIBOG events</p>
@@ -582,6 +543,8 @@ export default function CompletedEventsPage() {
             </Card>
           </div>
         )}
+        </>
+      )}
     </div>
   )
 }

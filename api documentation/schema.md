@@ -15,6 +15,8 @@ CREATE TABLE event_games_with_slots (
   FOREIGN KEY (game_id) REFERENCES baby_games(id)  -- Changed reference from games to baby_games
 );
 
+
+
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,  -- Use SERIAL for auto-incrementing in PostgreSQL
   title VARCHAR(255) NOT NULL,
