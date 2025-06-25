@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { CompletedEvent, fetchCompletedEventById } from "@/services/completedEventsService"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { format } from "date-fns"
@@ -18,91 +19,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-// We'll implement animations without framer-motion
 
-// Mock data - in a real app, this would come from an API
-const completedEvents = [
-  {
-    id: "CE001",
-    title: "Baby Crawling Championship",
-    gameTemplate: "Baby Crawling",
-    venue: "Gachibowli Indoor Stadium",
-    city: "Hyderabad",
-    date: "2025-08-15",
-    registrations: 45,
-    attendance: 42,
-    attendanceRate: 93,
-    revenue: 35955,
-    status: "completed",
-    description: "A fun and exciting baby crawling competition for babies aged 5-13 months. Parents and children enjoyed a day full of activities and friendly competition.",
-    participants: [
-      { id: "P001", parentName: "Rahul Sharma", childName: "Arjun Sharma", childAge: 8, attended: true, addons: ["T-Shirt", "Photo Package"] },
-      { id: "P002", parentName: "Priya Patel", childName: "Aarav Patel", childAge: 7, attended: true, addons: ["T-Shirt"] },
-      { id: "P003", parentName: "Neha Singh", childName: "Ishaan Singh", childAge: 9, attended: true, addons: ["Meal Pack", "Photo Package"] },
-      { id: "P004", parentName: "Amit Kumar", childName: "Vihaan Kumar", childAge: 6, attended: true, addons: ["T-Shirt", "Meal Pack"] },
-      { id: "P005", parentName: "Deepa Reddy", childName: "Aadhya Reddy", childAge: 10, attended: true, addons: ["Photo Package"] },
-      { id: "P006", parentName: "Kiran Joshi", childName: "Ananya Joshi", childAge: 8, attended: false, addons: ["T-Shirt"] },
-      { id: "P007", parentName: "Sanjay Gupta", childName: "Aanya Gupta", childAge: 7, attended: true, addons: ["Meal Pack"] },
-      { id: "P008", parentName: "Meera Verma", childName: "Advait Verma", childAge: 9, attended: true, addons: ["T-Shirt", "Photo Package"] },
-      { id: "P009", parentName: "Rajesh Malhotra", childName: "Advik Malhotra", childAge: 8, attended: true, addons: [] },
-      { id: "P010", parentName: "Anita Kapoor", childName: "Avni Kapoor", childAge: 6, attended: false, addons: ["T-Shirt", "Meal Pack"] },
-    ],
-    addonSales: [
-      { name: "T-Shirt", sold: 18, collected: 16, revenue: 8982 },
-      { name: "Meal Pack", sold: 15, collected: 14, revenue: 4485 },
-      { name: "Photo Package", sold: 12, collected: 12, revenue: 11988 },
-    ],
-    winners: [
-      { position: 1, childName: "Arjun Sharma", parentName: "Rahul Sharma", prize: "Gold Medal + Gift Hamper" },
-      { position: 2, childName: "Aadhya Reddy", parentName: "Deepa Reddy", prize: "Silver Medal + Gift Hamper" },
-      { position: 3, childName: "Ishaan Singh", parentName: "Neha Singh", prize: "Bronze Medal + Gift Hamper" },
-    ],
-    certificatesSent: 40,
-    feedbackRating: 4.8,
-  },
-  {
-    id: "CE002",
-    title: "Baby Walker Race",
-    gameTemplate: "Baby Walker",
-    venue: "Hitex Exhibition Center",
-    city: "Hyderabad",
-    date: "2025-08-10",
-    registrations: 38,
-    attendance: 35,
-    attendanceRate: 92,
-    revenue: 30362,
-    status: "completed",
-    description: "An exciting baby walker race for babies aged 5-13 months. The event featured multiple race categories and fun activities for the whole family.",
-    participants: [
-      { id: "P011", parentName: "Vikram Mehta", childName: "Aarav Mehta", childAge: 10, attended: true, addons: ["T-Shirt", "Photo Package"] },
-      { id: "P012", parentName: "Pooja Agarwal", childName: "Anaya Agarwal", childAge: 9, attended: true, addons: ["Meal Pack"] },
-      { id: "P013", parentName: "Suresh Nair", childName: "Advait Nair", childAge: 11, attended: true, addons: ["T-Shirt"] },
-      { id: "P014", parentName: "Kavita Menon", childName: "Anika Menon", childAge: 8, attended: false, addons: ["T-Shirt", "Meal Pack"] },
-      { id: "P015", parentName: "Rajiv Saxena", childName: "Vihaan Saxena", childAge: 10, attended: true, addons: ["Photo Package"] },
-    ],
-    addonSales: [
-      { name: "T-Shirt", sold: 15, collected: 13, revenue: 7485 },
-      { name: "Meal Pack", sold: 12, collected: 11, revenue: 3588 },
-      { name: "Photo Package", sold: 10, collected: 10, revenue: 9990 },
-    ],
-    winners: [
-      { position: 1, childName: "Aarav Mehta", parentName: "Vikram Mehta", prize: "Gold Medal + Gift Hamper" },
-      { position: 2, childName: "Advait Nair", parentName: "Suresh Nair", prize: "Silver Medal + Gift Hamper" },
-      { position: 3, childName: "Anaya Agarwal", parentName: "Pooja Agarwal", prize: "Bronze Medal + Gift Hamper" },
-    ],
-    certificatesSent: 33,
-    feedbackRating: 4.6,
-  },
-]
+// Keep the mock data for additional details not in API
+const mockEventData = {
+  description: "A fun and exciting event with multiple games and activities.",
+  participants: [
+    { id: "P001", parentName: "Rahul Sharma", childName: "Arjun Sharma", childAge: 8, attended: true, addons: ["T-Shirt", "Photo Package"] },
+    { id: "P002", parentName: "Priya Patel", childName: "Aarav Patel", childAge: 7, attended: true, addons: ["T-Shirt"] },
+    { id: "P003", parentName: "Neha Singh", childName: "Ishaan Singh", childAge: 9, attended: true, addons: ["Meal Pack", "Photo Package"] },
+  ],
+  addonSales: [
+    { name: "T-Shirt", sold: 18, collected: 16, revenue: 8982 },
+    { name: "Meal Pack", sold: 15, collected: 14, revenue: 4485 },
+    { name: "Photo Package", sold: 12, collected: 12, revenue: 11988 },
+  ],
+  winners: [
+    { position: 1, childName: "Arjun Sharma", parentName: "Rahul Sharma", prize: "Gold Medal + Gift Hamper" },
+    { position: 2, childName: "Aarav Patel", parentName: "Priya Patel", prize: "Silver Medal + Gift Hamper" },
+    { position: 3, childName: "Ishaan Singh", parentName: "Neha Singh", prize: "Bronze Medal + Gift Hamper" },
+  ],
+  certificatesSent: 40,
+  feedbackRating: 4.8,
+}
 
 export default function CompletedEventDetailPage() {
   const params = useParams()
   const eventId = params.id as string
+  const [event, setEvent] = useState<CompletedEvent | null>(null)
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("participants")
 
-  // Find the event
-  const event = completedEvents.find(e => e.id === eventId)
+  useEffect(() => {
+    const loadEvent = async () => {
+      try {
+        const data = await fetchCompletedEventById(eventId)
+        setEvent(data)
+      } catch (error) {
+        console.error('Error loading event:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadEvent()
+  }, [eventId])
+
+  if (loading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-muted-foreground">Loading event details...</div>
+      </div>
+    )
+  }
 
   if (!event) {
     return (
@@ -119,19 +88,13 @@ export default function CompletedEventDetailPage() {
   }
 
   // Filter participants based on search query
-  const filteredParticipants = event.participants.filter(participant => {
+  const filteredParticipants = mockEventData.participants.filter(participant => {
     if (!searchQuery) return true
-
     return (
       participant.parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       participant.childName.toLowerCase().includes(searchQuery.toLowerCase())
     )
   })
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toLocaleString('en-IN')}`
-  }
 
   return (
     <div className="space-y-6">
@@ -144,21 +107,21 @@ export default function CompletedEventDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{event.title}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{event.event_name}</h1>
             <p className="text-muted-foreground">
-              {event.venue}, {event.city} • {format(new Date(event.date), "MMMM d, yyyy")}
+              {event.venue_name}, {event.city_name} • {event.event_date}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/admin/completed-events/venues/${encodeURIComponent(event.venue)}`}>
+            <Link href={`/admin/completed-events/venues/${encodeURIComponent(event.venue_name)}`}>
               <MapPin className="mr-2 h-4 w-4" />
               View Venue
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href={`/admin/completed-events/cities/${encodeURIComponent(event.city)}`}>
+            <Link href={`/admin/completed-events/cities/${encodeURIComponent(event.city_name)}`}>
               <Calendar className="mr-2 h-4 w-4" />
               View City
             </Link>
@@ -184,21 +147,21 @@ export default function CompletedEventDetailPage() {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Attendance</div>
-                  <div className="text-2xl font-bold">{event.attendance}</div>
+                  <div className="text-2xl font-bold">{event.attendance_count}</div>
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Attendance Rate</div>
-                  <div className="text-2xl font-bold">{event.attendanceRate}%</div>
+                  <div className="text-2xl font-bold">{event.attendance_percentage}</div>
                 </div>
               </div>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Total Revenue</div>
-                  <div className="text-2xl font-bold">{formatCurrency(event.revenue)}</div>
+                  <div className="text-2xl font-bold">{event.revenue}</div>
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Feedback Rating</div>
-                  <div className="text-2xl font-bold">{event.feedbackRating}/5.0</div>
+                  <div className="text-2xl font-bold">{mockEventData.feedbackRating}/5.0</div>
                 </div>
               </div>
             </CardContent>
@@ -209,7 +172,21 @@ export default function CompletedEventDetailPage() {
               <CardTitle>Event Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">{event.description}</p>
+              <p className="text-sm text-muted-foreground">{mockEventData.description}</p>
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Games</h3>
+                <div className="flex flex-wrap gap-2">
+                  {event.games ? (
+                    event.games.map((game) => (
+                      <Badge key={game.id} variant="outline">
+                        {game.name}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">No games configured</span>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -220,7 +197,7 @@ export default function CompletedEventDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {event.winners.map((winner) => (
+                {mockEventData.winners.map((winner) => (
                   <div key={winner.position} className="flex items-center gap-4">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
                       winner.position === 1 ? "bg-yellow-100 text-yellow-700" :
@@ -273,7 +250,7 @@ export default function CompletedEventDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {event.addonSales.map((addon) => (
+                {mockEventData.addonSales.map((addon) => (
                   <div key={addon.name} className="flex items-center justify-between">
                     <div>
                       <div className="font-medium">{addon.name}</div>
@@ -281,13 +258,13 @@ export default function CompletedEventDetailPage() {
                         {addon.sold} sold • {addon.collected} collected
                       </div>
                     </div>
-                    <div className="font-medium">{formatCurrency(addon.revenue)}</div>
+                    <div className="font-medium">₹{addon.revenue.toLocaleString('en-IN')}</div>
                   </div>
                 ))}
                 <div className="border-t pt-4 flex items-center justify-between">
                   <div className="font-medium">Total Add-on Revenue</div>
                   <div className="font-bold">
-                    {formatCurrency(event.addonSales.reduce((sum, addon) => sum + addon.revenue, 0))}
+                    ₹{mockEventData.addonSales.reduce((sum, addon) => sum + addon.revenue, 0).toLocaleString('en-IN')}
                   </div>
                 </div>
               </div>
@@ -302,20 +279,22 @@ export default function CompletedEventDetailPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="text-sm">Certificates Generated</div>
-                  <div className="font-medium">{event.attendance}</div>
+                  <div className="font-medium">{event.attendance_count}</div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm">Certificates Sent</div>
-                  <div className="font-medium">{event.certificatesSent}</div>
+                  <div className="font-medium">{mockEventData.certificatesSent}</div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm">Pending</div>
-                  <div className="font-medium">{event.attendance - event.certificatesSent}</div>
+                  <div className="font-medium">
+                    {parseInt(event.attendance_count) - mockEventData.certificatesSent}
+                  </div>
                 </div>
               </div>
             </CardContent>
             <CardFooter>
-              {event.attendance > event.certificatesSent && (
+              {parseInt(event.attendance_count) > mockEventData.certificatesSent && (
                 <Button className="w-full" variant="outline">
                   <Mail className="mr-2 h-4 w-4" />
                   Send Pending Certificates
@@ -330,7 +309,7 @@ export default function CompletedEventDetailPage() {
         <CardHeader>
           <CardTitle>Participant Details</CardTitle>
           <CardDescription>
-            {event.attendance} out of {event.registrations} registered participants attended
+            {event.attendance_count} out of {event.registrations} registered participants attended
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -350,76 +329,74 @@ export default function CompletedEventDetailPage() {
             </Tabs>
           </div>
 
-          <div className="transition-all duration-300 ease-in-out">
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Parent Name</TableHead>
-                      <TableHead>Child Name</TableHead>
-                      <TableHead>Child Age</TableHead>
-                      <TableHead>Attendance</TableHead>
-                      <TableHead>Add-ons</TableHead>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Parent Name</TableHead>
+                  <TableHead>Child Name</TableHead>
+                  <TableHead>Child Age</TableHead>
+                  <TableHead>Attendance</TableHead>
+                  <TableHead>Add-ons</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredParticipants
+                  .filter(p => {
+                    if (activeTab === "participants") return true
+                    if (activeTab === "attended") return p.attended
+                    if (activeTab === "no-show") return !p.attended
+                    return true
+                  })
+                  .map((participant) => (
+                    <TableRow key={participant.id}>
+                      <TableCell className="font-medium">{participant.parentName}</TableCell>
+                      <TableCell>{participant.childName}</TableCell>
+                      <TableCell>{participant.childAge} months</TableCell>
+                      <TableCell>
+                        {participant.attended ? (
+                          <div className="flex items-center">
+                            <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+                            <span>Attended</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <XCircle className="mr-2 h-4 w-4 text-red-500" />
+                            <span>No-show</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {participant.addons.length > 0 ? (
+                            participant.addons.map((addon, index) => (
+                              <Badge key={index} variant="outline">{addon}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground">None</span>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredParticipants
-                      .filter(p => {
-                        if (activeTab === "participants") return true
-                        if (activeTab === "attended") return p.attended
-                        if (activeTab === "no-show") return !p.attended
-                        return true
-                      })
-                      .map((participant) => (
-                        <TableRow key={participant.id}>
-                          <TableCell className="font-medium">{participant.parentName}</TableCell>
-                          <TableCell>{participant.childName}</TableCell>
-                          <TableCell>{participant.childAge} months</TableCell>
-                          <TableCell>
-                            {participant.attended ? (
-                              <div className="flex items-center">
-                                <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
-                                <span>Attended</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center">
-                                <XCircle className="mr-2 h-4 w-4 text-red-500" />
-                                <span>No-show</span>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {participant.addons.length > 0 ? (
-                                participant.addons.map((addon, index) => (
-                                  <Badge key={index} variant="outline">{addon}</Badge>
-                                ))
-                              ) : (
-                                <span className="text-sm text-muted-foreground">None</span>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                  ))}
 
-                    {filteredParticipants
-                      .filter(p => {
-                        if (activeTab === "participants") return true
-                        if (activeTab === "attended") return p.attended
-                        if (activeTab === "no-show") return !p.attended
-                        return true
-                      })
-                      .length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="h-24 text-center">
-                            No participants found.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
+                {filteredParticipants
+                  .filter(p => {
+                    if (activeTab === "participants") return true
+                    if (activeTab === "attended") return p.attended
+                    if (activeTab === "no-show") return !p.attended
+                    return true
+                  })
+                  .length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-24 text-center">
+                        No participants found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
