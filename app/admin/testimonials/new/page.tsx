@@ -106,7 +106,7 @@ export default function NewTestimonialPage() {
       // Prepare payload exactly as per API documentation
       const payload = {
         name: name.trim(),
-        city: selectedCityName.trim(), // Send city name directly
+        city_id: selectedCityName.trim(), // Include city ID to ensure proper association
         event_id: parseInt(selectedEventId),
         rating: parseInt(rating),
         testimonial: testimonialText.trim(),
