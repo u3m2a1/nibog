@@ -9,6 +9,7 @@ import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
 import { convertBookingRefFormat } from "@/services/bookingService"
 import { checkPhonePePaymentStatus } from "@/services/paymentService"
 import { sendBookingConfirmationFromClient } from "@/services/emailNotificationService"
+import { generateConsistentBookingRef } from "@/utils/bookingReference"
 
 export default function PaymentCallbackPage() {
   const router = useRouter()
@@ -73,21 +74,71 @@ export default function PaymentCallbackPage() {
             // We just need to verify and show success, plus send backup email if needed
 
             if (txnId) {
-              // Use the transaction ID directly as the booking reference
-              const bookingRef = txnId;
-              
-              // Update state with the booking reference
-              setBookingRef(bookingRef);
-              setTransactionId(bookingRef);
-              
-              console.log(`📋 Using transaction ID as booking reference: ${bookingRef}`);
-              
-              // Store the reference for later use
-              localStorage.setItem('lastBookingRef', bookingRef);
-              
-              // Redirect to booking confirmation with the exact same reference
-              router.push(`/booking-confirmation?ref=${encodeURIComponent(bookingRef)}`);
-              return;
+              // Get booking data from localStorage and call the payment status API to create the booking
+              try {
+                console.log(`📋 Getting booking data and creating booking for transaction: ${txnId}`);
+
+                // Retrieve booking data from localStorage
+                let bookingDataFromStorage = null;
+                try {
+                  const storedData = localStorage.getItem('nibog_booking_data');
+                  if (storedData) {
+                    bookingDataFromStorage = JSON.parse(storedData);
+                    console.log('Retrieved booking data from localStorage for booking creation:', bookingDataFromStorage);
+                  }
+                } catch (error) {
+                  console.error('Error retrieving booking data from localStorage:', error);
+                }
+
+                const statusResponse = await fetch('/api/payments/phonepe-status', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    transactionId: txnId,
+                    bookingData: bookingDataFromStorage,
+                  }),
+                });
+
+                const statusData = await statusResponse.json();
+                console.log('Payment status response:', statusData);
+                console.log('Status data bookingCreated:', statusData.bookingCreated);
+                console.log('Status data bookingData:', statusData.bookingData);
+                console.log('Status data bookingData.booking_ref:', statusData.bookingData?.booking_ref);
+
+                // Extract the actual booking reference from the response
+                let actualBookingRef = null;
+                if (statusData.bookingCreated && statusData.bookingData && statusData.bookingData.booking_ref) {
+                  actualBookingRef = statusData.bookingData.booking_ref;
+                  console.log(`📋 Found actual booking reference from database: ${actualBookingRef}`);
+                } else {
+                  // Fallback: generate consistent booking reference from transaction ID
+                  actualBookingRef = generateConsistentBookingRef(txnId);
+                  console.log(`📋 Generated fallback booking reference: ${actualBookingRef}`);
+                  console.log(`📋 Fallback reason - bookingCreated: ${statusData.bookingCreated}, bookingData exists: ${!!statusData.bookingData}, booking_ref exists: ${!!statusData.bookingData?.booking_ref}`);
+                }
+
+                // Update state with the actual booking reference
+                setBookingRef(actualBookingRef);
+                setTransactionId(txnId);
+
+                // Store the reference for later use
+                localStorage.setItem('lastBookingRef', actualBookingRef);
+
+                // Redirect to booking confirmation with the actual booking reference
+                router.push(`/booking-confirmation?ref=${encodeURIComponent(actualBookingRef)}`);
+                return;
+              } catch (error) {
+                console.error('Error getting actual booking reference:', error);
+                // Fallback to using transaction ID if API call fails
+                const bookingRef = txnId;
+                setBookingRef(bookingRef);
+                setTransactionId(bookingRef);
+                localStorage.setItem('lastBookingRef', bookingRef);
+                router.push(`/booking-confirmation?ref=${encodeURIComponent(bookingRef)}`);
+                return;
+              }
             }
 
             // Retrieve booking data from localStorage
@@ -121,12 +172,18 @@ export default function PaymentCallbackPage() {
                       const bookingVerifyData = await bookingVerifyResponse.json()
                       console.log('✅ Booking verification successful:', bookingVerifyData)
                       
-                      // Send confirmation email
-                      await sendBookingConfirmationFromClient({
-                        ...bookingData,
-                        bookingRef: emailBookingRef
-                      })
-                      console.log('📧 Confirmation email sent successfully')
+                      // Send confirmation email as backup (server should have already sent it)
+                      console.log('📧 Sending backup confirmation email from client...');
+                      try {
+                        await sendBookingConfirmationFromClient({
+                          ...bookingData,
+                          bookingRef: emailBookingRef
+                        })
+                        console.log('📧 Backup confirmation email sent successfully from client')
+                      } catch (emailError) {
+                        console.error('📧 Failed to send backup confirmation email:', emailError)
+                        // Don't fail the process if backup email fails
+                      }
                       
                       // Update the booking reference in state
                       setBookingRef(emailBookingRef)
@@ -207,12 +264,14 @@ export default function PaymentCallbackPage() {
               let bookingRefForRedirect = bookingRef;
               
               try {
-                // Check if we have a transaction ID to use as booking reference
-                if (txnId) {
+                // Use the booking reference from state (which should be the correct database reference)
+                if (bookingRef) {
+                  bookingRefForRedirect = bookingRef;
+                  console.log(`Using booking reference from state for redirect: ${bookingRefForRedirect}`);
+                } else if (txnId) {
+                  // Only use transaction ID as last resort if no booking reference is available
+                  console.log(`No booking reference in state, using transaction ID as fallback: ${txnId}`);
                   bookingRefForRedirect = txnId;
-                  console.log(`Using transaction ID as booking reference for redirect: ${bookingRefForRedirect}`);
-                  // Update state for consistency
-                  setBookingRef(bookingRefForRedirect);
                 }
               } catch (e) {
                 console.error('Error processing booking reference:', e);

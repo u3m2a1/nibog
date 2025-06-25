@@ -281,18 +281,39 @@ export interface TicketDetails {
   event_date: string;
   event_status: string;
   event_created_at: string;
-  game_id: number;
-  game_name: string;
-  game_description: string;
-  min_age: number;
-  max_age: number;
-  duration_minutes: number;
-  categories: string[];
-  game_active: boolean;
+  // Event Game Slot Info (from event_games_with_slots)
+  event_game_slot_id: number;
+  custom_title: string;
+  custom_description: string;
+  custom_price: string;
+  start_time: string;
+  end_time: string;
+  slot_price: string;
+  max_participants: number;
+  slot_created_at: string;
+  slot_updated_at: string;
+
+  // Slot details from the new API response
+  slot_id: number;
+  slot_title: string;
+  slot_description: string;
+
+  // Legacy game fields (for backward compatibility)
+  game_id?: number;
+  game_name?: string;
+  game_description?: string;
+  min_age?: number;
+  max_age?: number;
+  duration_minutes?: number;
+  categories?: string[];
+  game_active?: boolean;
   booking_game_id: number;
   game_price: string;
   attendance_status: string;
   game_booking_created_at: string;
+
+  // Additional fields that might be useful for slot identification
+  // slot_id is now defined above in the slot details section
 }
 
 /**
