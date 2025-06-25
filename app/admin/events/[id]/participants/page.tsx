@@ -175,8 +175,53 @@ export default function ParticipantsPage({ params }: { params: { id: string } })
 
   // Export participants list
   const exportParticipants = () => {
-    // TODO: Implement CSV export
-    console.log("Export participants")
+    // Define the CSV headers
+    const headers = [
+      "Booking Ref",
+      "Parent Name",
+      "Email",
+      "Phone",
+      "Child Name",
+      "Date of Birth",
+      "Gender",
+      "Game"
+    ].join(",");
+
+    // Convert participant data to CSV rows
+    const rows = filteredParticipants.map(participant => [
+      participant.booking_ref,
+      `"${participant.parent_name}"`,
+      participant.email,
+      participant.additional_phone,
+      `"${participant.child_name}"`,
+      participant.date_of_birth,
+      participant.gender,
+      `"${participant.game_name}"`
+    ].join(","));
+
+    // Combine headers and rows
+    const csvContent = [headers, ...rows].join("\n");
+
+    // Create a Blob containing the CSV data
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    
+    // Create a download link
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    // Set up download attributes
+    const eventTitle = eventData.participants?.[0]?.event_title || 'Event';
+    const fileName = `${eventTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_participants.csv`;
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    
+    // Add to document, trigger download, and cleanup
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   return (
