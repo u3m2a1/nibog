@@ -13,6 +13,7 @@ import { jsPDF } from "jspdf"
 import { TicketDetails, getTicketDetails, convertBookingRefFormat } from "@/services/bookingService"
 import { checkPhonePePaymentStatus } from "@/services/paymentService"
 
+
 export default function BookingConfirmationClientPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -21,7 +22,9 @@ export default function BookingConfirmationClientPage() {
   const [ticketDetails, setTicketDetails] = useState<TicketDetails[] | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showTicket, setShowTicket] = useState(true)
+  const [showTicket, setShowTicket] = useState(false)
+  const [ticketEmailSent, setTicketEmailSent] = useState(false)
+  const [ticketEmailSending, setTicketEmailSending] = useState(true)
   const ticketRef = useRef<HTMLDivElement>(null)
 
   // Handler for downloading ticket as image
@@ -61,6 +64,8 @@ export default function BookingConfirmationClientPage() {
   }
 
   // Fetch booking details when component mounts
+
+
   // Helper function to normalize booking reference formats to ensure API compatibility
   // Simply extract the booking reference without any format conversion
   // This ensures we use the EXACT SAME reference ID throughout the entire system
@@ -146,6 +151,11 @@ export default function BookingConfirmationClientPage() {
             if (ticketData[0]) {
               setBookingDetails(ticketData[0])
             }
+
+            // Ticket email is sent automatically from the payment callback
+            // No need to send it again from the confirmation page
+            setTicketEmailSent(true); // Mark as sent since it was sent during payment processing
+
             return
           }
         } catch (ticketError) {
@@ -186,6 +196,11 @@ export default function BookingConfirmationClientPage() {
                   if (ticketData[0]) {
                     setBookingDetails(ticketData[0]);
                   }
+
+                  // Ticket email is sent automatically from the payment callback
+                  // No need to send it again from the confirmation page
+                  setTicketEmailSent(true); // Mark as sent since it was sent during payment processing
+
                   return;
                 }
               } catch (ticketError) {
@@ -354,7 +369,7 @@ export default function BookingConfirmationClientPage() {
                 We've sent a booking confirmation email with all the details to your registered email address.
               </p>
               <p className="mt-2 text-gray-600">
-                🎫 <strong>Your tickets have also been sent separately</strong> - check your email for the ticket details with QR codes!
+                🎫 <strong>Your tickets have been sent!</strong> - Check your email for the ticket details with QR codes!
               </p>
               <p className="mt-2 text-gray-600">
                 Please save your booking reference: <span className="font-bold text-green-700">{ticketDetails?.[0]?.booking_ref || bookingDetails?.booking_ref || "N/A"}</span>
