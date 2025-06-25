@@ -33,7 +33,9 @@ export interface BookingRegistrationData {
     terms_accepted: boolean;
   };
   booking_games: {
+    slot_id: number;
     game_id: number;
+    game_price: number;
   }[];
   booking_addons?: BookingAddon[];
   promo_code?: string;

@@ -10,6 +10,99 @@ setInterval(() => {
   processedTransactions = new Set<string>();
 }, 60 * 60 * 1000);
 
+/**
+ * Generate HTML content for booking confirmation email
+ */
+function generateBookingConfirmationHTML(emailData: any): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Confirmation - NIBOG</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+    <h1 style="margin: 0; font-size: 28px;">🎉 Booking Confirmed!</h1>
+    <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Thank you for choosing NIBOG</p>
+  </div>
+
+  <div style="background: white; padding: 30px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 10px 10px;">
+    <p style="margin: 0 0 20px 0; font-size: 16px;">Dear ${emailData.parentName},</p>
+
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+      <h2 style="margin: 0 0 15px 0; color: #495057; font-size: 20px;">Booking Details</h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; width: 40%;">Booking ID:</td>
+          <td style="padding: 8px 0;">#${emailData.bookingId}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Booking Reference:</td>
+          <td style="padding: 8px 0; font-family: monospace; font-weight: bold; color: #007bff;">${emailData.bookingRef}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Child Name:</td>
+          <td style="padding: 8px 0;">${emailData.childName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Event:</td>
+          <td style="padding: 8px 0;">${emailData.eventTitle}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Date:</td>
+          <td style="padding: 8px 0;">${emailData.eventDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Venue:</td>
+          <td style="padding: 8px 0;">${emailData.eventVenue}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold;">Transaction ID:</td>
+          <td style="padding: 8px 0; font-family: monospace; font-size: 12px;">${emailData.transactionId}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 18px; font-weight: bold;">Total Amount:</span>
+        <span style="font-size: 24px; font-weight: bold; color: #28a745;">₹${emailData.totalAmount.toFixed(2)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Payment Method:</span>
+        <span style="font-weight: bold;">${emailData.paymentMethod}</span>
+      </div>
+    </div>
+
+    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+      <strong>✅ Payment Successful!</strong><br>
+      Your booking has been confirmed and payment has been processed successfully.
+    </div>
+
+    <div style="margin-bottom: 25px;">
+      <h3 style="margin: 0 0 15px 0; color: #495057; font-size: 18px;">What's Next?</h3>
+      <ul style="margin: 0; padding-left: 20px;">
+        <li style="margin-bottom: 8px;">Please arrive 15 minutes before the event start time</li>
+        <li style="margin-bottom: 8px;">Bring a copy of this confirmation email</li>
+        <li style="margin-bottom: 8px;">Ensure your child is well-rested and ready for fun!</li>
+        <li style="margin-bottom: 8px;">Contact us if you have any questions</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+      <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+        If you have any questions, please contact us at support@nibog.com
+      </p>
+      <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">
+        Thank you for choosing NIBOG! 🎮
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 // Interface for pending booking data
 interface PendingBookingData {
   userId: number;
@@ -507,6 +600,68 @@ async function createBookingAndPayment(
     }
 
     console.log('Payment record created successfully');
+
+    // Send booking confirmation email after successful booking and payment creation
+    try {
+      console.log(`📧 Sending booking confirmation email for booking ID: ${bookingId}`);
+
+      // Get email settings first
+      const emailSettingsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/emailsetting/get`);
+      if (!emailSettingsResponse.ok) {
+        console.error('📧 Failed to get email settings');
+        throw new Error('Email settings not configured');
+      }
+
+      const emailSettings = await emailSettingsResponse.json();
+      if (!emailSettings || emailSettings.length === 0) {
+        console.error('📧 No email settings found');
+        throw new Error('No email settings found');
+      }
+
+      const settings = emailSettings[0];
+      console.log('📧 Email settings retrieved successfully');
+
+      // Generate booking confirmation HTML
+      const bookingRef = `B${String(bookingId).padStart(7, '0')}`;
+      const htmlContent = generateBookingConfirmationHTML({
+        bookingId: parseInt(bookingId.toString()),
+        bookingRef: bookingRef,
+        parentName: bookingData?.parentName || 'Valued Customer',
+        childName: bookingData?.childName || 'Child',
+        eventTitle: bookingData?.eventTitle || 'NIBOG Event',
+        eventDate: bookingData?.eventDate || new Date().toLocaleDateString(),
+        eventVenue: bookingData?.eventVenue || 'Main Stadium',
+        totalAmount: amount / 100,
+        paymentMethod: 'PhonePe',
+        transactionId: merchantTransactionId,
+        gameDetails: bookingData?.gameDetails || [] // Add gameDetails array
+      });
+
+      // Send email using existing send-receipt-email API
+      const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-receipt-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: bookingData?.email || `customer-${bookingId}@example.com`,
+          subject: `🎉 Booking Confirmed - ${bookingData?.eventTitle || 'NIBOG Event'} | NIBOG`,
+          html: htmlContent,
+          settings: settings
+        }),
+      });
+
+      if (emailResponse.ok) {
+        console.log(`📧 Booking confirmation email sent successfully`);
+      } else {
+        const errorData = await emailResponse.json();
+        console.error(`📧 Email sending failed:`, errorData);
+      }
+    } catch (emailError) {
+      console.error(`📧 Failed to send booking confirmation email:`, emailError);
+      // Don't fail the entire process if email fails - booking and payment were successful
+    }
+
     return { success: true, bookingId };
 
   } catch (error) {
@@ -592,9 +747,67 @@ export async function POST(request: Request) {
 
       if (bookingResult.success && bookingResult.bookingId) {
         console.log(`✅ Booking and payment successfully created for ID: ${bookingResult.bookingId}`);
-        
-        // Email notification is now handled by the PhonePe status route after both booking and payment are created
-        console.log(`📧 Email notification will be handled by PhonePe status route for booking ID: ${bookingResult.bookingId}`);
+
+        // Send booking confirmation email immediately after successful booking creation
+        try {
+          console.log(`📧 Sending booking confirmation email for booking ID: ${bookingResult.bookingId}`);
+
+          // Get email settings first
+          const emailSettingsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/emailsetting/get`);
+          if (!emailSettingsResponse.ok) {
+            console.error('📧 Failed to get email settings');
+            throw new Error('Email settings not configured');
+          }
+
+          const emailSettings = await emailSettingsResponse.json();
+          if (!emailSettings || emailSettings.length === 0) {
+            console.error('📧 No email settings found');
+            throw new Error('No email settings found');
+          }
+
+          const settings = emailSettings[0];
+          console.log('📧 Email settings retrieved successfully');
+
+          // Generate booking confirmation HTML
+          const bookingRef = `B${String(bookingResult.bookingId).padStart(7, '0')}`;
+          const htmlContent = generateBookingConfirmationHTML({
+            bookingId: bookingResult.bookingId,
+            bookingRef: bookingRef,
+            parentName: 'Valued Customer',
+            childName: 'Child',
+            eventTitle: 'NIBOG Event',
+            eventDate: new Date().toLocaleDateString(),
+            eventVenue: 'Main Stadium',
+            totalAmount: amount / 100,
+            paymentMethod: 'PhonePe',
+            transactionId: transactionId,
+            gameDetails: [] // Add empty gameDetails array for fallback case
+          });
+
+          // Send email using existing send-receipt-email API
+          const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-receipt-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: `customer-${transactionId.slice(-6)}@example.com`, // Fallback email
+              subject: `🎉 Booking Confirmed - NIBOG Event | NIBOG`,
+              html: htmlContent,
+              settings: settings
+            }),
+          });
+
+          if (emailResponse.ok) {
+            console.log(`📧 Booking confirmation email sent successfully`);
+          } else {
+            const errorData = await emailResponse.json();
+            console.error(`📧 Email sending failed:`, errorData);
+          }
+        } catch (emailError) {
+          console.error(`📧 Failed to send booking confirmation email:`, emailError);
+          // Don't fail the entire process if email fails - booking and payment were successful
+        }
 
         // Mark this transaction as processed
         processedTransactions.add(transactionId);
@@ -602,7 +815,8 @@ export async function POST(request: Request) {
         return NextResponse.json({
           status: "SUCCESS",
           message: "Payment processed successfully",
-          booking_id: bookingResult.bookingId
+          booking_id: bookingResult.bookingId,
+          emailSent: true // Indicate that email was attempted
         });
       } else {
         console.error(`❌ Failed to create booking and payment: ${bookingResult.error}`);

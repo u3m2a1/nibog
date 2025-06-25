@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast"
 import { BOOKING_API, PAYMENT_API } from "@/config/api"
 import { getAllCities, City } from "@/services/cityService"
 import { getAllAddOns, AddOn, AddOnVariant } from "@/services/addOnService"
+import { generateConsistentBookingRef } from "@/utils/bookingReference"
 // Promo code functionality simplified for admin panel
 import { getEventsByCityId, getGamesByAgeAndEvent } from "@/services/eventService"
 import { differenceInMonths } from "date-fns"
@@ -642,11 +643,10 @@ export default function NewBookingPage() {
       // Calculate total amount using frontend logic
       const totalAmount = calculateTotalPrice()
 
-      // Generate unique booking reference
+      // Generate unique booking reference using consistent format
       const generateBookingRef = () => {
-        const timestamp = Date.now().toString().slice(-6)
-        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-        return `B${timestamp}${random}`
+        const timestamp = Date.now().toString()
+        return generateConsistentBookingRef(timestamp)
       }
 
       // Process booking_addons according to API structure

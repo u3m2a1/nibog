@@ -154,121 +154,118 @@ export default function BookingConfirmationClientPage() {
         }
         
         // Try to check if this is a payment transaction ID by calling payment status API
-        try {
-          const response = await fetch('/api/payments/phonepe-status', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              transactionId: bookingRef,
-              bookingData: null,
-            }),
-          })
-          
-          const data = await response.json()
-          console.log("Payment status response:", data)
-          
-          // If the payment status API returns a booking ID, use that to fetch booking details
-          if (data.bookingCreated && data.bookingId) {
-            const normalizedApiBookingId = normalizeBookingRef(data.bookingId);
-            console.log("Found booking ID from payment API:", data.bookingId, "Normalized to:", normalizedApiBookingId)
-            
-            // Try to get ticket details with this normalized booking ID
-            try {
-              const ticketData = await getTicketDetails(normalizedApiBookingId)
-              if (ticketData && ticketData.length > 0) {
-                console.log("Successfully fetched ticket details using payment API bookingId:", ticketData)
-                setTicketDetails(ticketData)
-                // Store the first ticket as the booking details for display
-                if (ticketData[0]) {
-                  setBookingDetails(ticketData[0])
-                }
-                return
-              }
-            } catch (ticketError) {
-              console.error("Error fetching ticket details with payment API bookingId:", ticketError)
-              // Continue to fallback methods if this fails
-            }
-          }
-          
-          // If we couldn't get booking ID from the payment API or couldn't fetch it,
-          // Try with PPT format as a fallback
+        // Skip PhonePe API call if we already have a PPT reference
+        if (!refToUse.startsWith('PPT')) {
           try {
-            // Format with PPT prefix + date + ID portion
-            if (!refToUse) {
-              throw new Error("No booking reference for PPT attempt");
-            }
-            
-            // Try to extract just numbers if reference has other characters
-            const numericPart = refToUse.replace(/\D/g, '');
-            if (numericPart.length > 0) {
-              // Create date variables for PPT format
-              const currentDate = new Date();
-              const year = currentDate.getFullYear().toString().slice(-2);
-              const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-              const day = currentDate.getDate().toString().padStart(2, '0');
-              
-              const pptRef = `PPT${year}${month}${day}${numericPart.slice(0, 3)}`;
-              console.log("Last attempt - trying PPT formatted reference:", pptRef);
-              
-              const ticketData = await getTicketDetails(pptRef);
-              if (ticketData && ticketData.length > 0) {
-                console.log("Successfully fetched ticket details using PPT format:", ticketData);
-                setTicketDetails(ticketData);
-                if (ticketData[0]) {
-                  setBookingDetails(ticketData[0]);
+            const response = await fetch('/api/payments/phonepe-status', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                transactionId: refToUse,
+                bookingData: null,
+              }),
+            });
+
+            const data = await response.json();
+            console.log("Payment status response:", data);
+
+            // If the payment status API returns a booking ID, use that to fetch booking details
+            if (data.bookingCreated && data.bookingId) {
+              const normalizedApiBookingId = normalizeBookingRef(data.bookingId);
+              console.log("Found booking ID from payment API:", data.bookingId, "Normalized to:", normalizedApiBookingId);
+
+              // Try to get ticket details with this normalized booking ID
+              try {
+                const ticketData = await getTicketDetails(normalizedApiBookingId);
+                if (ticketData && ticketData.length > 0) {
+                  console.log("Successfully fetched ticket details using payment API bookingId:", ticketData);
+                  setTicketDetails(ticketData);
+                  // Store the first ticket as the booking details for display
+                  if (ticketData[0]) {
+                    setBookingDetails(ticketData[0]);
+                  }
+                  return;
                 }
-                // Store this successful reference
-                localStorage.setItem('lastBookingRef', JSON.stringify(pptRef));
-                return;
+              } catch (ticketError) {
+                console.error("Error fetching ticket details with payment API bookingId:", ticketError);
+                // Continue to fallback methods if this fails
               }
             }
-            
-            setError("Payment was successful, but booking details could not be found. Please check your email for booking confirmation.");
-          } catch (pptError) {
-            console.error("Error with PPT format attempt:", pptError);
-            setError("Payment was successful, but booking details could not be found. Please check your email for booking confirmation.");
+
+            // If we couldn't get booking ID from the payment API or couldn't fetch it,
+            // Try with PPT format as a fallback
+            try {
+              // Format with PPT prefix + date + ID portion
+              if (!refToUse) {
+                throw new Error("No booking reference for PPT attempt");
+              }
+
+              // Try to extract just numbers if reference has other characters
+              const numericPart = refToUse.replace(/\D/g, '');
+              if (numericPart.length > 0) {
+                // Create date variables for PPT format
+                const currentDate = new Date();
+                const year = currentDate.getFullYear().toString().slice(-2);
+                const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+                const day = currentDate.getDate().toString().padStart(2, '0');
+
+                const pptRef = `PPT${year}${month}${day}${numericPart.slice(0, 3)}`;
+                console.log("Last attempt - trying PPT formatted reference:", pptRef);
+
+                const ticketData = await getTicketDetails(pptRef);
+                if (ticketData && ticketData.length > 0) {
+                  console.log("Successfully fetched ticket details using PPT format:", ticketData);
+                  setTicketDetails(ticketData);
+                  if (ticketData[0]) {
+                    setBookingDetails(ticketData[0]);
+                  }
+                  // Store this successful reference
+                  localStorage.setItem('lastBookingRef', JSON.stringify(pptRef));
+                  return;
+                }
+              }
+
+              setError("Payment was successful, but booking details could not be found. Please check your email for booking confirmation.");
+            } catch (pptError) {
+              console.error("Error with PPT format attempt:", pptError);
+              setError("Payment was successful, but booking details could not be found. Please check your email for booking confirmation.");
+            }
+          } catch (paymentError) {
+            console.error("Error checking payment status:", paymentError);
+            setError("Failed to check payment status");
           }
-        } catch (paymentError) {
-          console.error("Error checking payment status:", paymentError)
-          
-          // If checking payment status fails, try direct booking lookup as a final attempt
+        }
+
+        // If we still don't have ticket details, try direct booking lookup as a final attempt
+        if (!ticketDetails) {
           try {
             // Try ticket details API first
-            try {
-              if (!refToUse) {
-                throw new Error("No booking reference for ticket details");
-              }
-              const ticketData = await getTicketDetails(refToUse)
-              if (ticketData && ticketData.length > 0) {
-                console.log("Successfully fetched ticket details as final attempt:", ticketData)
-                setTicketDetails(ticketData)
-                return
-              }
-            } catch (ticketError) {
-              console.error("Error fetching ticket details as final attempt:", ticketError)
-            }
-            
-            // Nothing more we can try if ticket details API failed
             if (!refToUse) {
-              throw new Error("No booking reference for booking details");
+              throw new Error("No booking reference for ticket details");
             }
-            // We've already tried the ticket details API above, so just show error
-          } catch (bookingError: any) {
-            console.error("Error fetching booking details:", bookingError)
-            setError(bookingError.message || "Failed to fetch booking details")
+            const ticketData = await getTicketDetails(refToUse);
+            if (ticketData && ticketData.length > 0) {
+              console.log("Successfully fetched ticket details as final attempt:", ticketData);
+              setTicketDetails(ticketData);
+              return;
+            }
+          } catch (ticketError) {
+            console.error("Error fetching ticket details as final attempt:", ticketError);
+            setError("Failed to fetch booking details");
           }
         }
       } catch (error: any) {
-        console.error("Error in booking confirmation flow:", error)
-        setError(error.message || "Failed to process booking confirmation")
+        console.error("Error in booking confirmation flow:", error);
+        setError(error.message || "Failed to process booking confirmation");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
-    fetchBookingDetails()
-  }, [bookingRef])
+    };
+
+    fetchBookingDetails();
+  }, [bookingRef]);
 
   return (
     <div className="container py-8 px-4 sm:px-6 relative">
@@ -347,20 +344,23 @@ export default function BookingConfirmationClientPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Game:</span>
-                  <span>{ticketDetails?.[0]?.game_name || bookingDetails?.game_name || "N/A"}</span>
+                  <span>{ticketDetails?.[0]?.slot_title || ticketDetails?.[0]?.custom_title || ticketDetails?.[0]?.game_name || bookingDetails?.slot_title || bookingDetails?.custom_title || bookingDetails?.game_name || "N/A"}</span>
                 </div>
               </div>
             </div>
 
             <div className="text-center p-6 bg-green-50/50 rounded-lg">
               <p className="text-lg text-gray-700">
-                We've sent a confirmation email with all the details to your registered email address.
+                We've sent a booking confirmation email with all the details to your registered email address.
+              </p>
+              <p className="mt-2 text-gray-600">
+                🎫 <strong>Your tickets have also been sent separately</strong> - check your email for the ticket details with QR codes!
               </p>
               <p className="mt-2 text-gray-600">
                 Please save your booking reference: <span className="font-bold text-green-700">{ticketDetails?.[0]?.booking_ref || bookingDetails?.booking_ref || "N/A"}</span>
               </p>
-              <Button 
-                onClick={() => setShowTicket(!showTicket)} 
+              <Button
+                onClick={() => setShowTicket(!showTicket)}
                 className="mt-4 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
               >
                 <Ticket className="mr-2 h-4 w-4" />
@@ -391,14 +391,15 @@ export default function BookingConfirmationClientPage() {
                 <div className="flex">
                   {/* QR Code Section - Left */}
                   <div className="w-1/3 p-4 flex flex-col items-center justify-center border-r border-gray-200">
-                    <QRCodeCanvas 
+                    <QRCodeCanvas
                       value={JSON.stringify({
                         ref: ticketDetails?.[0]?.booking_ref || bookingDetails?.booking_ref || "",
                         id: ticketDetails?.[0]?.booking_id || bookingDetails?.booking_id || 0,
                         name: ticketDetails?.[0]?.child_name || bookingDetails?.child_name || "",
-                        game: ticketDetails?.[0]?.game_name || bookingDetails?.game_name || ""
-                      })} 
-                      size={120} 
+                        game: ticketDetails?.[0]?.custom_title || ticketDetails?.[0]?.game_name || bookingDetails?.custom_title || bookingDetails?.game_name || "",
+                        slot_id: ticketDetails?.[0]?.event_game_slot_id || ticketDetails?.[0]?.booking_game_id || 0
+                      })}
+                      size={120}
                       level="H"
                       includeMargin={true}
                     />
@@ -418,15 +419,19 @@ export default function BookingConfirmationClientPage() {
                         <div className="font-medium">
                           {ticketDetails ? (
                             <div className="flex flex-col gap-1">
-                              {ticketDetails.map((ticket, index) => (
-                                <div key={index} className="flex items-center gap-1">
-                                  <span>{ticket.game_name}</span>
+                              {/* Show only one slot per booking_game_id to display actual booked slots */}
+                              {Array.from(new Map(ticketDetails.map(ticket => [
+                                ticket.booking_game_id,
+                                ticket
+                              ])).values()).map((ticket, index) => (
+                                <div key={ticket.booking_game_id || index} className="flex items-center gap-1">
+                                  <span>{ticket.slot_title || ticket.custom_title || ticket.game_name || "Game"}</span>
                                   <span className="text-xs text-gray-500">(₹{ticket.game_price})</span>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            bookingDetails?.game_name || "N/A"
+                            bookingDetails?.slot_title || bookingDetails?.custom_title || bookingDetails?.game_name || "N/A"
                           )}
                         </div>
                       </div>
