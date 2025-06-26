@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Save, Upload, Mail } from "lucide-react"
+import { Save, Upload, Mail, Edit, X } from "lucide-react"
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -30,6 +30,8 @@ export default function SettingsPage() {
   const [generalSettingId, setGeneralSettingId] = useState<number | undefined>(undefined)
   const [isSavingGeneralSetting, setIsSavingGeneralSetting] = useState(false)
   const [isLoadingGeneralSetting, setIsLoadingGeneralSetting] = useState(true)
+  const [isEditingGeneral, setIsEditingGeneral] = useState(false)
+  const [generalSettingsExist, setGeneralSettingsExist] = useState(false)
 
   // Refs for file inputs
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -95,6 +97,11 @@ export default function SettingsPage() {
           setLogo(data.logo || null)
           setFavicon(data.favicon || null)
           setGeneralSettingId(data.id)
+          setGeneralSettingsExist(true)
+          setIsEditingGeneral(false)
+        } else {
+          setGeneralSettingsExist(false)
+          setIsEditingGeneral(true)
         }
       } catch (error: any) {
         console.error("Failed to fetch general settings:", error)
@@ -110,6 +117,43 @@ export default function SettingsPage() {
 
     fetchGeneralSetting()
   }, [])
+
+  // Handle edit general settings
+  const handleEditGeneralSettings = () => {
+    setIsEditingGeneral(true)
+  }
+
+  // Handle cancel general editing
+  const handleCancelGeneralEdit = async () => {
+    setIsEditingGeneral(false)
+
+    // Reset form to original values
+    if (generalSettingsExist) {
+      try {
+        const data = await getGeneralSetting()
+        if (data) {
+          setSiteName(data.site_name)
+          setSiteTagline(data.site_tagline)
+          setContactEmail(data.contact_email)
+          setContactPhone(data.contact_phone)
+          setAddress(data.address)
+          setLogo(data.logo || null)
+          setFavicon(data.favicon || null)
+        }
+      } catch (error) {
+        console.error("Failed to reset general settings:", error)
+      }
+    } else {
+      // Reset to default values if no settings exist
+      setSiteName("NIBOG - New India Baby Olympics Games")
+      setSiteTagline("India's Biggest Baby Games")
+      setContactEmail("info@nibog.in")
+      setContactPhone("+91 9876543210")
+      setAddress("Gachibowli Indoor Stadium, Hyderabad, Telangana 500032")
+      setLogo(null)
+      setFavicon(null)
+    }
+  }
 
   // Social media settings
   const [facebook, setFacebook] = useState("https://facebook.com/nibog")
@@ -286,7 +330,98 @@ export default function SettingsPage() {
                   <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   <p className="text-sm text-muted-foreground">Loading general settings...</p>
                 </div>
+              ) : !isEditingGeneral ? (
+                /* Display Mode */
+                <>
+                  {generalSettingsExist ? (
+                    <div className="space-y-6">
+                      {/* Basic Information Display */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Basic Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Site Name</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{siteName || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Site Tagline</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{siteTagline || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Contact Email</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{contactEmail || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Contact Phone</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{contactPhone || "Not configured"}</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+                          <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md">{address || "Not configured"}</p>
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* Media Assets Display */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Media Assets</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Logo</Label>
+                            <div className="bg-muted px-3 py-2 rounded-md">
+                              <img
+                                src={logo || "/placeholder.svg?height=50&width=200&text=NIBOG+Logo"}
+                                alt="NIBOG Logo"
+                                className="h-12 w-auto object-contain"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Favicon</Label>
+                            <div className="bg-muted px-3 py-2 rounded-md">
+                              <img
+                                src={favicon || "/placeholder.svg?height=32&width=32&text=N"}
+                                alt="NIBOG Favicon"
+                                className="h-8 w-8 object-contain"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit Button */}
+                      <div className="flex justify-end pt-4">
+                        <Button onClick={handleEditGeneralSettings} variant="outline">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit General Settings
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* No Settings Configured */
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="text-center space-y-4">
+                        <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                          <Edit className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">No General Settings Configured</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Configure your basic platform settings to get started
+                          </p>
+                        </div>
+                        <Button onClick={handleEditGeneralSettings} variant="outline">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Configure General Settings
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
+                /* Edit Mode */
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="site-name">Site Name</Label>
@@ -386,58 +521,70 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-          <div className="flex justify-end">
-            <Button
-              onClick={async () => {
-                try {
-                  setIsSavingGeneralSetting(true)
+          {isEditingGeneral && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleCancelGeneralEdit}
+                disabled={isSavingGeneralSetting}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    setIsSavingGeneralSetting(true)
 
-                  const generalSettingData = {
-                    id: generalSettingId,
-                    site_name: siteName,
-                    site_tagline: siteTagline,
-                    contact_email: contactEmail,
-                    contact_phone: contactPhone,
-                    address: address,
-                    logo: logo || undefined,
-                    favicon: favicon || undefined
-                  }
+                    const generalSettingData = {
+                      id: generalSettingId,
+                      site_name: siteName,
+                      site_tagline: siteTagline,
+                      contact_email: contactEmail,
+                      contact_phone: contactPhone,
+                      address: address,
+                      logo: logo || undefined,
+                      favicon: favicon || undefined
+                    }
 
-                  const result = await saveGeneralSetting(generalSettingData)
+                    const result = await saveGeneralSetting(generalSettingData)
 
-                  if (result && result.id) {
-                    setGeneralSettingId(result.id)
+                    if (result && result.id) {
+                      setGeneralSettingId(result.id)
+                      setGeneralSettingsExist(true)
+                      setIsEditingGeneral(false)
+                      toast({
+                        title: "Success",
+                        description: "General settings saved successfully",
+                      })
+                    }
+                  } catch (error: any) {
+                    console.error("Failed to save general settings:", error)
                     toast({
-                      title: "Success",
-                      description: "General settings saved successfully",
+                      title: "Error",
+                      description: error.message || "Failed to save general settings",
+                      variant: "destructive",
                     })
+                  } finally {
+                    setIsSavingGeneralSetting(false)
                   }
-                } catch (error: any) {
-                  console.error("Failed to save general settings:", error)
-                  toast({
-                    title: "Error",
-                    description: error.message || "Failed to save general settings",
-                    variant: "destructive",
-                  })
-                } finally {
-                  setIsSavingGeneralSetting(false)
-                }
-              }}
-              disabled={isSavingGeneralSetting}
-            >
-              {isSavingGeneralSetting ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
+                }}
+                disabled={isSavingGeneralSetting}
+              >
+                {isSavingGeneralSetting ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* Social Media Settings */}

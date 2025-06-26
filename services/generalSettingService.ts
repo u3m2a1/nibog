@@ -21,8 +21,8 @@ export async function saveGeneralSetting(generalSettingData: GeneralSetting): Pr
   console.log("Saving general settings:", generalSettingData);
 
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/generalsetting/create', {
+    // Use the external API directly
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/generalsetting/create', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -57,8 +57,8 @@ export async function getGeneralSetting(): Promise<GeneralSetting | null> {
   console.log("Fetching general settings");
 
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/generalsetting/get', {
+    // Use the external API directly
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/generalsetting/get', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -70,12 +70,12 @@ export async function getGeneralSetting(): Promise<GeneralSetting | null> {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Error response: ${errorText}`);
-      
+
       // If 404, return null instead of throwing an error
       if (response.status === 404) {
         return null;
       }
-      
+
       throw new Error(`API returned error status: ${response.status}`);
     }
 
