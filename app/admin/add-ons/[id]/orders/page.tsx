@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Search, Filter, Eye, CheckCircle, XCircle, Clock } from "lucide-react"
-import { addOns } from "@/data/add-ons"
+import { getAddOnById } from "@/services/addOnService"
 import { formatPrice } from "@/lib/utils"
 
 type Props = {
@@ -79,15 +79,36 @@ const mockOrders = [
 export default function AddOnOrdersPage({ params }: Props) {
   const router = useRouter()
   
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const addOnId = unwrappedParams.id
+  // Get the ID from params
+  const addOnId = params.id
   
-  const addOn = addOns.find((a) => a.id === addOnId)
-  
+  // State for add-on data and loading states
+  const [addOn, setAddOn] = useState<any | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [orders, setOrders] = useState(mockOrders)
+  
+  // Fetch add-on data when component mounts or ID changes
+  useEffect(() => {
+    async function loadAddOnData() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Try to get add-on data using the service
+        const data = await getAddOnById(addOnId);
+        setAddOn(data);
+      } catch (err: any) {
+        console.error('Error fetching add-on data:', err);
+        setError(err.message || 'Failed to load add-on data');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    loadAddOnData();
+  }, [addOnId])
 
   const handleUpdateStatus = (orderId: string, newStatus: "pending" | "fulfilled" | "cancelled") => {
     setOrders(orders.map(order => 
@@ -107,12 +128,25 @@ export default function AddOnOrdersPage({ params }: Props) {
     return matchesSearch && matchesStatus
   })
 
-  if (!addOn) {
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Loading...</h2>
+          <p className="text-muted-foreground">Fetching add-on data</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !addOn) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Add-on Not Found</h2>
-          <p className="text-muted-foreground">The add-on you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">{error || "The add-on you're looking for doesn't exist or has been removed."}</p>
           <Button className="mt-4" asChild>
             <Link href="/admin/add-ons">Back to Add-ons</Link>
           </Button>

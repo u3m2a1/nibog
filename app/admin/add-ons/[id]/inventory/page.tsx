@@ -11,6 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Minus, Save, Package } from "lucide-react"
 import { addOns } from "@/data/add-ons"
+import { getAddOnById } from "@/services/addOnService"
+// Import AddOn type from service to ensure compatibility
+import { AddOn as ServiceAddOn } from "@/services/addOnService"
 import { AddOn } from "@/types"
 
 type Props = {
@@ -20,12 +23,13 @@ type Props = {
 export default function AddOnInventoryPage({ params }: Props) {
   const router = useRouter()
   
-  // Unwrap params using React.use()
-  const unwrappedParams = use(params)
-  const addOnId = unwrappedParams.id
+  // Get the ID from params
+  const addOnId = params.id
   
-  const addOnData = addOns.find((a) => a.id === addOnId)
-  
+  // State for add-on data and loading states
+  const [addOnData, setAddOnData] = useState<any | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [stockQuantity, setStockQuantity] = useState(0)
   const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
   const [isSaved, setIsSaved] = useState(false)
@@ -61,22 +65,49 @@ export default function AddOnInventoryPage({ params }: Props) {
   const [adjustmentNotes, setAdjustmentNotes] = useState("")
   const [selectedVariantId, setSelectedVariantId] = useState("")
 
+  // Fetch add-on data when component mounts or ID changes
   useEffect(() => {
-    if (addOnData) {
-      if (addOnData.hasVariants && addOnData.variants) {
-        const initialVariantStocks: Record<string, number> = {}
-        addOnData.variants.forEach(variant => {
-          initialVariantStocks[variant.id] = variant.stockQuantity
-        })
-        setVariantStocks(initialVariantStocks)
-        if (addOnData.variants.length > 0) {
-          setSelectedVariantId(addOnData.variants[0].id)
+    async function loadAddOnData() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // Try to get add-on data using the service
+        const data = await getAddOnById(addOnId);
+        setAddOnData(data);
+        
+        // Access properties with type safety
+        const hasVariants = Boolean(data.hasVariants || data.has_variants);
+        const variants = data.variants || [];
+        
+        // Initialize stock quantities
+        if (hasVariants && variants.length > 0) {
+          const initialVariantStocks: Record<string, number> = {};
+          data.variants.forEach((variant: any) => {
+            // Handle both stockQuantity and stock_quantity property names
+            const variantId = String(variant.id || ''); // Ensure ID is a string
+            initialVariantStocks[variantId] = variant.stockQuantity || variant.stock_quantity || 0;
+          });
+          setVariantStocks(initialVariantStocks);
+          if (data.variants.length > 0) {
+            const firstVariantId = String(data.variants[0].id || '');
+            setSelectedVariantId(firstVariantId);
+          }
+        } else {
+          // Handle both stockQuantity and stock_quantity property names
+          const stockQty = typeof data.stockQuantity !== 'undefined' ? data.stockQuantity : 
+                          typeof data.stock_quantity !== 'undefined' ? data.stock_quantity : 0;
+          setStockQuantity(stockQty);
         }
-      } else {
-        setStockQuantity(addOnData.stockQuantity || 0)
+      } catch (err: any) {
+        console.error('Error fetching add-on data:', err);
+        setError(err.message || 'Failed to load add-on data');
+      } finally {
+        setIsLoading(false);
       }
     }
-  }, [addOnData])
+    
+    loadAddOnData();
+  }, [addOnId])
 
   const handleStockAdjustment = () => {
     if (adjustmentQuantity <= 0 || !adjustmentNotes.trim()) {
@@ -119,7 +150,7 @@ export default function AddOnInventoryPage({ params }: Props) {
     // In a real app, this would be an API call to update inventory
     console.log("Saving inventory changes:", {
       addOnId,
-      hasVariants: addOnData?.hasVariants,
+      hasVariants: addOnData?.hasVariants || addOnData?.has_variants,
       stockQuantity,
       variantStocks
     })
@@ -132,12 +163,25 @@ export default function AddOnInventoryPage({ params }: Props) {
     }, 1500)
   }
 
-  if (!addOnData) {
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-[400px] items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">Loading...</h2>
+          <p className="text-muted-foreground">Fetching add-on inventory data</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !addOnData) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold">Add-on Not Found</h2>
-          <p className="text-muted-foreground">The add-on you're looking for doesn't exist or has been removed.</p>
+          <p className="text-muted-foreground">{error || "The add-on you're looking for doesn't exist or has been removed."}</p>
           <Button className="mt-4" asChild>
             <Link href="/admin/add-ons">Back to Add-ons</Link>
           </Button>
@@ -167,13 +211,13 @@ export default function AddOnInventoryPage({ params }: Props) {
             <CardHeader>
               <CardTitle>Current Inventory</CardTitle>
               <CardDescription>
-                {addOnData.hasVariants 
+                {(addOnData.hasVariants || addOnData.has_variants) 
                   ? "Manage inventory for each variant" 
                   : "Manage inventory for this add-on"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {addOnData.hasVariants && addOnData.variants ? (
+              {(addOnData.hasVariants || addOnData.has_variants) && addOnData.variants && addOnData.variants.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -184,8 +228,8 @@ export default function AddOnInventoryPage({ params }: Props) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {addOnData.variants.map((variant) => (
-                      <TableRow key={variant.id}>
+                    {addOnData.variants.map((variant: any) => (
+                      <TableRow key={String(variant.id || '')}>
                         <TableCell className="font-medium">{variant.name}</TableCell>
                         <TableCell>{variant.sku}</TableCell>
                         <TableCell>
@@ -296,7 +340,7 @@ export default function AddOnInventoryPage({ params }: Props) {
               <CardDescription>Add or remove stock</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {addOnData.hasVariants && addOnData.variants && (
+              {(addOnData.hasVariants || addOnData.has_variants) && addOnData.variants && (
                 <div className="space-y-2">
                   <Label htmlFor="variant">Select Variant</Label>
                   <select
@@ -305,7 +349,7 @@ export default function AddOnInventoryPage({ params }: Props) {
                     onChange={(e) => setSelectedVariantId(e.target.value)}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
-                    {addOnData.variants.map((variant) => (
+                    {addOnData.variants.map((variant: any) => (
                       <option key={variant.id} value={variant.id}>
                         {variant.name} ({variant.sku})
                       </option>
