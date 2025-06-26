@@ -205,12 +205,7 @@ const EventCard = memo(({ event }: { event: EventListItem }) => {
               {event.venue}, {event.city}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <Badge variant="outline">
-              Age: {event.minAgeMonths}-{event.maxAgeMonths} months
-            </Badge>
-            <span className="font-medium">{formatPrice(event.price)}</span>
-          </div>
+
         </div>
       </CardContent>
       <CardFooter className="flex items-center justify-between border-t bg-muted/50 p-4">
