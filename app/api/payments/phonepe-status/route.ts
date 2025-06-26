@@ -567,13 +567,14 @@ export async function POST(request: Request) {
                 if (ticketDetails && ticketDetails.length > 0) {
                   console.log(`🎫 Retrieved ${ticketDetails.length} ticket details`);
 
-                  // Prepare QR code data
+                  // Prepare QR code data (same format as booking confirmation page)
+                  const firstTicket = ticketDetails[0];
                   const qrCodeData = JSON.stringify({
                     ref: bookingRef,
                     id: bookingId,
-                    name: bookingData?.childName || 'Child',
-                    event: bookingData?.eventTitle || 'NIBOG Event',
-                    booking_id: bookingId
+                    name: firstTicket.child_name || firstTicket.child_full_name || bookingData?.childName || 'Child',
+                    game: firstTicket.custom_title || firstTicket.event_title || firstTicket.game_name || bookingData?.eventTitle || 'NIBOG Event',
+                    slot_id: firstTicket.event_game_slot_id || firstTicket.booking_game_id || 0
                   });
 
                   // Prepare ticket email data

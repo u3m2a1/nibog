@@ -56,10 +56,14 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
     // Generate ticket HTML content
     const htmlContent = await generateTicketHTML(ticketData);
 
-    console.log(`🎫 HTML content generated with embedded QR code, sending ticket email...`);
+    console.log(`🎫 HTML content generated, preparing QR code attachment for email...`);
 
-    // Send email using regular email API since QR code is now embedded in HTML
-    const emailResponse = await fetch('http://localhost:3000/api/send-receipt-email', {
+    // Generate QR code as buffer for attachment
+    const qrCodeBuffer = await generateQRCodeBuffer(ticketData.qrCodeData);
+    console.log('🎫 QR code buffer generated, size:', qrCodeBuffer.length, 'bytes');
+
+    // Send email using attachment API for better email client compatibility
+    const emailResponse = await fetch('http://localhost:3000/api/send-ticket-email-with-attachment', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +72,9 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
         to: ticketData.parentEmail,
         subject: `🎫 Your Tickets - ${ticketData.eventTitle} | NIBOG`,
         html: htmlContent,
-        settings: settings
+        settings: settings,
+        qrCodeBuffer: Array.from(qrCodeBuffer),
+        bookingRef: ticketData.bookingRef
       }),
     });
 
@@ -97,9 +103,9 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
  * Generate HTML content for ticket email with QR code
  */
 async function generateTicketHTML(ticketData: TicketEmailData): Promise<string> {
-  // Generate QR code as base64 data URL directly in the HTML for better email client compatibility
-  console.log('🎫 Generating ticket HTML with embedded QR code');
-  const qrCodeDataURL = await generateQRCodeDataURL(ticketData.qrCodeData);
+  // Use placeholder for QR code that will be replaced with CID reference for attachment
+  console.log('🎫 Generating ticket HTML with QR code placeholder');
+  const qrCodePlaceholder = 'data:image/png;base64,placeholder';
   
   // Generate ticket details HTML
   const ticketDetailsHtml = ticketData.ticketDetails.map((ticket, index) => {
@@ -133,7 +139,7 @@ async function generateTicketHTML(ticketData: TicketEmailData): Promise<string> 
         </div>
         <div style="text-align: center; margin-left: 20px;">
           <div style="background: white; padding: 10px; border: 1px solid #ddd; border-radius: 8px; display: inline-block;">
-            <img src="${qrCodeDataURL}" width="200" height="200" alt="QR Code for ${ticketData.bookingRef}" style="display: block; max-width: 200px; max-height: 200px; border: none;" />
+            <img src="${qrCodePlaceholder}" width="200" height="200" alt="QR Code for ${ticketData.bookingRef}" style="display: block; max-width: 200px; max-height: 200px; border: none;" />
           </div>
           <p style="margin: 8px 0 0 0; font-size: 12px; color: #666; font-weight: bold;">📱 Scan this QR code at the venue</p>
           <p style="margin: 4px 0 0 0; font-size: 10px; color: #999;">Booking: ${ticketData.bookingRef}</p>
@@ -237,33 +243,101 @@ async function generateTicketHTML(ticketData: TicketEmailData): Promise<string> 
 }
 
 /**
- * Generate QR Code as base64 data URL using the qrcode library
+ * Generate QR Code as buffer for email attachment
+ */
+async function generateQRCodeBuffer(data: string): Promise<Buffer> {
+  try {
+    console.log('🎫 Generating QR code buffer for data:', data);
+    const qrCodeBuffer = await QRCode.toBuffer(data, {
+      width: 200,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      errorCorrectionLevel: 'M'
+    });
+    console.log('🎫 QR code buffer generated successfully, size:', qrCodeBuffer.length);
+    return qrCodeBuffer;
+  } catch (error) {
+    console.error('🎫 Error generating QR code buffer:', error);
+    console.error('🎫 QR code error details:', error.message);
+    console.error('🎫 QR code data that failed:', data);
+
+    // Try with simpler data as fallback
+    try {
+      console.log('🎫 Attempting QR code buffer generation with simpler data...');
+      const simpleData = `NIBOG-${Date.now()}`;
+      const fallbackBuffer = await QRCode.toBuffer(simpleData, {
+        width: 200,
+        margin: 2,
+        errorCorrectionLevel: 'L'
+      });
+      console.log('🎫 Fallback QR code buffer generated successfully');
+      return fallbackBuffer;
+    } catch (fallbackError) {
+      console.error('🎫 Fallback QR code buffer also failed:', fallbackError);
+
+      // Create a minimal PNG buffer as final fallback
+      const fallbackPng = Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+        0x00, 0x00, 0x00, 0xC8, 0x00, 0x00, 0x00, 0xC8, // 200x200 dimensions
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x4C, 0x8D, 0x87, 0x29 // rest of minimal PNG
+      ]);
+      console.log('🎫 Using minimal PNG buffer as final fallback');
+      return fallbackPng;
+    }
+  }
+}
+
+/**
+ * Generate QR Code as base64 data URL using the qrcode library (legacy function)
  */
 async function generateQRCodeDataURL(data: string): Promise<string> {
   try {
     console.log('🎫 Generating QR code for data:', data);
     const qrCodeDataURL = await QRCode.toDataURL(data, {
-      width: 120,
+      width: 200,
       margin: 2,
       color: {
         dark: '#000000',
         light: '#FFFFFF'
-      }
+      },
+      errorCorrectionLevel: 'M'
     });
     console.log('🎫 QR code generated successfully, length:', qrCodeDataURL.length);
     console.log('🎫 QR code starts with:', qrCodeDataURL.substring(0, 50));
     return qrCodeDataURL;
   } catch (error) {
     console.error('🎫 Error generating QR code:', error);
-    // Fallback to a simple placeholder that should definitely work
-    const fallbackSvg = `<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <rect width="120" height="120" fill="white" stroke="#ddd" stroke-width="2"/>
-        <rect x="20" y="20" width="80" height="80" fill="none" stroke="#333" stroke-width="2"/>
-        <text x="60" y="65" text-anchor="middle" font-size="12" fill="#333">QR CODE</text>
-        <text x="60" y="80" text-anchor="middle" font-size="8" fill="#666">PLACEHOLDER</text>
-      </svg>`;
-    const fallbackDataURL = 'data:image/svg+xml;base64,' + Buffer.from(fallbackSvg).toString('base64');
-    console.log('🎫 Using fallback QR code placeholder');
-    return fallbackDataURL;
+    console.error('🎫 QR code error details:', error.message);
+    console.error('🎫 QR code data that failed:', data);
+
+    // Try with simpler data as fallback
+    try {
+      console.log('🎫 Attempting QR code generation with simpler data...');
+      const simpleData = `NIBOG-${Date.now()}`;
+      const fallbackQR = await QRCode.toDataURL(simpleData, {
+        width: 200,
+        margin: 2,
+        errorCorrectionLevel: 'L'
+      });
+      console.log('🎫 Fallback QR code generated successfully');
+      return fallbackQR;
+    } catch (fallbackError) {
+      console.error('🎫 Fallback QR code also failed:', fallbackError);
+
+      // Final fallback to SVG placeholder
+      const fallbackSvg = `<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <rect width="200" height="200" fill="white" stroke="#ddd" stroke-width="2"/>
+          <rect x="20" y="20" width="160" height="160" fill="none" stroke="#333" stroke-width="2"/>
+          <text x="100" y="95" text-anchor="middle" font-size="16" fill="#333">QR CODE</text>
+          <text x="100" y="115" text-anchor="middle" font-size="12" fill="#666">PLACEHOLDER</text>
+        </svg>`;
+      const fallbackDataURL = 'data:image/svg+xml;base64,' + Buffer.from(fallbackSvg).toString('base64');
+      console.log('🎫 Using SVG fallback QR code placeholder');
+      return fallbackDataURL;
+    }
   }
 }

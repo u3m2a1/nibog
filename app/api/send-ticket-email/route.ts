@@ -42,13 +42,13 @@ export async function POST(request: Request) {
 
     const firstTicket = ticketDetails[0];
 
-    // Prepare QR code data
+    // Prepare QR code data (same format as booking confirmation page)
     const qrCodeData = JSON.stringify({
       ref: bookingRef,
       id: firstTicket.booking_id,
-      name: firstTicket.child_name || 'Child',
-      event: firstTicket.event_title || 'NIBOG Event',
-      booking_id: firstTicket.booking_id
+      name: firstTicket.child_name || firstTicket.child_full_name || 'Child',
+      game: firstTicket.custom_title || firstTicket.event_title || firstTicket.game_name || 'NIBOG Event',
+      slot_id: firstTicket.event_game_slot_id || firstTicket.booking_game_id || 0
     });
 
     // Prepare ticket email data using available TicketDetails properties

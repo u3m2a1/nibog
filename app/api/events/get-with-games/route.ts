@@ -4,7 +4,7 @@ export async function POST(request: Request) {
   try {
     // Parse the request body
     const data = await request.json();
-    const eventId = data.id;
+    const eventId = data.eventId || data.id;
     
     if (!eventId || isNaN(Number(eventId)) || Number(eventId) <= 0) {
       return NextResponse.json(

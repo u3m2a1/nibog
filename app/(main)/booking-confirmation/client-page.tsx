@@ -146,6 +146,12 @@ export default function BookingConfirmationClientPage() {
           
           if (ticketData && ticketData.length > 0) {
             console.log("Successfully fetched ticket details from API:", ticketData)
+            console.log("Venue information in ticket data:", {
+              venue_name: ticketData[0]?.venue_name,
+              venue_address: ticketData[0]?.venue_address,
+              city_name: ticketData[0]?.city_name,
+              state: ticketData[0]?.state
+            })
             setTicketDetails(ticketData)
             // Store the first ticket as the booking details for display
             if (ticketData[0]) {
@@ -463,7 +469,22 @@ export default function BookingConfirmationClientPage() {
                       
                       <div>
                         <div className="text-gray-500 uppercase text-xs">VENUE</div>
-                        <div className="font-medium">Main Stadium</div>
+                        <div className="font-medium">
+                          {ticketDetails?.[0]?.venue_name || bookingDetails?.venue_name || "Event Venue"}
+                        </div>
+                        {(ticketDetails?.[0]?.venue_address || bookingDetails?.venue_address) && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            {ticketDetails?.[0]?.venue_address || bookingDetails?.venue_address}
+                          </div>
+                        )}
+                        {(ticketDetails?.[0]?.city_name || bookingDetails?.city_name) && (
+                          <div className="text-xs text-gray-400">
+                            {ticketDetails?.[0]?.city_name || bookingDetails?.city_name}
+                            {(ticketDetails?.[0]?.state || bookingDetails?.state) &&
+                              `, ${ticketDetails?.[0]?.state || bookingDetails?.state}`
+                            }
+                          </div>
+                        )}
                       </div>
                       
                       <div>

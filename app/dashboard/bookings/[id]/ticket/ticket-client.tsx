@@ -2,45 +2,20 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Calendar, Clock, MapPin, Baby, Download, ArrowLeft, QrCode } from "lucide-react"
-
-type BookingType = {
-  id: string
-  eventName: string
-  description: string
-  venue: {
-    name: string
-    address: string
-    city: string
-  }
-  date: string
-  time: string
-  child: {
-    name: string
-    dob: string
-    ageAtEvent: string
-  }
-  status: string
-  price: number
-  bookingDate: string
-  paymentStatus: string
-  ticketCode: string
-  qrCode: string
-  instructions: string
-}
+import { Calendar, Clock, MapPin, Baby, Download, ArrowLeft } from "lucide-react"
+import { QRCodeCanvas } from "qrcode.react"
 
 type TicketClientProps = {
-  booking: BookingType
+  bookingData: any // Real booking data from API
   id: string
 }
 
-export default function TicketClient({ booking, id }: TicketClientProps) {
+export default function TicketClient({ bookingData, id }: TicketClientProps) {
   const [isPrinting, setIsPrinting] = useState(false)
-  
+
   // Handle print ticket
   const handlePrintTicket = () => {
     setIsPrinting(true)
@@ -48,7 +23,7 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
     setTimeout(() => setIsPrinting(false), 1000)
   }
 
-  if (!booking) {
+  if (!bookingData) {
     return (
       <div className="container flex h-[400px] items-center justify-center py-8">
         <div className="text-center">
@@ -60,6 +35,42 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
         </div>
       </div>
     )
+  }
+
+  // Generate QR code data
+  const qrCodeData = JSON.stringify({
+    ref: bookingData.booking_ref || id,
+    id: bookingData.booking_id || id,
+    name: bookingData.child_full_name || bookingData.child_name || 'Child',
+    event: bookingData.event_title || bookingData.game_name || 'NIBOG Event',
+    booking_id: bookingData.booking_id || id
+  })
+
+  // Format date and time
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'TBD'
+    try {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return 'TBD'
+    try {
+      return new Date(timeString).toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    } catch {
+      return timeString
+    }
   }
 
   return (
@@ -74,7 +85,7 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Event Ticket</h1>
           <p className="text-muted-foreground">
-            Booking ID: {booking.id} | {booking.eventName}
+            Booking ID: {bookingData.booking_ref || bookingData.booking_id || id} | {bookingData.event_title || bookingData.game_name || 'NIBOG Event'}
           </p>
         </div>
       </div>
@@ -86,12 +97,14 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
           </div>
           <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
             <div>
-              <CardTitle className="text-2xl">{booking.eventName}</CardTitle>
-              <p className="text-muted-foreground">Booking ID: {booking.id}</p>
+              <CardTitle className="text-2xl">{bookingData.event_title || bookingData.game_name || 'NIBOG Event'}</CardTitle>
+              <p className="text-muted-foreground">Booking ID: {bookingData.booking_ref || bookingData.booking_id || id}</p>
             </div>
             <div className="text-right">
-              <p className="font-medium">Status: Confirmed</p>
-              <p className="text-sm text-muted-foreground">Booked on {booking.bookingDate}</p>
+              <p className="font-medium">Status: {bookingData.booking_status || bookingData.status || 'Confirmed'}</p>
+              <p className="text-sm text-muted-foreground">
+                Booked on {formatDate(bookingData.booking_created_at || bookingData.created_at)}
+              </p>
             </div>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
@@ -102,7 +115,9 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
                     <Calendar className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Date</p>
-                      <p className="text-sm text-muted-foreground">{booking.date}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(bookingData.event_event_date || bookingData.event_date)}
+                      </p>
                     </div>
                   </div>
 
@@ -110,7 +125,12 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
                     <Clock className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Time</p>
-                      <p className="text-sm text-muted-foreground">{booking.time}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {bookingData.start_time && bookingData.end_time
+                          ? `${formatTime(bookingData.start_time)} - ${formatTime(bookingData.end_time)}`
+                          : 'Time TBD'
+                        }
+                      </p>
                     </div>
                   </div>
 
@@ -118,9 +138,15 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
                     <MapPin className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Venue</p>
-                      <p className="text-sm text-muted-foreground">{booking.venue.name}</p>
-                      <p className="text-xs text-muted-foreground">{booking.venue.address}</p>
-                      <p className="text-xs text-muted-foreground">{booking.venue.city}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {bookingData.venue_name || 'NIBOG Venue'}
+                      </p>
+                      {bookingData.venue_address && (
+                        <p className="text-xs text-muted-foreground">{bookingData.venue_address}</p>
+                      )}
+                      {bookingData.city_name && (
+                        <p className="text-xs text-muted-foreground">{bookingData.city_name}, {bookingData.city_state}</p>
+                      )}
                     </div>
                   </div>
 
@@ -128,8 +154,19 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
                     <Baby className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Child</p>
-                      <p className="text-sm text-muted-foreground">{booking.child.name}</p>
-                      <p className="text-xs text-muted-foreground">Age at event: {booking.child.ageAtEvent}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {bookingData.child_full_name || 'Child'}
+                      </p>
+                      {bookingData.child_date_of_birth && (
+                        <p className="text-xs text-muted-foreground">
+                          DOB: {formatDate(bookingData.child_date_of_birth)}
+                        </p>
+                      )}
+                      {bookingData.child_gender && (
+                        <p className="text-xs text-muted-foreground">
+                          Gender: {bookingData.child_gender}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -138,21 +175,38 @@ export default function TicketClient({ booking, id }: TicketClientProps) {
 
                 <div>
                   <h3 className="mb-2 font-medium">Important Information</h3>
-                  <p className="text-sm text-muted-foreground">{booking.instructions}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {bookingData.game_description || bookingData.event_description ||
+                     'Please arrive 15 minutes before the event starts. Parents must stay with their children throughout the event.'}
+                  </p>
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-green-600">
+                      Amount Paid: ₹{bookingData.total_amount || '0'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Payment Status: {bookingData.payment_status || 'Paid'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Payment Method: {bookingData.payment_method || 'Online'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
               <div className="flex flex-col items-center justify-center">
-                <div className="relative h-40 w-40 overflow-hidden rounded-md bg-white p-2">
-                  <Image
-                    src={booking.qrCode}
-                    alt="Ticket QR Code"
-                    fill
-                    className="object-contain"
+                <div className="relative h-40 w-40 overflow-hidden rounded-md bg-white p-2 border">
+                  <QRCodeCanvas
+                    value={qrCodeData}
+                    size={150}
+                    level="M"
+                    includeMargin={true}
+                    className="w-full h-full"
                   />
                 </div>
                 <p className="mt-2 text-center text-xs text-muted-foreground">Scan this QR code at the venue</p>
-                <p className="text-center text-xs font-medium">{booking.ticketCode}</p>
+                <p className="text-center text-xs font-medium">
+                  {bookingData.booking_ref || `NIBOG-${bookingData.booking_id || id}`}
+                </p>
               </div>
             </div>
           </CardContent>

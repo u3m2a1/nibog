@@ -314,6 +314,49 @@ export interface TicketDetails {
 
   // Additional fields that might be useful for slot identification
   // slot_id is now defined above in the slot details section
+
+  // Venue-related fields returned by the API
+  venue_id: number;
+  venue_name: string;
+  venue_address: string;
+  venue_capacity: number;
+  venue_active: boolean;
+  venue_created_at: string;
+  venue_updated_at: string;
+  event_city_id: number;
+  city_name: string;
+  state: string;
+}
+
+/**
+ * Get event details with venue information by event ID
+ * @param eventId Event ID
+ * @returns Promise with event details including venue information
+ */
+export async function getEventWithVenueDetails(eventId: number) {
+  try {
+    console.log('Fetching event details with venue information for event ID:', eventId);
+
+    const response = await fetch(`/api/events/get-with-games`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ eventId })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch event details: ${response.status}`);
+    }
+
+    const eventData = await response.json();
+    console.log('Event details with venue information:', eventData);
+
+    return eventData;
+  } catch (error) {
+    console.error('Error fetching event details with venue information:', error);
+    throw error;
+  }
 }
 
 /**
