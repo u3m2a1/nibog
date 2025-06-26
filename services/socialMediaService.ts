@@ -18,8 +18,8 @@ export async function saveSocialMedia(socialMediaData: SocialMedia): Promise<Soc
   console.log("Saving social media:", socialMediaData);
 
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/socialmedia/create', {
+    // Use the external API directly
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/socialmedia/create', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,8 +54,8 @@ export async function getSocialMedia(): Promise<SocialMedia | null> {
   console.log("Fetching social media");
 
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/socialmedia/get', {
+    // Use the external API directly
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/socialmedia/get', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

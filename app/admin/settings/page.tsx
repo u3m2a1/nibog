@@ -163,6 +163,8 @@ export default function SettingsPage() {
   const [socialMediaId, setSocialMediaId] = useState<number | undefined>(undefined)
   const [isSavingSocialMedia, setIsSavingSocialMedia] = useState(false)
   const [isLoadingSocialMedia, setIsLoadingSocialMedia] = useState(true)
+  const [isEditingSocialMedia, setIsEditingSocialMedia] = useState(false)
+  const [socialMediaSettingsExist, setSocialMediaSettingsExist] = useState(false)
 
   // Fetch social media settings when component mounts
   useEffect(() => {
@@ -177,6 +179,11 @@ export default function SettingsPage() {
           setTwitter(data.twitter_url)
           setYoutube(data.youtube_url)
           setSocialMediaId(data.id)
+          setSocialMediaSettingsExist(true)
+          setIsEditingSocialMedia(false)
+        } else {
+          setSocialMediaSettingsExist(false)
+          setIsEditingSocialMedia(true)
         }
       } catch (error: any) {
         console.error("Failed to fetch social media:", error)
@@ -192,6 +199,37 @@ export default function SettingsPage() {
 
     fetchSocialMedia()
   }, [])
+
+  // Handle edit social media settings
+  const handleEditSocialMediaSettings = () => {
+    setIsEditingSocialMedia(true)
+  }
+
+  // Handle cancel social media editing
+  const handleCancelSocialMediaEdit = async () => {
+    setIsEditingSocialMedia(false)
+
+    // Reset form to original values
+    if (socialMediaSettingsExist) {
+      try {
+        const data = await getSocialMedia()
+        if (data) {
+          setFacebook(data.facebook_url)
+          setInstagram(data.instagram_url)
+          setTwitter(data.twitter_url)
+          setYoutube(data.youtube_url)
+        }
+      } catch (error) {
+        console.error("Failed to reset social media settings:", error)
+      }
+    } else {
+      // Reset to default values if no settings exist
+      setFacebook("https://facebook.com/nibog")
+      setInstagram("https://instagram.com/nibog")
+      setTwitter("https://twitter.com/nibog")
+      setYoutube("https://youtube.com/nibog")
+    }
+  }
 
   // Email settings
   const [smtpHost, setSmtpHost] = useState("")
@@ -602,7 +640,65 @@ export default function SettingsPage() {
                   <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
                   <p className="text-sm text-muted-foreground">Loading social media settings...</p>
                 </div>
+              ) : !isEditingSocialMedia ? (
+                /* Display Mode */
+                <>
+                  {socialMediaSettingsExist ? (
+                    <div className="space-y-6">
+                      {/* Social Media Links Display */}
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Social Media Links</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Facebook</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md break-all">{facebook || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Instagram</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md break-all">{instagram || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Twitter</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md break-all">{twitter || "Not configured"}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">YouTube</Label>
+                            <p className="text-sm font-mono bg-muted px-3 py-2 rounded-md break-all">{youtube || "Not configured"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit Button */}
+                      <div className="flex justify-end pt-4">
+                        <Button onClick={handleEditSocialMediaSettings} variant="outline">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Social Media Settings
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* No Settings Configured */
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="text-center space-y-4">
+                        <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center">
+                          <Edit className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">No Social Media Settings Configured</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Configure your social media links to connect with your audience
+                          </p>
+                        </div>
+                        <Button onClick={handleEditSocialMediaSettings} variant="outline">
+                          <Edit className="mr-2 h-4 w-4" />
+                          Configure Social Media Settings
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
+                /* Edit Mode */
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="facebook">Facebook</Label>
@@ -640,55 +736,67 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-          <div className="flex justify-end">
-            <Button
-              onClick={async () => {
-                try {
-                  setIsSavingSocialMedia(true)
+          {isEditingSocialMedia && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleCancelSocialMediaEdit}
+                disabled={isSavingSocialMedia}
+              >
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  try {
+                    setIsSavingSocialMedia(true)
 
-                  const socialMediaData = {
-                    id: socialMediaId,
-                    facebook_url: facebook,
-                    instagram_url: instagram,
-                    twitter_url: twitter,
-                    youtube_url: youtube
-                  }
+                    const socialMediaData = {
+                      id: socialMediaId,
+                      facebook_url: facebook,
+                      instagram_url: instagram,
+                      twitter_url: twitter,
+                      youtube_url: youtube
+                    }
 
-                  const result = await saveSocialMedia(socialMediaData)
+                    const result = await saveSocialMedia(socialMediaData)
 
-                  if (result && result.id) {
-                    setSocialMediaId(result.id)
+                    if (result && result.id) {
+                      setSocialMediaId(result.id)
+                      setSocialMediaSettingsExist(true)
+                      setIsEditingSocialMedia(false)
+                      toast({
+                        title: "Success",
+                        description: "Social media settings saved successfully",
+                      })
+                    }
+                  } catch (error: any) {
+                    console.error("Failed to save social media:", error)
                     toast({
-                      title: "Success",
-                      description: "Social media settings saved successfully",
+                      title: "Error",
+                      description: error.message || "Failed to save social media settings",
+                      variant: "destructive",
                     })
+                  } finally {
+                    setIsSavingSocialMedia(false)
                   }
-                } catch (error: any) {
-                  console.error("Failed to save social media:", error)
-                  toast({
-                    title: "Error",
-                    description: error.message || "Failed to save social media settings",
-                    variant: "destructive",
-                  })
-                } finally {
-                  setIsSavingSocialMedia(false)
-                }
-              }}
-              disabled={isSavingSocialMedia}
-            >
-              {isSavingSocialMedia ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </div>
+                }}
+                disabled={isSavingSocialMedia}
+              >
+                {isSavingSocialMedia ? (
+                  <>
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* Email Settings */}
