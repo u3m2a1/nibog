@@ -246,6 +246,44 @@ export async function deleteAddOn(addOnId: number): Promise<{ success: boolean }
 }
 
 /**
+ * Upload images for add-ons
+ * @param files Array of files to upload
+ * @returns Promise with array of uploaded file URLs
+ */
+export async function uploadAddOnImages(files: File[]): Promise<string[]> {
+  try {
+    const formData = new FormData();
+
+    // Add all files to the form data
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+
+    const response = await fetch('/api/add-ons/upload-images', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to upload images');
+    }
+
+    const result = await response.json();
+
+    if (result && result.success && result.files) {
+      // Return array of URLs
+      return result.files.map((file: any) => file.url);
+    } else {
+      throw new Error(`Upload failed or no files in response. Response: ${JSON.stringify(result)}`);
+    }
+  } catch (error: any) {
+    console.error('Error uploading add-on images:', error);
+    throw error;
+  }
+}
+
+/**
  * Get all add-ons from external API
  * @returns Promise with array of add-ons
  */

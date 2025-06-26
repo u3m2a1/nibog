@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft, Plus, Trash, X, Upload, Edit, Loader2, AlertTriangle, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getAddOnById, updateAddOn, AddOn, UpdateAddOnRequest } from "@/services/addOnService"
+import { getAddOnById, updateAddOn, AddOn, UpdateAddOnRequest, uploadAddOnImages } from "@/services/addOnService"
 
 interface AddOnVariant {
   id: string;
@@ -152,7 +152,7 @@ export default function EditAddOnPage({ params }: Props) {
     setVariants(variants.filter(v => v.id !== id))
   }
 
-  const handleAddImage = () => {
+  const handleAddImage = async () => {
     console.log('🔄 Add Image clicked in edit page');
     console.log('📷 Current images:', images);
 
@@ -161,26 +161,40 @@ export default function EditAddOnPage({ params }: Props) {
     input.accept = 'image/*'
     input.multiple = true
 
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       console.log('📁 File input changed');
       const files = (e.target as HTMLInputElement).files
       console.log('📁 Files selected:', files?.length);
 
-      if (files) {
-        Array.from(files).forEach(file => {
-          console.log('📄 Processing file:', file.name);
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const result = e.target?.result as string
-            console.log('✅ File read successfully, adding to images');
-            setImages(prev => {
-              const newImages = [...prev, result];
-              console.log('📷 Updated images array length:', newImages.length);
-              return newImages;
-            })
-          }
-          reader.readAsDataURL(file)
-        })
+      if (files && files.length > 0) {
+        try {
+          // Show loading state
+          const fileArray = Array.from(files)
+          console.log('📄 Processing files:', fileArray.map(f => f.name));
+
+          // Upload files to server
+          const uploadedUrls = await uploadAddOnImages(fileArray)
+          console.log('✅ Files uploaded successfully:', uploadedUrls);
+
+          // Add the URLs to the images state
+          setImages(prev => {
+            const newImages = [...prev, ...uploadedUrls];
+            console.log('📷 Updated images array length:', newImages.length);
+            return newImages;
+          })
+
+          toast({
+            title: "Success",
+            description: `${fileArray.length} image(s) uploaded successfully`,
+          })
+        } catch (error: any) {
+          console.error('Error uploading images:', error)
+          toast({
+            title: "Upload Error",
+            description: error.message || "Failed to upload images. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
     }
 

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft, Plus, Trash, X, Upload, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { createAddOn, CreateAddOnRequest } from "@/services/addOnService"
+import { createAddOn, CreateAddOnRequest, uploadAddOnImages } from "@/services/addOnService"
 
 interface AddOnVariant {
   id: string;
@@ -76,23 +76,37 @@ export default function NewAddOnPage() {
     setVariants(variants.filter(v => v.id !== id))
   }
 
-  const handleAddImage = () => {
+  const handleAddImage = async () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
     input.multiple = true
 
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = (e.target as HTMLInputElement).files
-      if (files) {
-        Array.from(files).forEach(file => {
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const result = e.target?.result as string
-            setImages(prev => [...prev, result])
-          }
-          reader.readAsDataURL(file)
-        })
+      if (files && files.length > 0) {
+        try {
+          // Show loading state
+          const fileArray = Array.from(files)
+
+          // Upload files to server
+          const uploadedUrls = await uploadAddOnImages(fileArray)
+
+          // Add the URLs to the images state
+          setImages(prev => [...prev, ...uploadedUrls])
+
+          toast({
+            title: "Success",
+            description: `${fileArray.length} image(s) uploaded successfully`,
+          })
+        } catch (error: any) {
+          console.error('Error uploading images:', error)
+          toast({
+            title: "Upload Error",
+            description: error.message || "Failed to upload images. Please try again.",
+            variant: "destructive",
+          })
+        }
       }
     }
 
