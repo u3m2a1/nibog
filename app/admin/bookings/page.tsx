@@ -14,7 +14,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { format, parseISO } from "date-fns"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-import { getAllBookings, updateBookingStatus, Booking } from "@/services/bookingService"
+import { getAllBookings, getPaginatedBookings, updateBookingStatus, Booking, PaginatedBookingsResponse } from "@/services/bookingService"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,40 +80,55 @@ export default function BookingsPage() {
   const [cities, setCities] = useState<{id: string, name: string}[]>([])
   const [events, setEvents] = useState<{id: string, name: string}[]>([])
 
-  // Fetch bookings from API
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(100)
+  const [totalBookings, setTotalBookings] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
 
-        const data = await getAllBookings()
-        setBookings(data)
+  // Fetch bookings from API with pagination
+  const fetchBookings = async (page: number = currentPage, limit: number = pageSize) => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-        // Extract unique cities and events from the bookings data
-        const uniqueCities = Array.from(new Set(data.map(booking => booking.city_name)))
-          .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
+      const response = await getPaginatedBookings({ page, limit })
+      setBookings(response.data)
 
-        const uniqueEvents = Array.from(new Set(data.map(booking => booking.event_title)))
-          .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
+      // Update pagination state
+      setCurrentPage(response.pagination.page)
+      setTotalBookings(response.pagination.total)
+      setTotalPages(response.pagination.totalPages)
+      setHasNext(response.pagination.hasNext)
+      setHasPrev(response.pagination.hasPrev)
 
-        setCities(uniqueCities)
-        setEvents(uniqueEvents)
-      } catch (error: any) {
-        console.error("Failed to fetch bookings:", error)
-        setError(error.message || "Failed to load bookings. Please try again.")
-        toast({
-          title: "Error",
-          description: "Failed to load bookings. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
+      // Extract unique cities and events from the bookings data
+      const uniqueCities = Array.from(new Set(response.data.map(booking => booking.city_name)))
+        .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
+
+      const uniqueEvents = Array.from(new Set(response.data.map(booking => booking.event_title)))
+        .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
+
+      setCities(uniqueCities)
+      setEvents(uniqueEvents)
+    } catch (error: any) {
+      console.error("Failed to fetch bookings:", error)
+      setError(error.message || "Failed to load bookings. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to load bookings. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchBookings()
-  }, []) // Removed toast from dependency array to prevent infinite loop
+  }, [currentPage, pageSize]) // Fetch when page or page size changes
 
   // Handle confirm booking
   const handleConfirmBooking = async (id: number) => {
@@ -185,42 +200,24 @@ export default function BookingsPage() {
 
   // Handle refresh bookings
   const handleRefreshBookings = async (showToast: boolean = true) => {
-    try {
-      setIsLoading(true)
-      setError(null)
+    await fetchBookings(currentPage, pageSize)
 
-      const data = await getAllBookings()
-      setBookings(data)
-
-      // Extract unique cities and events from the bookings data
-      const uniqueCities = Array.from(new Set(data.map(booking => booking.city_name)))
-        .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
-
-      const uniqueEvents = Array.from(new Set(data.map(booking => booking.event_title)))
-        .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
-
-      setCities(uniqueCities)
-      setEvents(uniqueEvents)
-
-      if (showToast) {
-        toast({
-          title: "Success",
-          description: "Bookings refreshed successfully",
-        })
-      }
-    } catch (error: any) {
-      console.error("Failed to refresh bookings:", error)
-      setError(error.message || "Failed to refresh bookings. Please try again.")
-      if (showToast) {
-        toast({
-          title: "Error",
-          description: "Failed to refresh bookings. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } finally {
-      setIsLoading(false)
+    if (showToast) {
+      toast({
+        title: "Success",
+        description: "Bookings refreshed successfully",
+      })
     }
+  }
+
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1) // Reset to first page when changing page size
   }
 
 
@@ -286,8 +283,7 @@ export default function BookingsPage() {
     return true
   })
 
-  // Calculate summary statistics
-  const totalBookings = bookings.length
+  // Calculate summary statistics (for current page only - note: for accurate totals across all pages, we'd need separate API calls)
   const confirmedBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'confirmed').length
   const pendingBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'pending').length
   const cancelledBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'cancelled').length
@@ -619,6 +615,78 @@ export default function BookingsPage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between px-2 py-4">
+        <div className="flex items-center space-x-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {bookings.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0} to{' '}
+            {Math.min(currentPage * pageSize, totalBookings)} of {totalBookings} bookings
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-6">
+          {/* Page Size Selector */}
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium">Rows per page</p>
+            <Select
+              value={pageSize.toString()}
+              onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+            >
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent side="top">
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Page Navigation */}
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(1)}
+                disabled={!hasPrev || isLoading}
+              >
+                First
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={!hasPrev || isLoading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!hasNext || isLoading}
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(totalPages)}
+                disabled={!hasNext || isLoading}
+              >
+                Last
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
