@@ -69,6 +69,24 @@ export interface Booking {
   venue_updated_at: string;
 }
 
+// Pagination interface
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedBookingsResponse {
+  data: Booking[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 /**
  * Get all bookings with error handling and timeout
  * @returns Promise with array of bookings
@@ -96,11 +114,81 @@ export async function getAllBookings(): Promise<Booking[]> {
 
       const data = await response.json();
 
-      if (!Array.isArray(data)) {
-        return [];
+      // Handle both old format (array) and new paginated format
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data.data && Array.isArray(data.data)) {
+        return data.data;
       }
 
-      return data;
+      return [];
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error("Request timed out. The server took too long to respond.");
+      }
+      throw fetchError;
+    }
+  } catch (error: any) {
+    throw error;
+  }
+}
+
+/**
+ * Get paginated bookings with error handling and timeout
+ * @param params Pagination parameters
+ * @returns Promise with paginated bookings response
+ */
+export async function getPaginatedBookings(params: PaginationParams = {}): Promise<PaginatedBookingsResponse> {
+  try {
+    const { page = 1, limit = 100 } = params;
+
+    // Use our internal API route to avoid CORS issues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    try {
+      const url = new URL('/api/bookings/get-all', window.location.origin);
+      url.searchParams.set('page', page.toString());
+      url.searchParams.set('limit', limit.toString());
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`API returned error status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Ensure we have the expected paginated format
+      if (data.data && data.pagination) {
+        return data;
+      }
+
+      // Fallback for old format
+      if (Array.isArray(data)) {
+        return {
+          data,
+          pagination: {
+            page: 1,
+            limit: data.length,
+            total: data.length,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false
+          }
+        };
+      }
+
+      throw new Error("Invalid response format");
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
