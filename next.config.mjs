@@ -50,8 +50,7 @@ const nextConfig = {
       'recharts',
     ],
   },
-  // Optimize bundle size
-  swcMinify: true,
+  // SWC minification is enabled by default in Next.js 13+
   // Add production-specific optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? {

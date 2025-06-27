@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +11,7 @@ import { checkPhonePePaymentStatus } from "@/services/paymentService"
 import { sendBookingConfirmationFromClient } from "@/services/emailNotificationService"
 import { generateConsistentBookingRef } from "@/utils/bookingReference"
 
-export default function PaymentCallbackPage() {
+function PaymentCallbackContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -540,4 +540,12 @@ export default function PaymentCallbackPage() {
         return "We're having trouble determining your payment status."
     }
   }
+}
+
+export default function PaymentCallbackPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading payment status...</div>}>
+      <PaymentCallbackContent />
+    </Suspense>
+  )
 }

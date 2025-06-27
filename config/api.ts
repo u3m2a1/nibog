@@ -117,6 +117,7 @@ export const USER_API = {
 export const BOOKING_API = {
   CREATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/create", // POST
   GET_ALL: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/get-all", // GET
+  GET_USER_BOOKINGS: "https://ai.alviongs.com/webhook/v1/nibog/user/booking", // POST
   UPDATE: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update", // POST
   UPDATE_STATUS: "https://ai.alviongs.com/webhook/v1/nibog/bookingsevents/update-status", // POST
 };

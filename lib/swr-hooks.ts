@@ -4,7 +4,69 @@ import useSWR from 'swr'
 import { EventListItem } from '@/types'
 import { getAllEvents as fetchAllEvents } from '@/services/eventService'
 import { getAllPayments as fetchAllPayments } from '@/services/paymentService'
-import { fetchEventsWithGames } from '@/services/eventGameService'
+import { getAllEventsWithGames } from '@/services/eventGameService'
+
+// Types for user bookings
+export interface UserBookingGame {
+  game_id: number;
+  game_name: string;
+  description: string;
+  duration_minutes: number;
+  child_id: number;
+  attendance_status: string;
+  slot_info: {
+    slot_id: number;
+    custom_title: string;
+    custom_description: string;
+    custom_price: number;
+    slot_price: number;
+    start_time: string;
+    end_time: string;
+    max_participants: number;
+  } | null;
+}
+
+export interface UserBookingAddon {
+  addon_id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  has_variants: boolean;
+  quantity: number;
+}
+
+export interface UserBookingEvent {
+  event_id: number;
+  title: string;
+  description: string;
+  event_date: string;
+  status: string;
+}
+
+export interface UserBooking {
+  booking_id: number;
+  booking_ref: string;
+  status: string;
+  total_amount: number;
+  payment_status: string;
+  created_at: string;
+  event: UserBookingEvent;
+  games: UserBookingGame[] | null;
+  addons: UserBookingAddon[] | null;
+}
+
+export interface UserBookingsResponse {
+  user_id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  city_id: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  bookings: UserBooking[];
+}
 
 // Global fetcher function for SWR
 const fetcher = async (url: string) => {
@@ -74,7 +136,7 @@ export function useEvents(initialData?: EventListItem[]) {
     // Use the comprehensive events API that includes games, cities, and venues
     async () => {
       try {
-        const apiEvents = await fetchEventsWithGames();
+        const apiEvents = await getAllEventsWithGames();
         return transformEventsData(apiEvents);
       } catch (err) {
         console.error('Failed to fetch events with games, falling back to basic events:', err);
@@ -136,6 +198,54 @@ export function usePayments() {
     isError: !!error,
     mutate,
   }
+}
+
+/**
+ * Hook to fetch user bookings with SWR caching and revalidation
+ * @param userId The user ID to fetch bookings for
+ */
+export function useUserBookings(userId: number | null) {
+  const { data, error, isLoading, mutate } = useSWR<UserBookingsResponse>(
+    userId ? `api/bookings/user/${userId}` : null,
+    async () => {
+      if (!userId) {
+        return null;
+      }
+
+      const response = await fetch('/api/bookings/user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user bookings: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // The API returns an array with one object containing user data and bookings
+      if (Array.isArray(result) && result.length > 0) {
+        return result[0];
+      }
+
+      return result;
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 300000, // 5 minutes
+    }
+  );
+
+  return {
+    userBookings: data,
+    isLoading,
+    isError: !!error,
+    mutate,
+  };
 }
 
 /**
