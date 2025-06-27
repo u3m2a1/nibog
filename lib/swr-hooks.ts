@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { EventListItem } from '@/types'
 import { getAllEvents as fetchAllEvents } from '@/services/eventService'
 import { getAllPayments as fetchAllPayments } from '@/services/paymentService'
-import { fetchEventsWithGames } from '@/services/eventGameService'
+import { getAllEventsWithGames } from '@/services/eventGameService'
 
 // Types for user bookings
 export interface UserBookingGame {
@@ -136,7 +136,7 @@ export function useEvents(initialData?: EventListItem[]) {
     // Use the comprehensive events API that includes games, cities, and venues
     async () => {
       try {
-        const apiEvents = await fetchEventsWithGames();
+        const apiEvents = await getAllEventsWithGames();
         return transformEventsData(apiEvents);
       } catch (err) {
         console.error('Failed to fetch events with games, falling back to basic events:', err);

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle, Calendar, MapPin, User, Phone, Mail, ArrowRight, Download, Ticket, Check, Home, File } from "lucide-react"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import html2canvas from "html2canvas"
 import { saveAs } from "file-saver"
@@ -14,7 +14,7 @@ import { TicketDetails, getTicketDetails, convertBookingRefFormat } from "@/serv
 import { checkPhonePePaymentStatus } from "@/services/paymentService"
 
 
-export default function BookingConfirmationClientPage() {
+function BookingConfirmationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const bookingRef = searchParams.get('ref')
@@ -553,5 +553,13 @@ export default function BookingConfirmationClientPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+export default function BookingConfirmationClientPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading booking confirmation...</div>}>
+      <BookingConfirmationContent />
+    </Suspense>
   )
 }
