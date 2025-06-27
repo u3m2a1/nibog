@@ -531,7 +531,7 @@ export default function BookingConfirmationClientPage() {
         <CardFooter className="flex flex-col space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 w-full">
             <Button variant="outline" className="flex-1" asChild>
-              <Link href="/my-bookings">
+              <Link href="/dashboard/bookings">
                 View My Bookings
               </Link>
             </Button>
