@@ -54,6 +54,7 @@ export default function Home() {
           <Badge className="px-3.5 py-1.5 text-sm font-medium" variant="secondary">
             New India Baby Olympics Games
           </Badge>
+
           <div className="relative z-20">
             <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
               NIBOG -{" "}
@@ -75,6 +76,7 @@ export default function Home() {
               </span>
             </h1>
           </div>
+          
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
             India's biggest baby Olympic games, executing in 21 cities of India. Join us for exciting baby games including crawling races, baby walker, running race, and more for children aged 5-84 months.
           </p>
@@ -82,7 +84,7 @@ export default function Home() {
             <div className="flex flex-col gap-4">
               <Button 
                 size="lg" 
-                className="w-full py-6 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white shadow-lg transform transition-all hover:scale-105"
+                className="w-full py-6 text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg transform transition-all hover:scale-105"
                 asChild
               >
                 <Link href="/register-event">

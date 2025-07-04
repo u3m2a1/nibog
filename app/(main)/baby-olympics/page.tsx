@@ -135,22 +135,19 @@ export default function BabyOlympicsPage() {
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
             Step into the World of Baby Games and watch while they Kick, Crawl, Conquer. India's biggest baby Olympic games in 21 cities.
           </p>
-          <div className="w-full max-w-md space-y-4 rounded-lg bg-background/80 p-4 shadow-lg backdrop-blur">
-            <Tabs defaultValue="city" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="city">Find by City</TabsTrigger>
-                <TabsTrigger value="age">Find by Age</TabsTrigger>
-              </TabsList>
-              <TabsContent value="city" className="mt-4">
-                <CitySelector />
-              </TabsContent>
-              <TabsContent value="age" className="mt-4">
-                <AgeSelector />
-              </TabsContent>
-            </Tabs>
-            <Button className="w-full bg-yellow-500 hover:bg-yellow-600" size="lg" asChild>
-              <Link href="/register-event">Register for NIBOG Events</Link>
-            </Button>
+          <div className="w-full max-w-md space-y-4">
+            <div className="flex flex-col gap-4">
+              <Button 
+                size="lg" 
+                className="w-full py-6 text-lg font-bold bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg transform transition-all hover:scale-105"
+                asChild
+              >
+                <Link href="/register-event">
+                  Register Now for NIBOG 2025
+                </Link>
+              </Button>
+              
+            </div>
           </div>
         </div>
       </section>
