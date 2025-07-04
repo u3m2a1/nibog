@@ -78,30 +78,19 @@ export default function Home() {
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
             India's biggest baby Olympic games, executing in 21 cities of India. Join us for exciting baby games including crawling races, baby walker, running race, and more for children aged 5-84 months.
           </p>
-          <div className="w-full max-w-md space-y-4 rounded-lg bg-background/80 p-4 shadow-lg backdrop-blur">
-            <Tabs defaultValue="city" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="city" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  Find by City
-                </TabsTrigger>
-                <TabsTrigger value="age" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  Find by Age
-                </TabsTrigger>
-              </TabsList>
+          <div className="w-full max-w-md space-y-4">
+            <div className="flex flex-col gap-4">
+              <Button 
+                size="lg" 
+                className="w-full py-6 text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white shadow-lg transform transition-all hover:scale-105"
+                asChild
+              >
+                <Link href="/register-event">
+                  Register Now for NIBOG 2025
+                </Link>
+              </Button>
               
-              <div className="min-h-[120px] w-full">
-                <TabsContent value="city" className="m-0">
-                  <CitySelector />
-                </TabsContent>
-                <TabsContent value="age" className="m-0">
-                  <AgeSelector />
-                </TabsContent>
-              </div>
-            </Tabs>
-            
-            <Button className="w-full mt-4" size="lg" asChild>
-              <Link href="/events">Find Events</Link>
-            </Button>
+            </div>
           </div>
         </div>
       </section>

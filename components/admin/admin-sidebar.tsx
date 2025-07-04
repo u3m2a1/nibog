@@ -41,16 +41,6 @@ const adminRoutes = [
     icon: <BarChart3 className="h-5 w-5" />,
   },
   {
-    href: "/admin/events",
-    label: "NIBOG Events",
-    icon: <Calendar className="h-5 w-5" />,
-  },
-  {
-    href: "/admin/completed-events",
-    label: "Completed Events",
-    icon: <CheckSquare className="h-5 w-5" />,
-  },
-  {
     href: "/admin/cities",
     label: "Cities",
     icon: <MapPin className="h-5 w-5" />,
@@ -60,6 +50,17 @@ const adminRoutes = [
     label: "Venues",
     icon: <MapPin className="h-5 w-5" />,
   },
+  {
+    href: "/admin/events",
+    label: "NIBOG Events",
+    icon: <Calendar className="h-5 w-5" />,
+  },
+  {
+    href: "/admin/completed-events",
+    label: "Completed Events",
+    icon: <CheckSquare className="h-5 w-5" />,
+  },
+  
   {
     href: "/admin/bookings",
     label: "Bookings",
