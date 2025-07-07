@@ -989,6 +989,17 @@ export default function RegisterEventClientPage() {
     } finally {
       setIsProcessingPayment(false)
     }
+    // After successful payment and booking, clear all registration/session data
+    // (This runs after redirect, so also add this logic to the confirmation page if needed)
+    if (bookingSuccess) {
+      sessionStorage.removeItem('registrationData')
+      sessionStorage.removeItem('selectedAddOns')
+      sessionStorage.removeItem('eligibleGames')
+      sessionStorage.removeItem('nibog_restored_city')
+      sessionStorage.removeItem('nibog_restored_eventType')
+      sessionStorage.removeItem('nibog_restored_childAgeMonths')
+      localStorage.removeItem('nibog_booking_data')
+    }
   }
 
   // Fetch cities from API when component mounts
@@ -1027,6 +1038,7 @@ export default function RegisterEventClientPage() {
   }, [isAuthenticated])
 
   // Load city from URL or saved registration data
+  // --- Session restore logic ---
   useEffect(() => {
     // Check URL parameters
     const urlParams = new URLSearchParams(window.location.search)
@@ -1071,21 +1083,12 @@ export default function RegisterEventClientPage() {
         
         // Load eligible games with price information
         const savedEligibleGames = sessionStorage.getItem('eligibleGames')
+        let eligibleGamesData: any[] = []
         if (savedEligibleGames) {
           try {
-            const eligibleGamesData = JSON.parse(savedEligibleGames)
+            eligibleGamesData = JSON.parse(savedEligibleGames)
             console.log('Restored eligible games from session:', eligibleGamesData)
             setEligibleGames(eligibleGamesData)
-            
-            // If we have a selected event type and child age, but no eligible games loaded,
-            // try to fetch them again
-            if (data.selectedEventType && data.childAgeMonths && eligibleGamesData.length === 0) {
-              const selectedApiEvent = apiEvents.find(event => event.event_title === data.selectedEventType);
-              if (selectedApiEvent) {
-                console.log('Re-fetching games for event and age')
-                fetchGamesByEventAndAge(selectedApiEvent.event_id, data.childAgeMonths);
-              }
-            }
           } catch (error) {
             console.error('Error parsing saved eligible games data:', error)
           }
@@ -1120,6 +1123,13 @@ export default function RegisterEventClientPage() {
           setStep(1)
         }
 
+        // Save the restored city for use in the next effect
+        sessionStorage.setItem('nibog_restored_city', data.selectedCity || cityParam || '')
+
+        // Save the restored event type and age for use in the next effect
+        sessionStorage.setItem('nibog_restored_eventType', data.selectedEventType || '')
+        sessionStorage.setItem('nibog_restored_childAgeMonths', data.childAgeMonths ? String(data.childAgeMonths) : '')
+
         // Clear the URL parameters to clean up the URL
         if (stepParam) {
           const newUrl = window.location.pathname + (cityParam ? `?city=${cityParam}` : '')
@@ -1132,7 +1142,34 @@ export default function RegisterEventClientPage() {
       // If no saved data but step parameter exists, redirect to start
       router.push('/register-event' + (cityParam ? `?city=${cityParam}` : ''))
     }
-  }, [isAuthenticated, router]) // Include isAuthenticated and router in dependencies
+  }, [isAuthenticated, router])
+
+  // --- Wait for cities to load, then trigger handleCityChange if needed ---
+  useEffect(() => {
+    const restoredCity = sessionStorage.getItem('nibog_restored_city')
+    if (restoredCity && cities.length > 0) {
+      handleCityChange(restoredCity)
+      sessionStorage.removeItem('nibog_restored_city')
+    }
+  }, [cities])
+
+  // --- Wait for apiEvents to load, then trigger fetchGamesByEventAndAge if needed ---
+  useEffect(() => {
+    const restoredEventType = sessionStorage.getItem('nibog_restored_eventType')
+    const restoredChildAgeMonths = sessionStorage.getItem('nibog_restored_childAgeMonths')
+    if (
+      restoredEventType &&
+      restoredChildAgeMonths &&
+      apiEvents.length > 0
+    ) {
+      const selectedApiEvent = apiEvents.find(event => event.event_title === restoredEventType)
+      if (selectedApiEvent) {
+        fetchGamesByEventAndAge(selectedApiEvent.event_id, Number(restoredChildAgeMonths))
+        sessionStorage.removeItem('nibog_restored_eventType')
+        sessionStorage.removeItem('nibog_restored_childAgeMonths')
+      }
+    }
+  }, [apiEvents])
 
   return (
     <div className="container py-8 px-4 sm:px-6 relative">

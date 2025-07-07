@@ -96,6 +96,15 @@ function BookingConfirmationContent() {
   };
 
   useEffect(() => {
+    // Clear all registration/session data after booking confirmation
+    sessionStorage.removeItem('registrationData')
+    sessionStorage.removeItem('selectedAddOns')
+    sessionStorage.removeItem('eligibleGames')
+    sessionStorage.removeItem('nibog_restored_city')
+    sessionStorage.removeItem('nibog_restored_eventType')
+    sessionStorage.removeItem('nibog_restored_childAgeMonths')
+    localStorage.removeItem('nibog_booking_data')
+
     // Log the current URL path and query parameters for debugging
     console.log('Current URL:', window.location.href);
     console.log('Booking ref from query param:', bookingRef);
