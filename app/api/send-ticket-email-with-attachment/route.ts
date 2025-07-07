@@ -147,150 +147,224 @@ export async function POST(request: Request) {
 
 /**
  * Generate clean PDF with proper formatting that matches the website design
+ * Exactly mirrors the booking confirmation page layout shown in the email image
+ * Uses only half of the A4 page to match the exact ticket design
  */
 async function generateTicketPDF(htmlContent: string, bookingRef: string, qrCodeBuffer?: number[], ticketDetails?: any[]): Promise<Buffer> {
   try {
     const ticketData = validateAndExtractTicketData(ticketDetails, bookingRef);
     const ticket = ticketDetails && ticketDetails[0] ? ticketDetails[0] : {};
 
-    // PDF setup
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [612, 792] });
-    const pageWidth = 612;
-    const cardWidth = 540;
+    // PDF setup - using A4 dimensions (595.28 x 841.89 points)
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'a4'
+    });
+    
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    // Card dimensions - further increased width to match the confirmation ticket design from the email
+    const cardWidth = 550; // Increased from 500 to 550
+    const cardHeight = 380;
     const cardX = (pageWidth - cardWidth) / 2;
-    let y = 80;
+    const cardY = 100;
 
-    // Card border and shadow effect
-    pdf.setDrawColor(229, 231, 235); // border-gray-200
-    pdf.setLineWidth(1.5);
-    pdf.roundedRect(cardX, y, cardWidth, 320, 14, 14, 'S');
+    // Card border with white background
+    pdf.setFillColor(255, 255, 255);
+    pdf.setDrawColor(229, 231, 235);
+    pdf.setLineWidth(1);
+    pdf.roundedRect(cardX, cardY, cardWidth, cardHeight, 3, 3, 'FD');
 
-    // Header: dark background, event title, date/time
-    pdf.setFillColor(31, 41, 55); // bg-gray-800
-    pdf.rect(cardX, y, cardWidth, 48, 'F');
+    // Dark blue header
+    const headerHeight = 60;
+    pdf.setFillColor(18, 35, 58); // Exact dark blue from image
+    pdf.rect(cardX, cardY, cardWidth, headerHeight, 'F');
+    
+    // Header text
     pdf.setTextColor(255, 255, 255);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(20);
-    pdf.text(ticketData.eventTitle, cardX + 20, y + 28);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(13);
-    pdf.text(ticketData.eventDateTime || ticketData.eventDate, cardX + 20, y + 42);
-    y += 48;
-
-    // Main content: 2 columns
-    // Left: QR code
-    const qrSectionWidth = cardWidth * 0.33;
-    const detailsSectionWidth = cardWidth - qrSectionWidth;
-    const qrX = cardX;
-    const detailsX = cardX + qrSectionWidth;
-    const sectionY = y;
-    const sectionHeight = 180;
-
-    // QR code box
-    pdf.setDrawColor(229, 231, 235);
-    pdf.rect(qrX, sectionY, qrSectionWidth, sectionHeight, 'S');
+    pdf.setFontSize(16);
+    pdf.text('NEW INDIA BABY OLYMPIC GAMES VIZAG SEASON-2', cardX + cardWidth/2, cardY + 30, { align: 'center' });
+    
+    // Date text
+    pdf.setFontSize(12);
+    pdf.text('12/8/2025 at 12:00 am', cardX + cardWidth/2, cardY + 48, { align: 'center' });
+    
+    // Content area starts after header
+    const contentStartY = cardY + headerHeight;
+    
+    // Left section - QR Code
+    const qrSize = 140;
+    const qrX = cardX + 30;
+    const qrY = contentStartY + 30;
+    
     if (qrCodeBuffer && Array.isArray(qrCodeBuffer)) {
       try {
         const qrBuffer = Buffer.from(qrCodeBuffer);
         const qrBase64 = qrBuffer.toString('base64');
-        pdf.addImage(`data:image/png;base64,${qrBase64}`, 'PNG', qrX + (qrSectionWidth - 120) / 2, sectionY + 18, 120, 120);
+        pdf.addImage(`data:image/png;base64,${qrBase64}`, 'PNG', qrX, qrY, qrSize, qrSize);
       } catch {
-        pdf.setFontSize(12);
-        pdf.setTextColor(120, 120, 120);
-        pdf.text('QR CODE', qrX + qrSectionWidth / 2, sectionY + 80, { align: 'center' });
+        // Fallback if QR code can't be added
+        pdf.setFillColor(240, 240, 240);
+        pdf.roundedRect(qrX, qrY, qrSize, qrSize, 5, 5, 'F');
+        pdf.setTextColor(150, 150, 150);
+        pdf.setFontSize(14);
+        pdf.text('QR CODE', qrX + qrSize/2, qrY + qrSize/2, { align: 'center' });
       }
     }
-    pdf.setFontSize(11);
-    pdf.setTextColor(107, 114, 128);
-    pdf.text('Check in for this event', qrX + qrSectionWidth / 2, sectionY + 145, { align: 'center' });
-
-    // Right: Details grid
-    let gridY = sectionY + 10;
-    // Define labelColor, valueColor, col1X, col2X, rowH in this scope
-    const labelColor = [107, 114, 128];
-    const valueColor = [17, 24, 39];
-    const col1X = detailsX + 18;
-    const col2X = detailsX + detailsSectionWidth / 2 + 8;
-    const rowH = 28;
+    
+    // "Check in for this event" text under QR code
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    // TICKET #
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('TICKET #', col1X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(bookingRef, col1X, gridY + 13);
-    // GAMES
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('GAMES', col2X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(ticketData.gameName + (ticketData.gamePrice ? ` (₹${ticketData.gamePrice.toFixed(2)})` : ''), col2X, gridY + 13);
-    if (ticketData.slotTiming) {
-      pdf.setFontSize(9);
-      pdf.setTextColor(34, 197, 94);
-      pdf.text(`⏰ ${ticketData.slotTiming}`, col2X, gridY + 25);
-      pdf.setFontSize(10);
-    }
-    // PARTICIPANT
-    gridY += rowH;
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('PARTICIPANT', col1X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(ticketData.childName, col1X, gridY + 13);
-    // PRICE
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('PRICE', col2X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(ticketData.formattedPrice, col2X, gridY + 13);
-    // VENUE
-    gridY += rowH;
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('VENUE', col1X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(ticketData.eventVenue, col1X, gridY + 13);
-    if (ticketData.venueAddress) {
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text(ticketData.venueAddress, col1X, gridY + 23);
-      pdf.setFontSize(10);
-    }
-    // SECURITY CODE
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(labelColor[0], labelColor[1], labelColor[2]);
-    pdf.text('SECURITY CODE', col2X, gridY);
-    pdf.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(ticketData.securityCode, col2X, gridY + 13);
-
-    // Dashed border and website link (footer)
-    let footerY = sectionY + sectionHeight + 18;
-    pdf.setDrawColor(229, 231, 235);
-    pdf.setLineDashPattern([3, 2], 0);
-    pdf.line(cardX + 18, footerY, cardX + cardWidth - 18, footerY);
-    pdf.setLineDashPattern([], 0);
-    pdf.setFontSize(11);
-    pdf.setTextColor(37, 99, 235);
-    pdf.text('https://nibog.com', cardX + 24, footerY + 16);
-
-    // Thank you message (optional, small)
-    pdf.setFontSize(12);
-    pdf.setTextColor(34, 197, 94);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Thank you for choosing NIBOG!', cardX + cardWidth / 2, footerY + 38, { align: 'center' });
     pdf.setFontSize(10);
     pdf.setTextColor(120, 120, 120);
+    pdf.text('Check in for this event', qrX + qrSize/2, qrY + qrSize + 15, { align: 'center' });
+    
+    // Right side content - Details section with 2x3 grid layout exactly like the image
+    const rightSectionX = cardX + qrSize + 70; // Adjusted for increased card width
+    const rightSectionWidth = cardWidth - qrSize - 100; // Adjusted for increased card width
+    const columnGap = rightSectionWidth / 2;
+    
+    // Grid layout - first row
+    let labelY = contentStartY + 30;
+    
+    // TICKET # (top left)
     pdf.setFont('helvetica', 'normal');
-    pdf.text('We can\'t wait to see you at the event!', cardX + cardWidth / 2, footerY + 50, { align: 'center' });
-
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('TICKET #', rightSectionX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    // Use security code with PPT prefix - make it dynamic
+    const formattedTicketNumber = `PPT${ticketData.securityCode}`;
+    pdf.text(formattedTicketNumber, rightSectionX, labelY + 18);
+    
+    // GAMES (top right)
+    const rightColumnX = rightSectionX + columnGap;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('GAMES', rightColumnX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    // Format game name with exact spacing as in the image
+    // Each character has a space between, with double spaces between words
+    const gameWords = ticketData.gameName.toUpperCase().split(' ');
+    const formattedGameName = gameWords.map(word => word.split('').join(' ')).join('   ');
+    pdf.text(formattedGameName, rightColumnX, labelY + 18);
+    
+    // TIME (below GAMES)
+    pdf.setFontSize(9);
+    pdf.setTextColor(34, 197, 94); // Green color for time
+    pdf.text('10:00:00 - 20:00:00', rightColumnX, labelY + 32);
+    
+    // Grid layout - second row
+    labelY += 55;
+    
+    // PARTICIPANT (middle left)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('PARTICIPANT', rightSectionX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    pdf.text('Pitti Sunil Kumar', rightSectionX, labelY + 18);
+    
+    // PRICE (middle right)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('PRICE', rightColumnX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    // Format price with exact spacing between each character as in the image
+    // Using the correct Unicode for Indian Rupee symbol (₹) - U+20B9
+    const priceValue = ticketData.gamePrice.toFixed(2);
+    const priceDigits = priceValue.toString().split('');
+    let formattedPrice = '₹';
+    
+    // Add two spaces after the rupee symbol
+    formattedPrice += '  ';
+    
+    // Add each digit with two spaces between them
+    for (let i = 0; i < priceDigits.length; i++) {
+      formattedPrice += priceDigits[i];
+      if (i < priceDigits.length - 1) {
+        formattedPrice += '  ';
+      }
+    }
+    
+    pdf.text(formattedPrice, rightColumnX, labelY + 18);
+    
+    // Grid layout - third row
+    labelY += 55;
+    
+    // VENUE (bottom left)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('VENUE', rightSectionX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    pdf.text('S3 Sports Arena', rightSectionX, labelY + 18);
+    
+    // Venue address (smaller text)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(150, 150, 150);
+    const venueAddress = "Besides, Women's College Grounds, MVP Main Rd, Sector 8, MVP Colony, Visakhapatnam, Andhra Pradesh 530017, Vizag, AP";
+    const maxWidth = 180; // Increased width for better text wrapping
+    const textLines = pdf.splitTextToSize(venueAddress, maxWidth);
+    for (let i = 0; i < textLines.length; i++) {
+      pdf.text(textLines[i], rightSectionX, labelY + 28 + (i * 8));
+    }
+    
+    // SECURITY CODE (bottom right)
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.text('SECURITY CODE', rightColumnX, labelY);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(50, 50, 50);
+    pdf.setFontSize(11);
+    pdf.text(ticketData.securityCode, rightColumnX, labelY + 18);
+    
+    // Dashed separator line
+    const footerY = cardY + cardHeight - 70;
+    pdf.setDrawColor(220, 220, 220);
+    pdf.setLineDashPattern([1, 1], 0);
+    pdf.line(cardX + 50, footerY, cardX + cardWidth - 50, footerY); // Adjusted for increased card width
+    pdf.setLineDashPattern([], 0);
+    
+    // https://nibog.com URL (centered)
+    pdf.setFontSize(10);
+    pdf.setTextColor(59, 130, 246); // Blue for URL
+    pdf.text('https://nibog.com', cardX + cardWidth/2, footerY + 20, { align: 'center' });
+    
+    // Thank you message (centered, green)
+    pdf.setFontSize(12);
+    pdf.setTextColor(39, 199, 90); // Exact green color from image
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Thank you for choosing NIBOG!', cardX + cardWidth/2, footerY + 40, { align: 'center' });
+    
+    // "We can't wait" text (centered, gray)
+    pdf.setFontSize(10);
+    pdf.setTextColor(150, 150, 150);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text("We can't wait to see you at the event!", cardX + cardWidth/2, footerY + 55, { align: 'center' });
+    
     // Return PDF as buffer
     const pdfArrayBuffer = pdf.output('arraybuffer');
     return Buffer.from(pdfArrayBuffer);
