@@ -3,6 +3,47 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
+
+// Dynamic Home Hero Slider
+function HomeHeroSlider() {
+  const [sliderImages, setSliderImages] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch("https://ai.alviongs.com/webhook/v1/nibog/homesection/get")
+      .then(res => res.json())
+      .then((data) => {
+        const imgs = Array.isArray(data)
+          ? data
+              .filter((img: any) => img.status === "active")
+              .map((img: any) => {
+                const rel = img.image_path.replace(/^public/, "")
+                return rel.startsWith("/") ? rel : "/" + rel
+              })
+          : []
+        setSliderImages(imgs)
+      })
+  }, [])
+
+  // Duplicate images for seamless loop
+  const loopImages = sliderImages.length > 0
+    ? [...sliderImages, sliderImages[0]]
+    : []
+
+  return (
+    <div className="absolute inset-y-0 left-0 flex w-[400%] animate-slide-slow">
+      {loopImages.map((src, i) => (
+        <div key={`heroimg-${i}`} className="flex-none w-[25%] h-full">
+          <img
+            src={src}
+            alt="Home Hero"
+            className="w-full h-full object-cover opacity-40 dark:opacity-25"
+            loading="lazy"
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -25,29 +66,9 @@ export default function Home() {
         {/* Background image overlay */}
         <div className="absolute inset-0 overflow-hidden -z-20">
           <div className="absolute inset-0 w-full h-full overflow-hidden">
-            <div className="absolute inset-y-0 left-0 flex w-[400%] animate-slide-slow">
-              {[
-                // Duplicate the images to create a seamless loop
-                ...[
-                  // Original images
-                  'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
-                  'https://images.pexels.com/photos/8033858/pexels-photo-8033858.jpeg?auto=compress&cs=tinysrgb&w=1600',
-                  'https://images.pexels.com/photos/5247758/pexels-photo-5247758.jpeg?auto=compress&cs=tinysrgb&w=1600',
-                  'https://images.pexels.com/photos/18830066/pexels-photo-18830066/free-photo-of-children-playing-outdoors.jpeg?auto=compress&cs=tinysrgb&w=1600',
-                ],
-                // Duplicate the first image at the end for smooth looping
-                'https://images.pexels.com/photos/1001914/pexels-photo-1001914.jpeg?auto=compress&cs=tinysrgb&w=1600',
-              ].map((src, i) => (
-                <div key={`kid-${i}`} className="flex-none w-[25%] h-full">
-                  <img 
-                    src={src} 
-                    alt="Children playing" 
-                    className="w-full h-full object-cover opacity-40 dark:opacity-25"
-                    loading="lazy"
-                  />
-                </div>
-              ))}
-            </div>
+            
+            <HomeHeroSlider />
+            
           </div>
         </div>
         <div className="container relative z-10 flex flex-col items-center justify-center gap-6 py-16 text-center md:py-24 lg:py-32">
