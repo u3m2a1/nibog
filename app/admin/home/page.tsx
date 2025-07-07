@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,30 @@ export default function HomeSection() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [imageMeta, setImageMeta] = useState<any[]>([])
+  
+  
+  useEffect(() => {
+    // Fetch all uploaded images from external API, limit to 50 for safety
+    fetch("https://ai.alviongs.com/webhook/v1/nibog/homesection/get")
+      .then(res => res.json())
+      .then((data) => {
+        const safeData = Array.isArray(data) ? data.slice(0, 50) : []
+        setImageMeta(safeData)
+        setImageUrls(
+          safeData.map((img: any) => {
+            if (!img?.image_path) return ""
+            // Convert "public/images/blog/home/filename" to "/images/blog/home/filename"
+            const rel = img.image_path.replace(/^public/, "")
+            return rel.startsWith("/") ? rel : "/" + rel
+          }).filter(Boolean)
+        )
+      })
+      .catch(() => {
+        setImageMeta([])
+        setImageUrls([])
+      })
+  }, [])
   
     // Handle file input change
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,8 +49,34 @@ export default function HomeSection() {
     }
   
     // Remove image by index (removes from preview list, not server)
-    const handleDelete = (idx: number) => {
-      setImageUrls((prev) => prev.filter((_, i) => i !== idx))
+    const handleDelete = async (idx: number) => {
+      const meta = imageMeta[idx]
+      if (!meta?.id) return
+      if (!window.confirm("Delete this image from the slider?")) return
+      try {
+        const resp = await fetch("https://ai.alviongs.com/webhook/v1/nibog/homesection/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: meta.id })
+        })
+        const result = await resp.json()
+        if (Array.isArray(result) && result[0]?.success) {
+          setImageMeta((prev) => prev.filter((_, i) => i !== idx))
+          setImageUrls((prev) => prev.filter((_, i) => i !== idx))
+          toast({
+            title: "Deleted",
+            description: "Image deleted successfully.",
+          })
+        } else {
+          throw new Error("Delete failed")
+        }
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to delete image.",
+          variant: "destructive",
+        })
+      }
     }
 
   // Drag and drop reordering
@@ -59,9 +109,37 @@ export default function HomeSection() {
       if (data.success && data.files) {
         setImageUrls((prev) => [...prev, ...data.files.map((f: any) => f.url)])
         setSelectedFiles([])
+
+        // Send each uploaded image to external API
+        await Promise.all(
+          data.files.map(async (f: any) => {
+            // Extract filename and build correct API path
+            // Use absolute image URL for payload
+            const filename = f.url.split("/").pop();
+            const rel_path = `public/images/blog/home/${filename}`;
+            try {
+              const resp = await fetch("https://ai.alviongs.com/webhook/v1/nibog/homesection/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  image_path: rel_path,
+                  status: "active"
+                })
+              });
+              if (!resp.ok) throw new Error("Webhook API error");
+            } catch (err) {
+              toast({
+                title: "Warning",
+                description: `Failed to notify external API for ${rel_path}`,
+                variant: "destructive",
+              });
+            }
+          })
+        );
+
         toast({
           title: "Success!",
-          description: "Images uploaded successfully.",
+          description: "Images uploaded and synced successfully.",
         })
       } else {
         throw new Error(data.error || "Upload failed")
@@ -214,3 +292,8 @@ export default function HomeSection() {
     </div>
   )
 }
+
+
+
+
+
