@@ -128,3 +128,55 @@ Response (200 OK)
     "success": true
   }
 ]
+
+
+
+
+
+
+
+
+POST https://ai.alviongs.com/webhook/v1/nibog/events/get-games-by-ageandevent-new
+
+
+Payload:-
+{ 
+  "event_id": 29, 
+  "child_age": 25
+}
+
+
+Responsive:-
+[
+    {
+        "event_id": 29,
+        "game_id": 22,
+        "title": "KIDS RAMP WALK",
+        "description": " KIDS RAMP WALK – CONFIDENCE ON THE CATWALK! \n\nLet your little stars shine bright! \nThe Kids Ramp Walk is the perfect platform for children to express their inner talent, confidence, and creativity – while giving parents a chance to witness their child’s unique spark! \n\n Age Group: 2 to 12 years\nWalk, pose, smile & shine in front of a cheering crowd!\n\nWhether it’s cute, stylish, funny, or fabulous – every child gets their moment in the spotlight. \n All participants receive E-certificates, medals, and tons of encouragement!",
+        "listed_price": "1500.00",
+        "min_age": 24,
+        "max_age": 90,
+        "duration_minutes": 120,
+        "event_date": "2025-08-12",
+        "venue_name": "S3 Sports Arena",
+        "slots": [
+            {
+                "slot_id": 92,
+                "start_time": "10:00:00",
+                "end_time": "11:30:00",
+                "slot_price": 1500,
+                "max_participants": 12
+            },
+            {
+                "slot_id": 91,
+                "start_time": "15:00:00",
+                "end_time": "20:00:00",
+                "slot_price": 1500,
+                "max_participants": 40
+            }
+        ]
+    }
+]
+
+
+

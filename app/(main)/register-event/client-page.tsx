@@ -96,7 +96,7 @@ export default function RegisterEventClientPage() {
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
-  const [selectedGames, setSelectedGames] = useState<number[]>([])
+  const [selectedGames, setSelectedGames] = useState<{gameId: number, slotId: number}[]>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
@@ -150,9 +150,9 @@ export default function RegisterEventClientPage() {
     // Calculate total based on eligible games prices
     let total = 0;
     
-    for (const gameId of selectedGames) {
-      // Find the game in eligible games by numeric ID
-      const game = eligibleGames.find(g => g.id === gameId);
+    for (const selection of selectedGames) {
+      // Find the slot in eligible games by slot ID
+      const game = eligibleGames.find(g => g.id === selection.slotId);
       
       // Get price from the game object - prioritize slot_price from event_games_with_slots table
       let gamePrice = 0;
@@ -287,7 +287,7 @@ export default function RegisterEventClientPage() {
     const cityObj = cities.find(c => c.name === city)
     if (!cityObj) return
 
-    const cityId = cityObj.id
+    const cityId = Number(cityObj.id)
     setSelectedCityId(cityId);
 
     // Fetch events for the selected city
@@ -467,28 +467,36 @@ export default function RegisterEventClientPage() {
           }
         }
 
-        // Format games to match the Game interface structure, using API data only
-        // IMPORTANT: Use slot_id as the unique identifier for selection (since each slot is unique)
-        // but store game_id separately for API calls
-        const formattedGames: Game[] = gamesData.map((game: any) => ({
-          id: Number(game.slot_id || 0), // Use slot_id as unique identifier for selection
-          game_id: Number(game.game_id || 0), // Store actual game_id for API calls
-          game_title: game.title || '',
-          game_description: game.description || '',
-          min_age: game.min_age || 0,
-          max_age: game.max_age || 0,
-          game_duration_minutes: game.duration_minutes || 0,
-          categories: game.categories || [],
-          custom_price: game.listed_price || 0,
-          slot_price: game.slot_price || 0,
-          start_time: game.start_time || '',
-          end_time: game.end_time || '',
-          custom_title: game.title || '',
-          custom_description: game.description || '',
-          max_participants: game.max_participants || 0,
-          // Store slot_id separately for reference
-          slot_id: Number(game.slot_id || 0)
-        }));
+        // Format games to match the Game interface structure, using new API data format
+        // The new API groups slots under each game, so we need to create separate entries for each slot
+        const formattedGames: Game[] = [];
+        
+        gamesData.forEach((game: any) => {
+          // Each game now has a slots array
+          if (game.slots && Array.isArray(game.slots)) {
+            game.slots.forEach((slot: any) => {
+              formattedGames.push({
+                id: Number(slot.slot_id || 0), // Use slot_id as unique identifier for selection
+                game_id: Number(game.game_id || 0), // Store actual game_id for API calls
+                game_title: game.title || '',
+                game_description: game.description || '',
+                min_age: game.min_age || 0,
+                max_age: game.max_age || 0,
+                game_duration_minutes: game.duration_minutes || 0,
+                categories: [],
+                custom_price: game.listed_price || 0,
+                slot_price: slot.slot_price || 0,
+                start_time: slot.start_time || '',
+                end_time: slot.end_time || '',
+                custom_title: game.title || '',
+                custom_description: game.description || '',
+                max_participants: slot.max_participants || 0,
+                // Store slot_id separately for reference
+                slot_id: Number(slot.slot_id || 0)
+              });
+            });
+          }
+        });
 
         // Set the formatted games (this is separate from eligibleEvents which contains event details)
         setEligibleGames(formattedGames);
@@ -505,13 +513,39 @@ export default function RegisterEventClientPage() {
     }
   }
 
-  // Handle game selection
-  const handleGameSelection = (gameId: number) => {
+  // Handle game selection with slot selection
+  const handleGameSelection = (slotId: number) => {
+    // Find the game associated with this slot
+    const selectedSlot = eligibleGames.find(g => g.id === slotId);
+    if (!selectedSlot) return;
+
+    const gameId = selectedSlot.game_id;
+
     // Toggle selection: add if not selected, remove if already selected
     setSelectedGames(prev => {
-      const newSelectedGames = prev.includes(gameId)
-        ? prev.filter(id => id !== gameId) // Remove from selection
-        : [...prev, gameId]; // Add to selection
+      // Check if this slot is already selected
+      const existingSelectionIndex = prev.findIndex(selection => selection.slotId === slotId);
+      
+      let newSelectedGames;
+      if (existingSelectionIndex >= 0) {
+        // Remove this slot selection
+        newSelectedGames = prev.filter((_, index) => index !== existingSelectionIndex);
+      } else {
+        // Check if user already selected a slot for this game
+        const existingGameSelectionIndex = prev.findIndex(selection => selection.gameId === gameId);
+        
+        if (existingGameSelectionIndex >= 0) {
+          // Replace the existing slot selection for this game
+          newSelectedGames = prev.map((selection, index) =>
+            index === existingGameSelectionIndex
+              ? { gameId, slotId }
+              : selection
+          );
+        } else {
+          // Add new game and slot selection
+          newSelectedGames = [...prev, { gameId, slotId }];
+        }
+      }
 
       // Reset promocode when games change
       setPromoCode('');
@@ -522,11 +556,8 @@ export default function RegisterEventClientPage() {
       if (newSelectedGames.length > 0 && selectedEventType) {
         const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
         if (selectedApiEvent) {
-          // Convert slot IDs to game IDs for promo code API
-          const gameIdsForPromo = newSelectedGames.map(slotId => {
-            const game = eligibleGames.find(g => g.id === slotId);
-            return game?.game_id;
-          }).filter(Boolean);
+          // Get unique game IDs for promo code API
+          const gameIdsForPromo = [...new Set(newSelectedGames.map(selection => selection.gameId))];
 
           if (gameIdsForPromo.length > 0) {
             fetchApplicablePromocodes(selectedApiEvent.event_id, gameIdsForPromo);
@@ -540,13 +571,8 @@ export default function RegisterEventClientPage() {
     });
 
     // Log selection state for debugging
-    console.log(`Toggled game ID: ${gameId}`);
-
-    // Find the selected game for additional logging
-    const game = eligibleGames.find(g => g.id === gameId);
-    if (game) {
-      console.log("Toggled game:", game);
-    }
+    console.log(`Toggled slot ID: ${slotId} for game ID: ${gameId}`);
+    console.log("Selected slot:", selectedSlot);
   }
 
   // Get unique event titles from API events
@@ -705,11 +731,12 @@ export default function RegisterEventClientPage() {
       const addOnsTotal = calculateAddOnsTotal();
       const subtotal = gamesTotal + addOnsTotal;
       
-      // Validate the promocode
+      // Validate the promocode - convert selectedGames to slot IDs array
+      const slotIds = selectedGames.map(selection => selection.slotId);
       const result = await validatePromoCodePreview(
         promoCode,
         selectedApiEvent.event_id,
-        selectedGames,
+        slotIds,
         subtotal
       );
       
@@ -772,12 +799,12 @@ export default function RegisterEventClientPage() {
 
       // Filter out any undefined games to prevent errors
       const selectedGamesObj = selectedGames
-        .map(slotId => {
-          const game = eligibleGames.find(game => game.id === slotId)
+        .map(selection => {
+          const game = eligibleGames.find(game => game.id === selection.slotId)
           if (!game) {
-            console.error(`❌ Game slot with ID ${slotId} not found in eligible games!`)
+            console.error(`❌ Game slot with ID ${selection.slotId} not found in eligible games!`)
           } else {
-            console.log(`✅ Found game slot: Slot ID ${slotId}, Game ID ${game.game_id}, Title: ${game.custom_title || game.game_title}`)
+            console.log(`✅ Found game slot: Slot ID ${selection.slotId}, Game ID ${game.game_id}, Title: ${game.custom_title || game.game_title}`)
           }
           return game
         })
@@ -862,20 +889,37 @@ export default function RegisterEventClientPage() {
         eventVenue: selectedEventDetails?.venue || 'TBD',
         eventCity: selectedEventDetails?.city || selectedCity || 'TBD', // Use selectedCity as fallback
 
-        // Add rich game details for email
+        // Add rich game details for email with enhanced slot timing information
         selectedGamesObj: selectedGamesObj.map(game => ({
           id: game?.id,
           game_id: game?.game_id,
+          slot_id: game?.slot_id || game?.id, // Ensure slot_id is available
           custom_title: game?.custom_title,
           game_title: game?.game_title,
           custom_description: game?.custom_description,
           game_description: game?.game_description,
           start_time: game?.start_time,
           end_time: game?.end_time,
+          // Enhanced timing information for email ticket
+          slot_timing: `${game?.start_time} - ${game?.end_time}`,
+          formatted_timing: game?.start_time && game?.end_time ?
+            `${game.start_time} to ${game.end_time}` : 'Time TBD',
           slot_price: game?.slot_price,
           custom_price: game?.custom_price,
           max_participants: game?.max_participants,
-          game_duration_minutes: game?.game_duration_minutes
+          game_duration_minutes: game?.game_duration_minutes,
+          // Additional formatted information for ticket
+          display_title: game?.custom_title || game?.game_title || 'Game',
+          display_description: game?.custom_description || game?.game_description || '',
+          price_display: `₹${game?.slot_price || game?.custom_price || 0}`
+        })),
+
+        // Add a separate games_with_timings array for easy access in email templates
+        games_with_timings: selectedGamesObj.map(game => ({
+          game_name: game?.custom_title || game?.game_title || 'Game',
+          slot_timing: `${game?.start_time} - ${game?.end_time}`,
+          price: game?.slot_price || game?.custom_price || 0,
+          duration: `${game?.game_duration_minutes || 0} minutes`
         }))
       }
 
@@ -1053,7 +1097,7 @@ export default function RegisterEventClientPage() {
           try {
             const addOnsData = JSON.parse(savedAddOns)
             const loadedAddOns = addOnsData.map((item: { addOnId: string; quantity: number; variantId?: string }) => ({
-              addOn: addOns.find(addon => addon.id === item.addOnId) as AddOn,
+              addOn: apiAddOns.find(addon => addon.id === item.addOnId) as AddOn,
               quantity: item.quantity,
               variantId: item.variantId
             })).filter((item: { addOn: AddOn | undefined }) => item.addOn !== undefined)
@@ -1583,48 +1627,108 @@ export default function RegisterEventClientPage() {
                         </div>
                       </div>
                     ) : eligibleGames.length > 0 ? (
-                      <div className="grid gap-3 sm:grid-cols-1">
-                        {eligibleGames.map((game) => (
-                          <div
-                            key={game.id}
-                            className={cn(
-                              "flex items-start space-x-3 rounded-lg border-2 p-3 transition-all duration-200 cursor-pointer",
-                              selectedGames.includes(game.id)
-                                ? "border-primary bg-primary/10 shadow-md"
-                                : "border-muted hover:border-primary/30 hover:bg-primary/5"
-                            )}
-                            onClick={() => handleGameSelection(game.id)}
-                          >
-                            <div className="flex items-start space-x-3 flex-1">
-                              <Checkbox
-                                id={`game-${game.id}`}
-                                className="mt-1"
-                                checked={selectedGames.includes(game.id)}
-                                onCheckedChange={() => handleGameSelection(game.id)}
-                              />
-                                <div className="space-y-1 flex-1">
-                                  <Label htmlFor={`game-${game.id}`} className="font-medium cursor-pointer">
-                                    {game.custom_title || game.game_title}
-                                  </Label>
-                                  <p className="text-sm text-muted-foreground">{game.custom_description || game.game_description}</p>
-                                  <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="grid gap-4 sm:grid-cols-1">
+                        {(() => {
+                          // Group games by game_id to show slots for each game
+                          const groupedGames = eligibleGames.reduce((acc, game) => {
+                            const gameId = game.game_id;
+                            if (!acc[gameId]) {
+                              acc[gameId] = {
+                                gameInfo: {
+                                  game_id: game.game_id,
+                                  game_title: game.game_title,
+                                  game_description: game.game_description,
+                                  min_age: game.min_age,
+                                  max_age: game.max_age,
+                                  game_duration_minutes: game.game_duration_minutes,
+                                  custom_title: game.custom_title,
+                                  custom_description: game.custom_description,
+                                  custom_price: game.custom_price
+                                },
+                                slots: []
+                              };
+                            }
+                            acc[gameId].slots.push(game);
+                            return acc;
+                          }, {} as Record<number, { gameInfo: any; slots: any[] }>);
+
+                          return Object.values(groupedGames).map((gameGroup) => {
+                            const { gameInfo, slots } = gameGroup;
+                            const selectedSlotForGame = selectedGames.find(selection => selection.gameId === gameInfo.game_id);
+                            
+                            return (
+                              <div
+                                key={gameInfo.game_id}
+                                className="rounded-lg border-2 border-muted p-4 space-y-3"
+                              >
+                                {/* Game Header */}
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-lg">
+                                    {gameInfo.custom_title || gameInfo.game_title}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {gameInfo.custom_description || gameInfo.game_description}
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
                                     <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                      {game.start_time} {game.end_time ? `- ${game.end_time}` : ''}
+                                      {gameInfo.game_duration_minutes} min
                                     </div>
                                     <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                      {game.game_duration_minutes} min
-                                    </div>
-                                    <div className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                                      Age: {game.min_age}-{game.max_age} months
+                                      Age: {gameInfo.min_age}-{gameInfo.max_age} months
                                     </div>
                                   </div>
-                                  <div className="mt-2 text-sm">
-                                    <span className="font-medium text-primary">₹{game.slot_price || game.custom_price || 0}</span>
+                                </div>
+
+                                {/* Slot Selection */}
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium">
+                                    Select Time Slot {slots.length > 1 ? '(Choose one)' : ''}:
+                                  </Label>
+                                  <div className="grid gap-2">
+                                    {slots.map((slot) => {
+                                      const isSelected = selectedSlotForGame?.slotId === slot.id;
+                                      return (
+                                        <div
+                                          key={slot.id}
+                                          className={cn(
+                                            "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all duration-200",
+                                            isSelected
+                                              ? "border-primary bg-primary/10 shadow-md"
+                                              : "border-muted hover:border-primary/30 hover:bg-primary/5"
+                                          )}
+                                          onClick={() => handleGameSelection(slot.id)}
+                                        >
+                                          <div className="flex items-center space-x-3">
+                                            <input
+                                              type="radio"
+                                              name={`game-${gameInfo.game_id}`}
+                                              checked={isSelected}
+                                              onChange={() => handleGameSelection(slot.id)}
+                                              className="text-primary focus:ring-primary"
+                                            />
+                                            <div>
+                                              <div className="font-medium text-sm">
+                                                {slot.start_time} - {slot.end_time}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                Max {slot.max_participants} participants
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="font-medium text-primary">
+                                              ₹{slot.slot_price || slot.custom_price || 0}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>
-                          </div>
-                        ))}
+                            );
+                          });
+                        })()}
                       </div>
                     ) : (
                       <div className="rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 p-4 dark:from-yellow-950 dark:to-amber-950 border border-yellow-100 dark:border-yellow-900 shadow-inner">

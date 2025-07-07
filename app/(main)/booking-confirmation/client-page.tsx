@@ -445,14 +445,30 @@ function BookingConfirmationContent() {
                                 ticket.booking_game_id,
                                 ticket
                               ])).values()).map((ticket, index) => (
-                                <div key={ticket.booking_game_id || index} className="flex items-center gap-1">
-                                  <span>{ticket.slot_title || ticket.custom_title || ticket.game_name || "Game"}</span>
-                                  <span className="text-xs text-gray-500">(₹{ticket.game_price})</span>
+                                <div key={ticket.booking_game_id || index} className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1">
+                                    <span>{ticket.slot_title || ticket.custom_title || ticket.game_name || "Game"}</span>
+                                    <span className="text-xs text-gray-500">(₹{ticket.game_price})</span>
+                                  </div>
+                                  {/* Add slot timing information */}
+                                  {(ticket.start_time && ticket.end_time) && (
+                                    <div className="text-xs text-green-600 font-medium">
+                                      ⏰ {ticket.start_time} - {ticket.end_time}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            bookingDetails?.slot_title || bookingDetails?.custom_title || bookingDetails?.game_name || "N/A"
+                            <div className="flex flex-col gap-1">
+                              <span>{bookingDetails?.slot_title || bookingDetails?.custom_title || bookingDetails?.game_name || "N/A"}</span>
+                              {/* Add slot timing for single booking details */}
+                              {(bookingDetails?.start_time && bookingDetails?.end_time) && (
+                                <div className="text-xs text-green-600 font-medium">
+                                  ⏰ {bookingDetails.start_time} - {bookingDetails.end_time}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

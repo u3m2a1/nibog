@@ -62,6 +62,21 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
     const qrCodeBuffer = await generateQRCodeBuffer(ticketData.qrCodeData);
     console.log('🎫 QR code buffer generated, size:', qrCodeBuffer.length, 'bytes');
 
+    // Debug: Log ticket details being sent to PDF API
+    console.log('🎫 Ticket details being sent to PDF API:', {
+      count: ticketData.ticketDetails?.length || 0,
+      sampleTicket: ticketData.ticketDetails?.[0] ? {
+        parent_name: ticketData.ticketDetails[0].parent_name,
+        child_name: ticketData.ticketDetails[0].child_name,
+        event_title: ticketData.ticketDetails[0].event_title,
+        start_time: ticketData.ticketDetails[0].start_time,
+        end_time: ticketData.ticketDetails[0].end_time,
+        slot_title: ticketData.ticketDetails[0].slot_title,
+        custom_title: ticketData.ticketDetails[0].custom_title,
+        game_name: ticketData.ticketDetails[0].game_name
+      } : 'No ticket details available'
+    });
+
     // Send email using attachment API for better email client compatibility
     const emailResponse = await fetch('http://localhost:3000/api/send-ticket-email-with-attachment', {
       method: 'POST',
@@ -74,7 +89,8 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
         html: htmlContent,
         settings: settings,
         qrCodeBuffer: Array.from(qrCodeBuffer),
-        bookingRef: ticketData.bookingRef
+        bookingRef: ticketData.bookingRef,
+        ticketDetails: ticketData.ticketDetails // Pass actual ticket data for better PDF generation
       }),
     });
 
@@ -217,11 +233,20 @@ async function generateTicketHTML(ticketData: TicketEmailData): Promise<string> 
     <div style="background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
       <h4 style="margin: 0 0 10px 0; color: #0c5460;">📱 Important Instructions:</h4>
       <ul style="margin: 0; padding-left: 20px;">
-        <li>Show this email or scan the QR code at the venue entrance</li>
+        <li>Show this email, the attached PDF ticket, or scan the QR code at the venue entrance</li>
+        <li>Download and save the PDF ticket attachment for easy access</li>
         <li>Arrive 15 minutes before your scheduled game time</li>
         <li>Keep your booking reference handy: <strong>${ticketData.bookingRef}</strong></li>
         <li>Contact support if you have any questions</li>
       </ul>
+    </div>
+
+    <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+      <h4 style="margin: 0 0 10px 0; color: #155724;">📎 PDF Ticket Attached!</h4>
+      <p style="margin: 0;">
+        <strong>Your printable ticket is attached as a PDF file.</strong><br>
+        You can download, save, or print this PDF for easy access at the venue.
+      </p>
     </div>
 
     <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
@@ -261,7 +286,7 @@ async function generateQRCodeBuffer(data: string): Promise<Buffer> {
     return qrCodeBuffer;
   } catch (error) {
     console.error('🎫 Error generating QR code buffer:', error);
-    console.error('🎫 QR code error details:', error.message);
+    console.error('🎫 QR code error details:', error instanceof Error ? error.message : error);
     console.error('🎫 QR code data that failed:', data);
 
     // Try with simpler data as fallback
@@ -311,7 +336,7 @@ async function generateQRCodeDataURL(data: string): Promise<string> {
     return qrCodeDataURL;
   } catch (error) {
     console.error('🎫 Error generating QR code:', error);
-    console.error('🎫 QR code error details:', error.message);
+    console.error('🎫 QR code error details:', error instanceof Error ? error.message : error);
     console.error('🎫 QR code data that failed:', data);
 
     // Try with simpler data as fallback

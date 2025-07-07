@@ -138,18 +138,41 @@ export default function EditEventPage({ params }: Props) {
 
         // Format games data for the form
         const formattedGames = event.games.map((game: any) => {
-          return {
-            templateId: game.game_id.toString(),
-            customTitle: game.custom_title,
-            customDescription: game.custom_description,
-            customPrice: game.custom_price,
-            slots: [{
-              id: `game-${game.game_id}-slot-1`,
-              startTime: game.start_time.substring(0, 5), // Format HH:MM
-              endTime: game.end_time.substring(0, 5), // Format HH:MM
-              price: game.slot_price,
-              maxParticipants: game.max_participants
-            }]
+          // Check if the game has multiple slots (new API format)
+          if (game.slots && Array.isArray(game.slots) && game.slots.length > 0) {
+            // New API format with multiple slots
+            const slots = game.slots.map((slot: any, index: number) => ({
+              id: `game-${game.game_id}-slot-${index + 1}`,
+              startTime: slot.start_time.substring(0, 5), // Format HH:MM
+              endTime: slot.end_time.substring(0, 5), // Format HH:MM
+              price: slot.slot_price,
+              maxParticipants: slot.max_participants
+            }))
+
+            // Use the first slot's data for game-level customization
+            const firstSlot = game.slots[0]
+            return {
+              templateId: game.game_id.toString(),
+              customTitle: firstSlot.custom_title,
+              customDescription: firstSlot.custom_description,
+              customPrice: firstSlot.custom_price,
+              slots: slots
+            }
+          } else {
+            // Old API format with single slot
+            return {
+              templateId: game.game_id.toString(),
+              customTitle: game.custom_title,
+              customDescription: game.custom_description,
+              customPrice: game.custom_price,
+              slots: [{
+                id: `game-${game.game_id}-slot-1`,
+                startTime: game.start_time.substring(0, 5), // Format HH:MM
+                endTime: game.end_time.substring(0, 5), // Format HH:MM
+                price: game.slot_price,
+                maxParticipants: game.max_participants
+              }]
+            }
           }
         })
         setSelectedGames(formattedGames)
@@ -221,6 +244,8 @@ export default function EditEventPage({ params }: Props) {
 
         // Make sure we have a valid city ID
         const cityId = Number(cityObj.id)
+        
+
         if (isNaN(cityId) || cityId <= 0) {
           console.error(`Invalid city ID: ${cityObj.id}`)
           setVenueError("Invalid city ID")

@@ -741,13 +741,13 @@ export async function getGamesByAgeAndEvent(eventId: number, childAge: number): 
   try {
     console.log(`Fetching games for event ID: ${eventId} and child age: ${childAge} months`);
     
-    // Use the games by age and event API endpoint
-    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/events/get-games-by-ageandevent', {
+    // Use the new games by age and event API endpoint with slot grouping
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/events/get-games-by-ageandevent-new', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         event_id: Number(eventId),
         child_age: Number(childAge)
       }),

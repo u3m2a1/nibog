@@ -376,6 +376,9 @@ GET https://ai.alviongs.com/webhook/v1/nibog/event-registration/get-all
     ]
   }
 ]
+
+
+
 ## get event
 
 
@@ -388,9 +391,7 @@ payload
 }
 
 
-
 response 200 OK
-
 
 
 [
@@ -440,6 +441,11 @@ response 200 OK
     }
 ]
 
+
+
+
+
+
 ## delete event
 
 
@@ -459,6 +465,9 @@ response 200 OK
     "success": true
   }
 ]
+
+
+
 
 ## update event
 
@@ -501,6 +510,9 @@ response 200 OK
     "success": true
   }
 ]
+
+
+
 
 ## get event by city id
 
@@ -583,3 +595,81 @@ response 200 OK
         ]
     }
 ]
+
+
+
+
+POST https://ai.alviongs.com/webhook/v1/nibog/event-registration-new/get
+
+
+payload
+
+{
+  "id": 29
+}
+
+
+response 200 OK
+
+
+[
+    {
+        "event_id": 29,
+        "event_title": "NEW INDIA BABY OLYMPIC GAMES VIZAG SEASON-2",
+        "event_description": "🇮🇳 NEW INDIA BABY OLYMPIC GAMES – VIZAG | SEASON 2 🎉\nGet ready, Vizag! The most adorable and exciting event of the year is back – bigger, brighter, and even more fun!\n\n🗓️ August 15th: Kids Ramp Walk 👗✨\n🗓️ August 16th: Baby & Kids Sports Events 🏃‍♂️🏅",
+        "event_date": "2025-08-11T18:30:00.000Z",
+        "event_status": "Published",
+        "event_created_at": "2025-06-27T10:17:02.626Z",
+        "event_updated_at": "2025-06-27T10:17:02.626Z",
+        "city_id": 2,
+        "city_name": "Vizag",
+        "state": "Andhra Pradesh",
+        "city_is_active": true,
+        "city_created_at": "2025-05-05T01:32:41.578Z",
+        "city_updated_at": "2025-05-05T01:32:41.578Z",
+        "venue_id": 2,
+        "venue_name": "S3 Sports Arena",
+        "venue_address": "Besides, Women's College Grounds, MVP Main Rd, Sector 8, MVP Colony, Visakhapatnam, Andhra Pradesh 530017",
+        "venue_capacity": 1000,
+        "venue_is_active": true,
+        "venue_created_at": "2025-05-05T01:43:10.074Z",
+        "venue_updated_at": "2025-05-05T01:43:10.074Z",
+        "games": [
+            {
+                "game_id": 22,
+                "game_title": "KIDS RAMP WALK",
+                "game_description": " KIDS RAMP WALK – CONFIDENCE ON THE CATWALK! \n\nLet your little stars shine bright! \nThe Kids Ramp Walk is the perfect platform for children to express their inner talent, confidence, and creativity – while giving parents a chance to witness their child’s unique spark! \n\n Age Group: 2 to 12 years\nWalk, pose, smile & shine in front of a cheering crowd!\n\nWhether it’s cute, stylish, funny, or fabulous – every child gets their moment in the spotlight. \n All participants receive E-certificates, medals, and tons of encouragement!",
+                "min_age": 24,
+                "max_age": 90,
+                "game_duration_minutes": 120,
+                "categories": [
+                    "3:00pm"
+                ],
+                "slots": [
+                    {
+                        "custom_title": "KIDS RAMP WALK",
+                        "custom_description": " KIDS RAMP WALK – CONFIDENCE ON THE CATWALK! \n\nLet your little stars shine bright! \nThe Kids Ramp Walk is the perfect platform for children to express their inner talent, confidence, and creativity – while giving parents a chance to witness their child’s unique spark! \n\n Age Group: 2 to 12 years\nWalk, pose, smile & shine in front of a cheering crowd!\n\nWhether it’s cute, stylish, funny, or fabulous – every child gets their moment in the spotlight. \n All participants receive E-certificates, medals, and tons of encouragement!",
+                        "custom_price": 1500,
+                        "start_time": "10:00:00",
+                        "end_time": "11:30:00",
+                        "slot_price": 1500,
+                        "max_participants": 12
+                    },
+                    {
+                        "custom_title": "KIDS RAMP WALK",
+                        "custom_description": " KIDS RAMP WALK – CONFIDENCE ON THE CATWALK! \n\nLet your little stars shine bright! \nThe Kids Ramp Walk is the perfect platform for children to express their inner talent, confidence, and creativity – while giving parents a chance to witness their child’s unique spark! \n\n Age Group: 2 to 12 years\nWalk, pose, smile & shine in front of a cheering crowd!\n\nWhether it’s cute, stylish, funny, or fabulous – every child gets their moment in the spotlight. \n All participants receive E-certificates, medals, and tons of encouragement!",
+                        "custom_price": 1500,
+                        "start_time": "15:00:00",
+                        "end_time": "20:00:00",
+                        "slot_price": 1500,
+                        "max_participants": 40
+                    }
+                ]
+            }
+        ]
+    }
+]
+
+
+
+
