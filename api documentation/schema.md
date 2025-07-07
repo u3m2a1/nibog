@@ -581,3 +581,18 @@ CREATE TABLE booking_addons (
     quantity INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+
+
+
+CREATE TABLE homepage_sections (
+  id SERIAL PRIMARY KEY,
+  image_path VARCHAR(255) NOT NULL,
+  status VARCHAR(10) CHECK (status IN ('active', 'inactive')) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+

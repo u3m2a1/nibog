@@ -7,6 +7,7 @@ import {
   BarChart3,
   Calendar,
   Home,
+  LayoutDashboard,
   MapPin,
   Users,
   Tag,
@@ -33,7 +34,17 @@ const adminRoutes = [
   {
     href: "/admin",
     label: "Dashboard",
+    icon: <LayoutDashboard className="h-5 w-5" />,
+  },
+  {
+    href: "/admin/home",
+    label: "Home Section",
     icon: <Home className="h-5 w-5" />,
+  },
+  {
+    href: "/admin/email",
+    label: "Email Sending",
+    icon: <MessageSquare className="h-5 w-5" />,
   },
   {
     href: "/admin/games",
