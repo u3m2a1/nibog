@@ -109,3 +109,18 @@ Response (200 OK)
 
 
 
+
+GET https://ai.alviongs.com/webhook/v1/nibog/city/get-all-city-event-count
+
+
+response (200 OK)
+
+[
+    {
+        "city_id": 12,
+        "city_name": "vizag",
+        "state": "Andhra Pradesh",
+        "venue_count": "1",
+        "event_count": "1"
+    }
+]

@@ -17,8 +17,7 @@ export interface City {
  */
 export const getAllCities = async (): Promise<City[]> => {
   try {
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/cities/get-all', {
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/city/get-all-city-event-count', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -48,7 +47,17 @@ export const getAllCities = async (): Promise<City[]> => {
       return [];
     }
 
-    return data;
+    // Map API response to local City interface
+    return data.map((item: any) => ({
+      id: item.city_id ?? item.id,
+      city_name: item.city_name,
+      state: item.state,
+      is_active: item.is_active ?? true,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      venues: Number(item.venue_count) || 0,
+      events: Number(item.event_count) || 0,
+    }));
   } catch (error) {
     throw error;
   }

@@ -28,7 +28,7 @@ const AddOnSelector = dynamic(() => import("@/components/add-on-selector"), {
 })
 
 import { fetchAllAddOnsFromExternalApi } from "@/services/addOnService"
-import { AddOn } from "@/types"
+import type { AddOn as AddOnType } from "@/types"
 import { getAllCities } from "@/services/cityService"
 import { getEventsByCityId, getGamesByAgeAndEvent, EventListItem, EventGameListItem } from "@/services/eventService"
 import { getGamesByAge, Game } from "@/services/gameService"
@@ -71,7 +71,21 @@ export default function RegisterEventClientPage() {
   const [selectedCity, setSelectedCity] = useState<string>("") // Empty string initially
   const [selectedEventType, setSelectedEventType] = useState<string>("") // New state for event type dropdown
   const [selectedEvent, setSelectedEvent] = useState<string>("")
-  const [eligibleEvents, setEligibleEvents] = useState<any[]>([])
+  const [eligibleEvents, setEligibleEvents] = useState<
+    Array<{
+      id: string;
+      title: string;
+      description: string;
+      minAgeMonths: number;
+      maxAgeMonths: number;
+      date: string;
+      time: string;
+      venue: string;
+      city: string;
+      price: number;
+      image: string;
+    }>
+  >([])
   const [availableDates, setAvailableDates] = useState<Date[]>([])
   const [step, setStep] = useState(1)
   const [parentName, setParentName] = useState<string>('')
@@ -81,14 +95,14 @@ export default function RegisterEventClientPage() {
   const [gender, setGender] = useState<string>('female')
   const [schoolName, setSchoolName] = useState<string>('')
   const [termsAccepted, setTermsAccepted] = useState<boolean>(false)
-  const [selectedAddOns, setSelectedAddOns] = useState<{ addOn: AddOn; quantity: number; variantId?: string }[]>([])
+  const [selectedAddOns, setSelectedAddOns] = useState<{ addOn: AddOnType; quantity: number; variantId?: string }[]>([])
   const [cities, setCities] = useState<{ id: string | number; name: string }[]>([])
   const [isLoadingCities, setIsLoadingCities] = useState<boolean>(false)
   const [cityError, setCityError] = useState<string | null>(null)
   const [apiEvents, setApiEvents] = useState<EventListItem[]>([])
   const [isLoadingEvents, setIsLoadingEvents] = useState<boolean>(false)
   const [eventError, setEventError] = useState<string | null>(null)
-  const [apiAddOns, setApiAddOns] = useState<AddOn[]>([])
+  const [apiAddOns, setApiAddOns] = useState<AddOnType[]>([])
   const [isLoadingAddOns, setIsLoadingAddOns] = useState<boolean>(false)
   const [addOnError, setAddOnError] = useState<string | null>(null)
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null)
@@ -96,7 +110,7 @@ export default function RegisterEventClientPage() {
   const [isLoadingGames, setIsLoadingGames] = useState<boolean>(false)
   const [gameError, setGameError] = useState<string | null>(null)
   const [eligibleGames, setEligibleGames] = useState<Game[]>([])
-  const [selectedGames, setSelectedGames] = useState<{gameId: number, slotId: number}[]>([])
+  const [selectedGames, setSelectedGames] = useState<Array<{gameId: number; slotId: number}>>([])
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState<boolean>(false)
@@ -122,7 +136,7 @@ export default function RegisterEventClientPage() {
       try {
         const addOnData = await fetchAllAddOnsFromExternalApi();
         console.log('Fetched add-ons from external API:', addOnData);
-        setApiAddOns(addOnData);
+        setApiAddOns(addOnData as AddOnType[]);
       } catch (error) {
         console.error('Failed to load add-ons:', error);
         setAddOnError('Failed to load add-ons. Please try again.');
@@ -212,7 +226,7 @@ export default function RegisterEventClientPage() {
   // Calculate add-ons subtotal
   const calculateAddOnsTotal = () => {
     const total = selectedAddOns.reduce((sum, item) => {
-      let price = parseFloat(item.addOn.price.toString()) || 0;
+      let price = parseFloat(String(item.addOn.price)) || 0;
 
       // Check if this is a variant with a different price
       if (item.variantId && item.addOn.hasVariants && item.addOn.variants) {
@@ -220,10 +234,10 @@ export default function RegisterEventClientPage() {
         if (variant) {
           // Use the variant's price if available, otherwise add price modifier to base price
           if (typeof variant.price === 'number' || !isNaN(parseFloat(variant.price?.toString() || ''))) {
-            price = parseFloat(variant.price.toString());
+            price = parseFloat(String(variant.price));
           } else if (typeof variant.price_modifier === 'number' || !isNaN(parseFloat((variant.price_modifier || 0).toString()))) {
-            const modifier = parseFloat((variant.price_modifier || 0).toString());
-            price = parseFloat(item.addOn.price.toString()) + modifier;
+            const modifier = parseFloat(String(variant.price_modifier || 0));
+            price = parseFloat(String(item.addOn.price)) + modifier;
           }
         }
       }
@@ -516,24 +530,24 @@ export default function RegisterEventClientPage() {
   // Handle game selection with slot selection
   const handleGameSelection = (slotId: number) => {
     // Find the game associated with this slot
-    const selectedSlot = eligibleGames.find(g => g.id === slotId);
+    const selectedSlot = eligibleGames.find((g) => g.id === slotId);
     if (!selectedSlot) return;
-
+  
     const gameId = selectedSlot.game_id;
-
+  
     // Toggle selection: add if not selected, remove if already selected
-    setSelectedGames(prev => {
+    setSelectedGames((prev) => {
       // Check if this slot is already selected
-      const existingSelectionIndex = prev.findIndex(selection => selection.slotId === slotId);
-      
-      let newSelectedGames;
+      const existingSelectionIndex = prev.findIndex((selection) => selection.slotId === slotId);
+  
+      let newSelectedGames: Array<{ gameId: number; slotId: number }>;
       if (existingSelectionIndex >= 0) {
         // Remove this slot selection
         newSelectedGames = prev.filter((_, index) => index !== existingSelectionIndex);
       } else {
         // Check if user already selected a slot for this game
-        const existingGameSelectionIndex = prev.findIndex(selection => selection.gameId === gameId);
-        
+        const existingGameSelectionIndex = prev.findIndex((selection) => selection.gameId === gameId);
+  
         if (existingGameSelectionIndex >= 0) {
           // Replace the existing slot selection for this game
           newSelectedGames = prev.map((selection, index) =>
@@ -546,19 +560,19 @@ export default function RegisterEventClientPage() {
           newSelectedGames = [...prev, { gameId, slotId }];
         }
       }
-
+  
       // Reset promocode when games change
       setPromoCode('');
       setAppliedPromoCode(null);
       setDiscountAmount(0);
-
+  
       // Fetch applicable promocodes for the new game selection
       if (newSelectedGames.length > 0 && selectedEventType) {
-        const selectedApiEvent = apiEvents.find(event => event.event_title === selectedEventType);
+        const selectedApiEvent = apiEvents.find((event) => event.event_title === selectedEventType);
         if (selectedApiEvent) {
           // Get unique game IDs for promo code API
-          const gameIdsForPromo = [...new Set(newSelectedGames.map(selection => selection.gameId))];
-
+          const gameIdsForPromo = [...new Set(newSelectedGames.map((selection) => selection.gameId))];
+  
           if (gameIdsForPromo.length > 0) {
             fetchApplicablePromocodes(selectedApiEvent.event_id, gameIdsForPromo);
           }
@@ -566,14 +580,14 @@ export default function RegisterEventClientPage() {
       } else {
         setAvailablePromocodes([]);
       }
-
+  
       return newSelectedGames;
     });
-
+  
     // Log selection state for debugging
     console.log(`Toggled slot ID: ${slotId} for game ID: ${gameId}`);
     console.log("Selected slot:", selectedSlot);
-  }
+  };
 
   // Get unique event titles from API events
   const getUniqueEventTypes = () => {
@@ -585,7 +599,7 @@ export default function RegisterEventClientPage() {
   }
 
   // Get selected event details from eligible events
-  const selectedEventDetails = eligibleEvents.find(event => event.id === selectedEvent);
+  const selectedEventDetails = eligibleEvents.find((event) => event.id === selectedEvent);
 
   // Handle registration - now focuses on authentication check and navigation
   const handleRegistration = async () => {
@@ -2035,11 +2049,11 @@ export default function RegisterEventClientPage() {
                             // For variants, we need to use the base price + price_modifier
                             // If variant has a direct price, use that, otherwise use base price + modifier
                             if (variant.price) {
-                              price = parseFloat(variant.price || '0');
+                              price = parseFloat(String(variant.price));
                             } else if (variant.price_modifier) {
                               // Add the price modifier to the base price
-                              const modifier = parseFloat(variant.price_modifier || '0');
-                              price = parseFloat(item.addOn.price || '0') + modifier;
+                              const modifier = parseFloat(String(variant.price_modifier || 0));
+                              price = parseFloat(String(item.addOn.price)) + modifier;
                             }
                             
                             console.log(`Calculated variant price for ${item.addOn.name}: ${price}`);

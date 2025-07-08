@@ -342,10 +342,9 @@ export const getVenuesByCity = async (cityId: number): Promise<Venue[]> => {
  */
 export const getAllVenuesWithCity = async (): Promise<any[]> => {
   try {
-    console.log("Fetching all venues with city details...");
+    console.log("Fetching all venues with city details from new API...");
 
-    // Use our internal API route to avoid CORS issues
-    const response = await fetch('/api/venues/getall-with-city', {
+    const response = await fetch('https://ai.alviongs.com/webhook/v1/nibog/venues/getall-with-city-event-count', {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -367,41 +366,6 @@ export const getAllVenuesWithCity = async (): Promise<any[]> => {
         // If we can't parse the error as JSON, use the status code
       }
 
-      // If the specific endpoint fails, try to get venues and cities separately
-      console.log("Primary endpoint failed, trying to fetch venues and cities separately...");
-
-      try {
-        const [venuesResponse, citiesResponse] = await Promise.all([
-          fetch('/api/venues/get-all', {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          }),
-          fetch('/api/cities/get-all', {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          })
-        ]);
-
-        if (venuesResponse.ok && citiesResponse.ok) {
-          const venues = await venuesResponse.json();
-          const cities = await citiesResponse.json();
-
-          // Merge venues with city data
-          const venuesWithCity = venues.map((venue: any) => {
-            const city = cities.find((c: any) => c.id === venue.city_id);
-            return {
-              ...venue,
-              city: city || { id: venue.city_id, city_name: 'Unknown City' }
-            };
-          });
-
-          console.log(`Retrieved ${venuesWithCity.length} venues with city details using fallback method`);
-          return venuesWithCity;
-        }
-      } catch (fallbackError) {
-        console.error("Fallback method also failed:", fallbackError);
-      }
-
       throw new Error(errorMessage);
     }
 
@@ -413,7 +377,23 @@ export const getAllVenuesWithCity = async (): Promise<any[]> => {
       return [];
     }
 
-    return data;
+    // Map API response to local Venue + City structure
+    return data.map((item: any) => ({
+      id: item.venue_id,
+      venue_name: item.venue_name,
+      address: item.address,
+      capacity: item.capacity,
+      is_active: item.venue_is_active,
+      created_at: item.venue_created_at,
+      updated_at: item.venue_updated_at,
+      city_id: item.city_id,
+      city_name: item.city_name,
+      state: item.state,
+      city_is_active: item.city_is_active,
+      city_created_at: item.city_created_at,
+      city_updated_at: item.city_updated_at,
+      event_count: Number(item.event_count) || 0,
+    }));
   } catch (error) {
     console.error("Error fetching venues with city:", error);
     throw error;

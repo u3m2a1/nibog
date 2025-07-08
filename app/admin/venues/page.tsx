@@ -90,7 +90,7 @@ export default function VenuesPage() {
               city_is_active: venue.city_is_active !== undefined ? venue.city_is_active : true,
               city_created_at: venue.city_created_at || new Date().toISOString(),
               city_updated_at: venue.city_updated_at || new Date().toISOString(),
-              events: Math.floor(Math.random() * 10) // Random number for demo purposes
+              events: Number(venue.event_count) || 0 // Use event_count from API
             }
           })
 
@@ -101,7 +101,11 @@ export default function VenuesPage() {
         // Fetch cities for the filter dropdown
         const citiesData = await getAllCities()
         console.log("Cities data received:", citiesData)
-        setCities(citiesData)
+        setCities(
+          citiesData
+            .filter(city => typeof city.id === "number")
+            .map(city => ({ id: city.id ?? 0, city_name: city.city_name }))
+        )
       } catch (error: any) {
         console.error("Failed to fetch data:", error)
         setError(error.message || "Failed to load venues. Please try again.")
