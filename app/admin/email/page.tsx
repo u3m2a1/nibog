@@ -19,9 +19,10 @@ export default function EmailSendingPage() {
   const [emailData, setEmailData] = useState({
     subject: "",
     content: "",
-    recipients: "all", // all, registered, admin
+    recipients: "all-users", // all-users, all-parents, event-parents, event-users, event-all-users
     attachments: [],
     template: "default",
+    eventId: "",
   })
   
   // Template state
@@ -48,9 +49,10 @@ export default function EmailSendingPage() {
       setEmailData({
         subject: "",
         content: "",
-        recipients: "all",
+        recipients: "all-users",
         attachments: [],
         template: "default",
+        eventId: "",
       })
     } catch (error) {
       toast({
@@ -106,7 +108,6 @@ export default function EmailSendingPage() {
           <TabsList className="mb-4 w-full flex flex-wrap gap-2">
             <TabsTrigger value="send" className="flex-1">Send Email</TabsTrigger>
             <TabsTrigger value="templates" className="flex-1">Email Templates</TabsTrigger>
-            <TabsTrigger value="history" className="flex-1">Send History</TabsTrigger>
           </TabsList>
           <TabsContent value="send">
             <Card className="w-full shadow border-blue-100">
@@ -116,76 +117,90 @@ export default function EmailSendingPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSendEmail} className="space-y-6 w-full">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="email-template">Email Template</Label>
-                      <Select
-                        value={emailData.template}
-                        onValueChange={(value) => setEmailData({...emailData, template: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default Template</SelectItem>
-                          <SelectItem value="newsletter">Newsletter Template</SelectItem>
-                          <SelectItem value="event-reminder">Event Reminder</SelectItem>
-                          <SelectItem value="custom">Custom (No Template)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email-subject">Subject</Label>
-                      <Input
-                        id="email-subject"
-                        value={emailData.subject}
-                        onChange={(e) => setEmailData({...emailData, subject: e.target.value})}
-                        placeholder="Email subject"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-content">Content</Label>
-                    <Textarea
-                      id="email-content"
-                      value={emailData.content}
-                      onChange={(e) => setEmailData({...emailData, content: e.target.value})}
-                      placeholder="Type your email content here..."
-                      rows={8}
-                      required
-                    />
-                  </div>
                   <div className="space-y-2">
                     <Label>Recipients</Label>
                     <div className="flex flex-wrap gap-4">
                       <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="recipients-all"
-                          checked={emailData.recipients === "all"}
-                          onCheckedChange={() => setEmailData({...emailData, recipients: "all"})}
+                          id="recipients-all-users"
+                          checked={emailData.recipients === "all-users"}
+                          onCheckedChange={() => setEmailData({...emailData, recipients: "all-users"})}
                         />
-                        <Label htmlFor="recipients-all">All Users</Label>
+                        <Label htmlFor="recipients-all-users">All Users</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="recipients-registered"
-                          checked={emailData.recipients === "registered"}
-                          onCheckedChange={() => setEmailData({...emailData, recipients: "registered"})}
+                          id="recipients-all-parents"
+                          checked={emailData.recipients === "all-parents"}
+                          onCheckedChange={() => setEmailData({...emailData, recipients: "all-parents"})}
                         />
-                        <Label htmlFor="recipients-registered">Registered Users</Label>
+                        <Label htmlFor="recipients-all-parents">All Parents</Label>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Checkbox
-                          id="recipients-admin"
-                          checked={emailData.recipients === "admin"}
-                          onCheckedChange={() => setEmailData({...emailData, recipients: "admin"})}
+                          id="recipients-event-parents"
+                          checked={emailData.recipients === "event-parents"}
+                          onCheckedChange={() => setEmailData({...emailData, recipients: "event-parents"})}
                         />
-                        <Label htmlFor="recipients-admin">Admin Users</Label>
+                        <Label htmlFor="recipients-event-parents">Event Parents</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="recipients-event-users"
+                          checked={emailData.recipients === "event-users"}
+                          onCheckedChange={() => setEmailData({...emailData, recipients: "event-users"})}
+                        />
+                        <Label htmlFor="recipients-event-users">Event Users</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="recipients-event-all-users"
+                          checked={emailData.recipients === "event-all-users"}
+                          onCheckedChange={() => setEmailData({...emailData, recipients: "event-all-users"})}
+                        />
+                        <Label htmlFor="recipients-event-all-users">Event All Users</Label>
                       </div>
                     </div>
+                    {(emailData.recipients === "event-parents" ||
+                      emailData.recipients === "event-users" ||
+                      emailData.recipients === "event-all-users") && (
+                      <div className="mt-4">
+                        <Label htmlFor="event-select">Select Event</Label>
+                        <Select
+                          value={emailData.eventId}
+                          onValueChange={(value) => setEmailData({...emailData, eventId: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an event" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* TODO: Replace with dynamic event list */}
+                            <SelectItem value="1">Event 1</SelectItem>
+                            <SelectItem value="2">Event 2</SelectItem>
+                            <SelectItem value="3">Event 3</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                  <Button type="submit" disabled={isLoading} className="w-full md:w-auto">
+                  <div className="space-y-2">
+                    <Label htmlFor="email-template">Email Template</Label>
+                    <Select
+                      value={emailData.template}
+                      onValueChange={(value) => setEmailData({...emailData, template: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Default Template</SelectItem>
+                        <SelectItem value="newsletter">Newsletter Template</SelectItem>
+                        <SelectItem value="event-reminder">Event Reminder</SelectItem>
+                        <SelectItem value="custom">Custom (No Template)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" disabled={isLoading} className="w-full md:w-auto mt-4">
                     {isLoading ? (
                       <span className="flex items-center gap-2">
                         <svg className="animate-spin" width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="#2563eb" strokeWidth="4" opacity="0.2"/><path d="M22 12a10 10 0 0 1-10 10" stroke="#2563eb" strokeWidth="4" strokeLinecap="round"/></svg>
@@ -321,48 +336,6 @@ export default function EmailSendingPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
-          <TabsContent value="history">
-            <Card className="w-full shadow border-blue-100">
-              <CardHeader className="bg-blue-50 rounded-t-lg border-b border-blue-100 w-full">
-                <CardTitle className="text-xl font-semibold text-blue-800">Email History</CardTitle>
-                <CardDescription>View history of sent emails</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border overflow-x-auto w-full">
-                  <div className="grid grid-cols-2 md:grid-cols-5 p-4 font-medium border-b min-w-[600px]">
-                    <div>Date</div>
-                    <div>Subject</div>
-                    <div>Template</div>
-                    <div>Recipients</div>
-                    <div>Status</div>
-                  </div>
-                  <div className="divide-y">
-                    <div className="grid grid-cols-2 md:grid-cols-5 p-4 min-w-[600px]">
-                      <div>2025-07-05</div>
-                      <div>July Newsletter</div>
-                      <div>Newsletter</div>
-                      <div>All Users (234)</div>
-                      <div className="text-green-500">Sent</div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 p-4 min-w-[600px]">
-                      <div>2025-07-03</div>
-                      <div>Event Reminder: Summer Games</div>
-                      <div>Event Reminder</div>
-                      <div>Registered (42)</div>
-                      <div className="text-green-500">Sent</div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 p-4 min-w-[600px]">
-                      <div>2025-06-28</div>
-                      <div>Welcome to NIBOG</div>
-                      <div>Welcome</div>
-                      <div>New Users (18)</div>
-                      <div className="text-green-500">Sent</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

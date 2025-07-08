@@ -95,7 +95,9 @@ export default function BookingsPage() {
       setError(null)
 
       const response = await getPaginatedBookings({ page, limit })
-      setBookings(response.data)
+      // Ensure we're setting an empty array if data is null or undefined
+      setBookings(response.data || [])
+      console.log("Fetched bookings:", response.data)
 
       // Update pagination state
       setCurrentPage(response.pagination.page)
@@ -104,15 +106,21 @@ export default function BookingsPage() {
       setHasNext(response.pagination.hasNext)
       setHasPrev(response.pagination.hasPrev)
 
-      // Extract unique cities and events from the bookings data
-      const uniqueCities = Array.from(new Set(response.data.map(booking => booking.city_name)))
-        .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
+      // Only extract unique cities and events if there is actual data
+      if (response.data && response.data.length > 0) {
+        const uniqueCities = Array.from(new Set(response.data.map(booking => booking.city_name)))
+          .map((cityName, index) => ({ id: String(index + 1), name: cityName as string }))
 
-      const uniqueEvents = Array.from(new Set(response.data.map(booking => booking.event_title)))
-        .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
+        const uniqueEvents = Array.from(new Set(response.data.map(booking => booking.event_title)))
+          .map((eventTitle, index) => ({ id: String(index + 1), name: eventTitle as string }))
 
-      setCities(uniqueCities)
-      setEvents(uniqueEvents)
+        setCities(uniqueCities)
+        setEvents(uniqueEvents)
+      } else {
+        // Reset cities and events when no data
+        setCities([])
+        setEvents([])
+      }
     } catch (error: any) {
       console.error("Failed to fetch bookings:", error)
       setError(error.message || "Failed to load bookings. Please try again.")
@@ -128,6 +136,7 @@ export default function BookingsPage() {
 
   useEffect(() => {
     fetchBookings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize]) // Fetch when page or page size changes
 
   // Handle confirm booking
@@ -229,17 +238,17 @@ export default function BookingsPage() {
       const query = searchQuery.toLowerCase()
       const searchableFields = [
         String(booking.booking_id),
-        booking.parent_name?.toLowerCase() || '',
-        booking.parent_email?.toLowerCase() || '',
+        typeof booking.parent_name === "string" ? booking.parent_name.toLowerCase() : '',
+        typeof booking.parent_email === "string" ? booking.parent_email.toLowerCase() : '',
         booking.parent_additional_phone || '',
-        booking.child_full_name?.toLowerCase() || '',
-        booking.event_title?.toLowerCase() || '',
-        booking.city_name?.toLowerCase() || '',
-        booking.venue_name?.toLowerCase() || '',
-        booking.booking_status?.toLowerCase() || '',
-        booking.payment_method?.toLowerCase() || '',
-        booking.payment_status?.toLowerCase() || '',
-        booking.game_name?.toLowerCase() || ''
+        typeof booking.child_full_name === "string" ? booking.child_full_name.toLowerCase() : '',
+        typeof booking.event_title === "string" ? booking.event_title.toLowerCase() : '',
+        typeof booking.city_name === "string" ? booking.city_name.toLowerCase() : '',
+        typeof booking.venue_name === "string" ? booking.venue_name.toLowerCase() : '',
+        typeof booking.booking_status === "string" ? booking.booking_status.toLowerCase() : '',
+        typeof booking.payment_method === "string" ? booking.payment_method.toLowerCase() : '',
+        typeof booking.payment_status === "string" ? booking.payment_status.toLowerCase() : '',
+        typeof booking.game_name === "string" ? booking.game_name.toLowerCase() : ''
       ]
 
       const matchesSearch = searchableFields.some(field =>
@@ -262,7 +271,11 @@ export default function BookingsPage() {
     }
 
     // Status filter
-    if (selectedStatus !== "all" && booking.booking_status.toLowerCase() !== selectedStatus.toLowerCase()) {
+    if (
+      selectedStatus !== "all" &&
+      typeof booking.booking_status === "string" &&
+      booking.booking_status.toLowerCase() !== selectedStatus.toLowerCase()
+    ) {
       return false
     }
 
@@ -284,12 +297,12 @@ export default function BookingsPage() {
   })
 
   // Calculate summary statistics (for current page only - note: for accurate totals across all pages, we'd need separate API calls)
-  const confirmedBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'confirmed').length
-  const pendingBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'pending').length
-  const cancelledBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'cancelled').length
-  const completedBookings = bookings.filter(b => b.booking_status.toLowerCase() === 'completed').length
+  const confirmedBookings = bookings.filter(b => typeof b.booking_status === "string" && b.booking_status.toLowerCase() === 'confirmed').length
+  const pendingBookings = bookings.filter(b => typeof b.booking_status === "string" && b.booking_status.toLowerCase() === 'pending').length
+  const cancelledBookings = bookings.filter(b => typeof b.booking_status === "string" && b.booking_status.toLowerCase() === 'cancelled').length
+  const completedBookings = bookings.filter(b => typeof b.booking_status === "string" && b.booking_status.toLowerCase() === 'completed').length
   const totalRevenue = bookings
-    .filter(b => ['confirmed', 'completed'].includes(b.booking_status.toLowerCase()))
+    .filter(b => typeof b.booking_status === "string" && ['confirmed', 'completed'].includes(b.booking_status.toLowerCase()))
     .reduce((sum, b) => sum + parseFloat(b.total_amount || '0'), 0)
 
   return (
@@ -300,7 +313,11 @@ export default function BookingsPage() {
           <p className="text-muted-foreground">Manage NIBOG event bookings</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefreshBookings} disabled={isLoading}>
+          <Button
+            variant="outline"
+            onClick={() => handleRefreshBookings()}
+            disabled={isLoading}
+          >
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
@@ -456,7 +473,7 @@ export default function BookingsPage() {
               <TableHead>Child</TableHead>
               <TableHead>Event</TableHead>
               <TableHead>City</TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead>Booking Date</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -484,8 +501,8 @@ export default function BookingsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredBookings.map((booking) => (
-                <TableRow key={booking.booking_id}>
+              filteredBookings.map((booking, idx) => (
+                <TableRow key={booking.booking_id ?? idx}>
                   <TableCell className="font-medium">{booking.booking_id}</TableCell>
                   <TableCell>
                     {booking.parent_name}
@@ -493,17 +510,22 @@ export default function BookingsPage() {
                   </TableCell>
                   <TableCell>
                     {booking.child_full_name}
+                  </TableCell>
+                  <TableCell>
+                    {booking.event_title}
                     <div className="text-xs text-muted-foreground">
-                      {new Date(booking.child_date_of_birth).toLocaleDateString()}
+                      Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
                     </div>
                   </TableCell>
-                  <TableCell>{booking.event_title}</TableCell>
                   <TableCell>{booking.city_name}</TableCell>
                   <TableCell>
-                    {new Date(booking.event_event_date).toLocaleDateString()}
+                    <div>{booking.child_full_name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
+                    </div>
                   </TableCell>
                   <TableCell>₹{booking.total_amount}</TableCell>
-                  <TableCell>{getStatusBadge(booking.booking_status.toLowerCase())}</TableCell>
+                  <TableCell>{getStatusBadge(typeof booking.booking_status === "string" ? booking.booking_status.toLowerCase() : "")}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="icon" asChild>
@@ -518,7 +540,7 @@ export default function BookingsPage() {
                           <span className="sr-only">Edit</span>
                         </Link>
                       </Button>
-                      {booking.booking_status.toLowerCase() === "pending" && (
+                      {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "pending" && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
@@ -564,7 +586,7 @@ export default function BookingsPage() {
                           </AlertDialogContent>
                         </AlertDialog>
                       )}
-                      {booking.booking_status.toLowerCase() === "confirmed" && (
+                      {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "confirmed" && (
                         <>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -621,8 +643,9 @@ export default function BookingsPage() {
       <div className="flex items-center justify-between px-2 py-4">
         <div className="flex items-center space-x-2">
           <p className="text-sm text-muted-foreground">
-            Showing {bookings.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0} to{' '}
-            {Math.min(currentPage * pageSize, totalBookings)} of {totalBookings} bookings
+            {filteredBookings.length === 0
+              ? "No bookings found."
+              : `Showing ${bookings.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0} to ${Math.min(currentPage * pageSize, totalBookings)} of ${totalBookings} bookings`}
           </p>
         </div>
 
