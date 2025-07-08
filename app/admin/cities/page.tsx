@@ -186,83 +186,116 @@ export default function CitiesPage() {
             ) : filteredCities.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No cities found.
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <p>No cities found.</p>
+                    <Button asChild>
+                      <Link href="/admin/cities/new">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Your First City
+                      </Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCities.map((city) => (
-                <TableRow key={city.id}>
-                  <TableCell className="font-medium">{city.city_name}</TableCell>
-                  <TableCell>{city.state}</TableCell>
-                  <TableCell>{city.venues || 0}</TableCell>
-                  <TableCell>{city.events || 0}</TableCell>
-                  <TableCell>
-                    {city.is_active ? (
-                      <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                    ) : (
-                      <Badge variant="outline">Inactive</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/cities/${city.id}`}>
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View</span>
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/cities/${city.id}/edit`}>
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Link>
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
+              (() => {
+                const displayCities = filteredCities
+                  .filter(city =>
+                    (city.city_name && city.city_name !== "No venues") &&
+                    (city.venues && city.venues > 0)
+                  );
+                if (displayCities.length === 0) {
+                  return (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center">
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                          <p>No cities found.</p>
+                          <Button asChild>
+                            <Link href="/admin/cities/new">
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add Your First City
+                            </Link>
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete City</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              <div className="flex items-start gap-2">
-                                <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
-                                <div className="space-y-2">
-                                  <div className="font-medium">This action cannot be undone.</div>
-                                  <div>
-                                    This will permanently delete the city "{city.city_name}" and all associated data.
-                                    {(city.venues && city.venues > 0) || (city.events && city.events > 0) ? (
-                                      <>
-                                        This city has {city.venues || 0} venue{(city.venues || 0) !== 1 ? "s" : ""} and {city.events || 0} event{(city.events || 0) !== 1 ? "s" : ""}.
-                                        Deleting it may affect existing data.
-                                      </>
-                                    ) : (
-                                      "This city has no venues or events."
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-red-500 hover:bg-red-600"
-                              onClick={() => handleDeleteCity(city.id!)}
-                              disabled={isDeleting === city.id}
-                            >
-                              {isDeleting === city.id ? "Deleting..." : "Delete City"}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+                return displayCities.map((city) => (
+                  <TableRow key={city.id}>
+                    <TableCell className="font-medium">{city.city_name}</TableCell>
+                    <TableCell>{city.state}</TableCell>
+                    <TableCell>
+                      {city.venues && city.venues > 0
+                        ? city.venues
+                        : "No venues"}
+                    </TableCell>
+                    <TableCell>{city.events || 0}</TableCell>
+                    <TableCell>
+                      {city.is_active ? (
+                        <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
+                      ) : (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/cities/${city.id}`}>
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">View</span>
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/cities/${city.id}/edit`}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Link>
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash className="h-4 w-4" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete City</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                <span>
+                                  <strong>This action cannot be undone.</strong>
+                                  <br />
+                                  This will permanently delete the city "{city.city_name}" and all associated data.
+                                  <br />
+                                  {(city.venues && city.venues > 0) || (city.events && city.events > 0) ? (
+                                    <>
+                                      This city has {city.venues || 0} venue{(city.venues || 0) !== 1 ? "s" : ""} and {city.events || 0} event{(city.events || 0) !== 1 ? "s" : ""}.
+                                      Deleting it may affect existing data.
+                                    </>
+                                  ) : (
+                                    <>This city has no venues or events.</>
+                                  )}
+                                </span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-red-500 hover:bg-red-600"
+                                onClick={() => handleDeleteCity(city.id!)}
+                                disabled={isDeleting === city.id}
+                              >
+                                {isDeleting === city.id ? "Deleting..." : "Delete City"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ));
+              })()
             )}
           </TableBody>
         </Table>

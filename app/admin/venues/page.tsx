@@ -70,30 +70,37 @@ export default function VenuesPage() {
           setVenuesList([])
         } else {
           // Normalize the data to ensure it matches our expected structure
-          const normalizedVenues = venuesData.map(venue => {
-            // Log the venue data to help diagnose issues
-            console.log("Processing venue:", venue)
-
-            // Create a normalized venue object with all required fields
-            return {
-              venue_id: venue.venue_id || venue.id || 0,
-              venue_name: venue.venue_name || venue.name || "Unknown Venue",
-              address: venue.address || "No address provided",
-              capacity: venue.capacity || 0,
-              venue_is_active: venue.venue_is_active !== undefined ? venue.venue_is_active :
-                              (venue.is_active !== undefined ? venue.is_active : false),
-              venue_created_at: venue.venue_created_at || venue.created_at || new Date().toISOString(),
-              venue_updated_at: venue.venue_updated_at || venue.updated_at || new Date().toISOString(),
-              city_id: venue.city_id || 0,
-              city_name: venue.city_name || "Unknown City",
-              state: venue.state || "",
-              city_is_active: venue.city_is_active !== undefined ? venue.city_is_active : true,
-              city_created_at: venue.city_created_at || new Date().toISOString(),
-              city_updated_at: venue.city_updated_at || new Date().toISOString(),
-              events: Number(venue.event_count) || 0 // Use event_count from API
-            }
-          })
-
+          const normalizedVenues = venuesData
+            .filter(venue =>
+              (venue.venue_id || venue.id) &&
+              (venue.venue_name || venue.name) &&
+              (venue.address || "") !== "" &&
+              (venue.city_name || "") !== ""
+            )
+            .map(venue => {
+              // Log the venue data to help diagnose issues
+              console.log("Processing venue:", venue)
+      
+              // Create a normalized venue object with all required fields
+              return {
+                venue_id: venue.venue_id || venue.id || 0,
+                venue_name: venue.venue_name || venue.name || "Unknown Venue",
+                address: venue.address || "No address provided",
+                capacity: venue.capacity || 0,
+                venue_is_active: venue.venue_is_active !== undefined ? venue.venue_is_active :
+                                (venue.is_active !== undefined ? venue.is_active : false),
+                venue_created_at: venue.venue_created_at || venue.created_at || new Date().toISOString(),
+                venue_updated_at: venue.venue_updated_at || venue.updated_at || new Date().toISOString(),
+                city_id: venue.city_id || 0,
+                city_name: venue.city_name || "Unknown City",
+                state: venue.state || "",
+                city_is_active: venue.city_is_active !== undefined ? venue.city_is_active : true,
+                city_created_at: venue.city_created_at || new Date().toISOString(),
+                city_updated_at: venue.city_updated_at || new Date().toISOString(),
+                events: Number(venue.event_count) || 0 // Use event_count from API
+              }
+            })
+    
           console.log("Normalized venues:", normalizedVenues)
           setVenuesList(normalizedVenues)
         }
@@ -278,7 +285,11 @@ export default function VenuesPage() {
                   <TableCell>{venue.city_name}</TableCell>
                   <TableCell className="max-w-[200px] truncate">{venue.address}</TableCell>
                   <TableCell>{venue.capacity}</TableCell>
-                  <TableCell>{venue.events || 0}</TableCell>
+                  <TableCell>
+                    {venue.events && venue.events > 0
+                      ? venue.events
+                      : "No events"}
+                  </TableCell>
                   <TableCell>
                     {venue.venue_is_active ? (
                       <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>

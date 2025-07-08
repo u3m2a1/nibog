@@ -501,139 +501,160 @@ export default function BookingsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredBookings.map((booking, idx) => (
-                <TableRow key={booking.booking_id ?? idx}>
-                  <TableCell className="font-medium">{booking.booking_id}</TableCell>
-                  <TableCell>
-                    {booking.parent_name}
-                    <div className="text-xs text-muted-foreground">{booking.parent_email}</div>
-                  </TableCell>
-                  <TableCell>
-                    {booking.child_full_name}
-                  </TableCell>
-                  <TableCell>
-                    {booking.event_title}
-                    <div className="text-xs text-muted-foreground">
-                      Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{booking.city_name}</TableCell>
-                  <TableCell>
-                    <div>{booking.child_full_name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
-                    </div>
-                  </TableCell>
-                  <TableCell>₹{booking.total_amount}</TableCell>
-                  <TableCell>{getStatusBadge(typeof booking.booking_status === "string" ? booking.booking_status.toLowerCase() : "")}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/bookings/${booking.booking_id}`}>
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View</span>
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/admin/bookings/${booking.booking_id}/edit`}>
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Link>
-                      </Button>
-                      {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "pending" && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isProcessing === booking.booking_id}
-                            >
-                              <Check className="h-4 w-4" />
-                              <span className="sr-only">Confirm</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirm Booking</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                <div className="flex items-start gap-2">
-                                  <CheckCircle className="mt-0.5 h-5 w-5 text-green-500" />
-                                  <div className="space-y-2">
-                                    <div className="font-medium">Do you want to confirm this booking?</div>
-                                    <div>
-                                      This will confirm booking #{booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
-                                      The booking status will change from "Pending" to "Confirmed".
-                                    </div>
-                                  </div>
-                                </div>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>No, Keep Pending</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-green-500 hover:bg-green-600"
-                                onClick={() => handleConfirmBooking(booking.booking_id)}
-                                disabled={isProcessing === booking.booking_id}
-                              >
-                                {isProcessing === booking.booking_id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Confirming...
-                                  </>
-                                ) : "Yes, Confirm Booking"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                      {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "confirmed" && (
-                        <>
+              (() => {
+                const validBookings = filteredBookings
+                  .filter(
+                    booking =>
+                      booking.booking_id &&
+                      booking.parent_name &&
+                      booking.child_full_name &&
+                      booking.event_title &&
+                      booking.city_name &&
+                      booking.total_amount
+                  );
+                if (validBookings.length === 0) {
+                  return (
+                    <TableRow>
+                      <TableCell colSpan={9} className="h-24 text-center">
+                        No bookings found.
+                      </TableCell>
+                    </TableRow>
+                  );
+                }
+                return validBookings.map((booking, idx) => (
+                  <TableRow key={booking.booking_id ?? idx}>
+                    <TableCell className="font-medium">{booking.booking_id}</TableCell>
+                    <TableCell>
+                      {booking.parent_name}
+                      <div className="text-xs text-muted-foreground">{booking.parent_email}</div>
+                    </TableCell>
+                    <TableCell>
+                      {booking.child_full_name}
+                    </TableCell>
+                    <TableCell>
+                      {booking.event_title}
+                      <div className="text-xs text-muted-foreground">
+                        Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </TableCell>
+                    <TableCell>{booking.city_name}</TableCell>
+                    <TableCell>
+                      <div>{booking.child_full_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Booked: {booking.booking_created_at ? new Date(booking.booking_created_at).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </TableCell>
+                    <TableCell>₹{booking.total_amount}</TableCell>
+                    <TableCell>{getStatusBadge(typeof booking.booking_status === "string" ? booking.booking_status.toLowerCase() : "")}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/bookings/${booking.booking_id}`}>
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">View</span>
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/bookings/${booking.booking_id}/edit`}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                          </Link>
+                        </Button>
+                        {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "pending" && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <X className="h-4 w-4" />
-                                <span className="sr-only">Cancel</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isProcessing === booking.booking_id}
+                              >
+                                <Check className="h-4 w-4" />
+                                <span className="sr-only">Confirm</span>
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                                <AlertDialogTitle>Confirm Booking</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   <div className="flex items-start gap-2">
-                                    <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                    <CheckCircle className="mt-0.5 h-5 w-5 text-green-500" />
                                     <div className="space-y-2">
-                                      <div className="font-medium">Are you sure you want to cancel this booking?</div>
+                                      <div className="font-medium">Do you want to confirm this booking?</div>
                                       <div>
-                                        This will cancel booking {booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
-                                        The user will be notified and may be eligible for a refund.
+                                        This will confirm booking #{booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
+                                        The booking status will change from "Pending" to "Confirmed".
                                       </div>
                                     </div>
                                   </div>
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
+                                <AlertDialogCancel>No, Keep Pending</AlertDialogCancel>
                                 <AlertDialogAction
-                                  className="bg-red-500 hover:bg-red-600"
-                                  onClick={() => handleCancelBooking(booking.booking_id)}
+                                  className="bg-green-500 hover:bg-green-600"
+                                  onClick={() => handleConfirmBooking(booking.booking_id)}
                                   disabled={isProcessing === booking.booking_id}
                                 >
                                   {isProcessing === booking.booking_id ? (
                                     <>
                                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Cancelling...
+                                      Confirming...
                                     </>
-                                  ) : "Yes, Cancel Booking"}
+                                  ) : "Yes, Confirm Booking"}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        )}
+                        {typeof booking.booking_status === "string" && booking.booking_status.toLowerCase() === "confirmed" && (
+                          <>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <X className="h-4 w-4" />
+                                  <span className="sr-only">Cancel</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancel Booking</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    <div className="flex items-start gap-2">
+                                      <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                      <div className="space-y-2">
+                                        <div className="font-medium">Are you sure you want to cancel this booking?</div>
+                                        <div>
+                                          This will cancel booking {booking.booking_id} for {booking.parent_name} for the {booking.event_title} event.
+                                          The user will be notified and may be eligible for a refund.
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>No, Keep Booking</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-500 hover:bg-red-600"
+                                    onClick={() => handleCancelBooking(booking.booking_id)}
+                                    disabled={isProcessing === booking.booking_id}
+                                  >
+                                    {isProcessing === booking.booking_id ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Cancelling...
+                                      </>
+                                    ) : "Yes, Cancel Booking"}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              })()
             )}
           </TableBody>
         </Table>
