@@ -199,11 +199,8 @@ export default function CitiesPage() {
               </TableRow>
             ) : (
               (() => {
-                const displayCities = filteredCities
-                  .filter(city =>
-                    (city.city_name && city.city_name !== "No venues") &&
-                    (city.venues && city.venues > 0)
-                  );
+                // Display all cities without restrictive filtering
+                const displayCities = filteredCities;
                 if (displayCities.length === 0) {
                   return (
                     <TableRow>
