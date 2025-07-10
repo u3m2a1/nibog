@@ -201,37 +201,42 @@ export default function PaymentsPage() {
 
   // Filter payments based on search and filters (client-side filtering for better UX)
   const filteredPayments = payments.filter((payment) => {
+    if (!payment) return false; // Skip if payment is undefined
+    
     // Search query filter
-    if (
-      searchQuery &&
-      !payment.payment_id.toString().toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.booking_id.toString().toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.user_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.event_title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !payment.transaction_id.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return false
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = 
+        (payment.payment_id?.toString()?.toLowerCase() || '').includes(searchLower) ||
+        (payment.booking_id?.toString()?.toLowerCase() || '').includes(searchLower) ||
+        (payment.user_name?.toLowerCase() || '').includes(searchLower) ||
+        (payment.event_title?.toLowerCase() || '').includes(searchLower) ||
+        (payment.transaction_id?.toLowerCase() || '').includes(searchLower);
+      
+      if (!matchesSearch) {
+        return false;
+      }
     }
 
     // Payment method filter
     if (selectedMethod !== "all" && payment.payment_method !== selectedMethod) {
-      return false
+      return false;
     }
 
     // Payment status filter
     if (selectedStatus !== "all" && payment.payment_status !== selectedStatus) {
-      return false
+      return false;
     }
 
     // Event filter
     if (selectedEvent !== "all" && payment.event_title) {
-      const eventId = events.find(event => event.event_title === payment.event_title)?.event_id?.toString()
+      const eventId = events.find(event => event.event_title === payment.event_title)?.event_id?.toString();
       if (eventId !== selectedEvent) {
-        return false
+        return false;
       }
     }
 
-    return true
+    return true;
   })
 
   // Use analytics data for summary or calculate from filtered payments
@@ -366,11 +371,16 @@ export default function PaymentsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Events</SelectItem>
-                  {events.map((event) => (
-                    <SelectItem key={event.event_id} value={event.event_id.toString()}>
-                      {event.event_title}
-                    </SelectItem>
-                  ))}
+                  {events
+                    .filter(event => event?.event_id != null) // Filter out events without an ID
+                    .map((event) => (
+                      <SelectItem 
+                        key={event.event_id} 
+                        value={event.event_id.toString()}
+                      >
+                        {event.event_title || 'Untitled Event'}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
 
@@ -453,16 +463,17 @@ export default function PaymentsPage() {
                 <TableRow key={payment.payment_id}>
                   <TableCell className="font-medium">{payment.payment_id}</TableCell>
                   <TableCell>{payment.booking_id}</TableCell>
-                  <TableCell>{payment.user_name}</TableCell>
+                  <TableCell>{payment.user_name || '-'}</TableCell>
                   <TableCell>
                     <button
-                      onClick={() => handleEventClick(payment.event_title)}
+                      onClick={() => payment.event_title && handleEventClick(payment.event_title)}
                       className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                      disabled={!payment.event_title}
                     >
-                      {payment.event_title}
+                      {payment.event_title || 'No event'}
                     </button>
                   </TableCell>
-                  <TableCell>{format(new Date(payment.payment_date), "yyyy-MM-dd")}</TableCell>
+                  <TableCell>{payment.payment_date ? format(new Date(payment.payment_date), "yyyy-MM-dd") : '-'}</TableCell>
                   <TableCell>₹{(typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount).toLocaleString()}</TableCell>
                   <TableCell>{payment.payment_method}</TableCell>
                   <TableCell className="font-mono text-xs">{payment.transaction_id}</TableCell>
