@@ -128,7 +128,8 @@ export async function initiatePhonePePayment(
 
     console.log(`Initiating PhonePe payment for booking ID: ${bookingId}`);
     console.log(`Amount in rupees: ₹${amount}`);
-    console.log(`Amount in paise (for PhonePe): ${amount * 100}`);
+    console.log(`Original amount in paise (before rounding): ${amount * 100}`);
+    console.log(`Final amount in paise (after rounding): ${Math.round(amount * 100)}`);
     console.log(`Using environment: ${PHONEPE_CONFIG.ENVIRONMENT}`);
     console.log(`Merchant ID: ${PHONEPE_CONFIG.MERCHANT_ID}`);
     console.log(`Test Mode: ${PHONEPE_CONFIG.IS_TEST_MODE}`);
@@ -141,7 +142,7 @@ export async function initiatePhonePePayment(
       merchantId: PHONEPE_CONFIG.MERCHANT_ID,
       merchantTransactionId: merchantTransactionId,
       merchantUserId: userId.toString(),
-      amount: amount * 100, // Convert rupees to paise (PhonePe requirement)
+      amount: Math.round(amount * 100), // Convert rupees to paise (PhonePe requirement) and round to ensure integer
       // Ensure APP_URL doesn't have trailing slash and parameters are properly encoded
       redirectUrl: `${PHONEPE_CONFIG.APP_URL.replace(/\/+$/, '')}/payment-callback?bookingId=${encodeURIComponent(String(bookingId))}&transactionId=${encodeURIComponent(merchantTransactionId)}`,
       redirectMode: 'REDIRECT',
