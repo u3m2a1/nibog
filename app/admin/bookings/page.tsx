@@ -95,16 +95,28 @@ export default function BookingsPage() {
       setError(null)
 
       const response = await getPaginatedBookings({ page, limit })
-      // Ensure we're setting an empty array if data is null or undefined
-      setBookings(response.data || [])
+      // Filter out empty booking objects and ensure we're setting an empty array if data is null or undefined
+      const validBookings = (response.data || []).filter(booking => {
+        // Check if booking is not empty (has at least one non-empty property)
+        return booking && Object.keys(booking).length > 0 && 
+          Object.values(booking).some(value => value !== null && value !== undefined && value !== '')
+      })
+      setBookings(validBookings)
       console.log("Fetched bookings:", response.data)
+      console.log("Valid bookings after filtering:", validBookings)
 
-      // Update pagination state
+      // Update pagination state with corrected totals based on valid bookings
       setCurrentPage(response.pagination.page)
-      setTotalBookings(response.pagination.total)
-      setTotalPages(response.pagination.totalPages)
-      setHasNext(response.pagination.hasNext)
-      setHasPrev(response.pagination.hasPrev)
+      
+      // If we filtered out some invalid bookings, adjust the total count
+      const actualTotal = response.data && validBookings.length !== response.data.length
+        ? validBookings.length 
+        : response.pagination.total
+      
+      setTotalBookings(actualTotal)
+      setTotalPages(Math.ceil(actualTotal / limit))
+      setHasNext(response.pagination.page < Math.ceil(actualTotal / limit))
+      setHasPrev(response.pagination.page > 1)
 
       // Only extract unique cities and events if there is actual data
       if (response.data && response.data.length > 0) {
