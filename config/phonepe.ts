@@ -54,9 +54,16 @@ const getAppUrl = (): string => {
   if (process.env.NODE_ENV === 'development') {
     return 'http://localhost:3000';
   }
-
-  // For production, use the production domain
-  return 'https://nibog.in';
+  
+  // For deployment/production, try to get the current hostname
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.host; // includes domain and port if any
+    return `${protocol}//${hostname}`;
+  }
+  
+  // Final fallback for server-side
+  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://nibog-seven.vercel.app';
 };
 
 // Determine if we're in production mode
