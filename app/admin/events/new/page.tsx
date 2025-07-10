@@ -44,7 +44,7 @@ const fallbackGameTemplates = [
     minAgeMonths: 6,
     maxAgeMonths: 18,
     durationMinutes: 90,
-    suggestedPrice: 799
+    suggestedPrice: 1799
   },
   {
     id: "2",
@@ -53,7 +53,7 @@ const fallbackGameTemplates = [
     minAgeMonths: 12,
     maxAgeMonths: 36,
     durationMinutes: 90,
-    suggestedPrice: 899
+    suggestedPrice: 1799
   },
   {
     id: "3",
@@ -62,7 +62,7 @@ const fallbackGameTemplates = [
     minAgeMonths: 8,
     maxAgeMonths: 24,
     durationMinutes: 120,
-    suggestedPrice: 999
+    suggestedPrice: 1799
   },
 ]
 
@@ -252,7 +252,7 @@ export default function NewEventPage() {
         minAgeMonths: game.min_age || 0,
         maxAgeMonths: game.max_age || 0,
         durationMinutes: game.duration_minutes,
-        suggestedPrice: 799, // Default price since API doesn't provide price
+        suggestedPrice: 1799, // Default price since API doesn't provide price
         categories: game.categories || []
       }))
     : fallbackGameTemplates
@@ -320,7 +320,7 @@ export default function NewEventPage() {
       id: `game-${game.templateId}-slot-${game.slots.length + 1}`,
       startTime: "10:00",
       endTime: "11:30",
-      price: game.customPrice || gameTemplates.find(t => t.id === game.templateId)?.suggestedPrice || 799,
+      price: game.customPrice || gameTemplates.find(t => t.id === game.templateId)?.suggestedPrice || 1799,
       maxParticipants: 12
     }
 
