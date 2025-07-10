@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -168,33 +168,79 @@ export default function EventsPage() {
     fetchFilterData()
   }, [])
 
-  // Convert API events to the format expected by the UI
-  const convertedEvents = apiEvents && Array.isArray(apiEvents) ? apiEvents.map((apiEvent: any) => {
-    // Extract games from the nested structure
-    const games = apiEvent.games || [];
-    const gameNames = games.map((game: any) => game.custom_title || game.game_title || "Unknown Game");
-    const uniqueGameNames = [...new Set(gameNames)]; // Remove duplicates
+  // Track if we have any valid events in the database
+  const [hasValidEvents, setHasValidEvents] = useState<boolean>(false);
 
-    return {
-      id: apiEvent.event_id?.toString() || "unknown",
-      title: apiEvent.event_title || "Untitled Event",
-      gameTemplate: uniqueGameNames.join(", ") || "Unknown", // Join all game names with commas
-      venue: apiEvent.venue?.venue_name || "Unknown Venue",
-      venueId: apiEvent.venue?.venue_id?.toString() || "unknown", // Add venue ID for proper linking
-      city: apiEvent.city?.city_name || "Unknown City",
-      date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : "Unknown Date", // Format date to YYYY-MM-DD
-      slots: games.map((game: any, index: number) => ({
-        id: `${apiEvent.event_id || 'unknown'}-${game.game_id || 'unknown'}-${index}`,
-        time: `${game.start_time || '00:00'} - ${game.end_time || '00:00'}`,
-        capacity: game.max_participants || 0,
-        booked: 0, // API doesn't provide this information
-        status: "active" // Assuming all slots are active
-      })),
-      status: apiEvent.event_status ? apiEvent.event_status.toLowerCase() : "unknown"
-    };
-  }) : [];
+  // Convert API events to the format expected by the UI and filter out invalid events
+  const convertedEvents = useMemo(() => {
+    if (!apiEvents || !Array.isArray(apiEvents)) return [];
+    
+    const validEvents = apiEvents
+      .map((apiEvent: any) => {
+        // Skip events that are completely empty or invalid
+        if (!apiEvent || !apiEvent.event_id) return null;
+        
+        // Extract games from the nested structure
+        const games = apiEvent.games || [];
+        const gameNames = games.map((game: any) => game.custom_title || game.game_title);
+        const uniqueGameNames = [...new Set(gameNames.filter(Boolean))]; // Remove duplicates and empty values
 
-  // Always use API data, even if it's empty
+        // Create the event object
+        const event = {
+          id: apiEvent.event_id.toString(),
+          title: apiEvent.event_title || "Untitled Event",
+          gameTemplate: uniqueGameNames.length > 0 ? uniqueGameNames.join(", ") : "No games",
+          venue: apiEvent.venue?.venue_name,
+          venueId: apiEvent.venue?.venue_id?.toString(),
+          city: apiEvent.city?.city_name,
+          date: apiEvent.event_date ? apiEvent.event_date.split('T')[0] : null, // Format date to YYYY-MM-DD
+          slots: games.map((game: any, index: number) => ({
+            id: `${apiEvent.event_id}-${game.game_id || 'unknown'}-${index}`,
+            time: game.start_time && game.end_time ? `${game.start_time} - ${game.end_time}` : null,
+            capacity: game.max_participants || 0,
+            booked: 0, // API doesn't provide this information
+            status: "active" // Default status
+          })).filter((slot: any) => slot.time !== null), // Only keep slots with valid times
+          status: apiEvent.event_status ? apiEvent.event_status.toLowerCase() : "draft",
+          _isValid: true // Flag to indicate this is a valid event
+        };
+
+        // Check if this is a valid event (has at least some valid data)
+        const isValidEvent = 
+          event.title !== "Untitled Event" ||
+          event.venue ||
+          event.city ||
+          event.date ||
+          (event.slots && event.slots.length > 0);
+
+        return isValidEvent ? event : null;
+      })
+      .filter(Boolean); // Remove any null entries (invalid events)
+
+    return validEvents;
+  }, [apiEvents]);
+
+  // Update hasValidEvents when apiEvents changes
+  useEffect(() => {
+    if (apiEvents && Array.isArray(apiEvents)) {
+      // Check if we have any valid events (not just empty or invalid ones)
+      const hasAnyValidEvents = apiEvents.some(apiEvent => {
+        if (!apiEvent || !apiEvent.event_id) return false;
+        return (
+          apiEvent.event_title ||
+          apiEvent.venue?.venue_name ||
+          apiEvent.city?.city_name ||
+          apiEvent.event_date ||
+          (apiEvent.games && apiEvent.games.length > 0)
+        );
+      });
+      setHasValidEvents(hasAnyValidEvents);
+    } else {
+      setHasValidEvents(false);
+    }
+  }, [apiEvents]);
+
+  // Use the processed events
   const eventsToUse = convertedEvents;
 
   // Filter events based on search and filters
@@ -639,23 +685,30 @@ export default function EventsPage() {
                   </TableRow>
                 ) : filteredEvents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      {apiEvents.length === 0 ? (
-                        <div>
-                          <p>No events found in the database.</p>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Click the "Create New Event" button to add your first event.
+                    <TableCell colSpan={8} className="py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-4">
+                        <div className="rounded-full bg-muted p-4">
+                          <CalendarIcon className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-medium">
+                            {!hasValidEvents ? 'No events found' : 'No matching events'}
+                          </h3>
+                          <p className="text-sm text-muted-foreground max-w-md">
+                            {!hasValidEvents 
+                              ? 'Get started by creating your first event.'
+                              : 'Try adjusting your search or filter criteria.'}
                           </p>
-                          <Button className="mt-4" asChild>
+                        </div>
+                        {!hasValidEvents && (
+                          <Button asChild className="mt-2">
                             <Link href="/admin/events/new">
                               <Plus className="mr-2 h-4 w-4" />
-                              Create New Event
+                              Create Your First Event
                             </Link>
                           </Button>
-                        </div>
-                      ) : (
-                        <p>No events match your current filters.</p>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
