@@ -77,8 +77,13 @@ export async function sendTicketEmail(ticketData: TicketEmailData): Promise<{ su
       } : 'No ticket details available'
     });
 
+    // Get the app URL from the same helper used in PhonePe config
+    const { getAppUrl } = await import('@/config/phonepe');
+    const appUrl = getAppUrl();
+    console.log(`🎫 Using app URL for ticket email API: ${appUrl}`);
+    
     // Send email using attachment API for better email client compatibility
-    const emailResponse = await fetch('http://localhost:3000/api/send-ticket-email-with-attachment', {
+    const emailResponse = await fetch(`${appUrl}/api/send-ticket-email-with-attachment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
