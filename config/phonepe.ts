@@ -43,7 +43,7 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 };
 
 // Get the correct APP_URL based on environment
-const getAppUrl = (): string => {
+export const getAppUrl = (): string => {
   // First try to get from environment variable
   const envUrl = getEnvVar('NEXT_PUBLIC_APP_URL', '');
   if (envUrl) {
