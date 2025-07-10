@@ -708,10 +708,36 @@ export default function RegisterEventClientPage() {
       setPromocodeError(null);
       
       console.log(`Fetching promocodes for event ID: ${eventId} and game IDs: ${gameIds.join(', ')}`);
-      const promocodes = await getPromoCodesByEventAndGames(eventId, gameIds);
+      const response = await getPromoCodesByEventAndGames(eventId, gameIds);
       
-      console.log('Available promocodes:', promocodes);
-      setAvailablePromocodes(promocodes);
+      console.log('API response for promocodes:', response);
+      
+      // Handle all possible response types
+      let normalizedPromocodes: any[] = [];
+      
+      if (Array.isArray(response)) {
+        // Check if it's the special case: [{success: true}]
+        if (response.length === 1 && response[0] && typeof response[0] === 'object' && response[0].success === true) {
+          // API returned [{success: true}] which means no promocodes available
+          console.log('API returned [{success: true}] (no promocodes available)');
+          // Keep normalizedPromocodes as empty array
+        } else {
+          // Normal array of promocode objects
+          const validPromocodes = response.filter(code => code.promo_code); // Only include items that have a promo_code property
+          normalizedPromocodes = validPromocodes;
+        }
+      } else if (response === true) {
+        // API returned boolean true (no promocodes available)
+        console.log('API returned true boolean (no promocodes available)');
+        // Keep normalizedPromocodes as empty array
+      } else if (response && typeof response === 'object') {
+        // API returned an object, likely {success: true} with no promocodes
+        // Keep normalizedPromocodes as an empty array
+        console.log('API returned success but no promocodes available');
+      }
+      
+      console.log('Normalized promocodes:', normalizedPromocodes);
+      setAvailablePromocodes(normalizedPromocodes);
       
       // Reset any applied promocode when fetching new ones
       setPromoCode('');
@@ -2151,30 +2177,43 @@ export default function RegisterEventClientPage() {
                     </Button>
                   </div>
                   
-                  {/* Available promocodes dropdown */}
-                  {availablePromocodes.length > 0 && !appliedPromoCode && (
-                    <div className="mt-2">
-                      <Label htmlFor="available-promocodes" className="text-xs text-muted-foreground">Available Promocodes</Label>
-                      <Select onValueChange={(value) => setPromoCode(value)}>
-                        <SelectTrigger className="w-full mt-1 text-sm">
-                          <SelectValue placeholder="Select a promocode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availablePromocodes.map((code) => (
-                            <SelectItem key={code.id} value={code.promo_code} className="text-sm">
-                              <div className="flex justify-between items-center w-full">
-                                <span className="font-medium">{code.promo_code}</span>
-                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                  {code.type === 'percentage' ? `${code.value}% OFF` : `₹${code.value} OFF`}
-                                </span>
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-1">{code.description}</div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  {/* Available promocodes section */}
+                  <div className="mt-2">
+                    <Label className="text-xs text-muted-foreground">Available Promocodes</Label>
+                    {Array.isArray(availablePromocodes) && availablePromocodes.length > 0 && availablePromocodes.some(code => code.promo_code) ? (
+                      <div>
+                        {/* Only render the Select component when promocodes are available with valid promo_code properties */}
+                        <Select onValueChange={(value) => setPromoCode(value)}>
+                          <SelectTrigger className="w-full mt-1 text-sm">
+                            <SelectValue placeholder="Select a promocode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availablePromocodes
+                              .filter(code => code.promo_code) // Only include items that have a promo_code property
+                              .map((code) => (
+                                <SelectItem key={code.id || `promo-${code.promo_code}`} value={code.promo_code} className="text-sm">
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium">{code.promo_code}</span>
+                                    {code.type && code.value !== undefined && (
+                                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                        {code.type === 'percentage' ? `${code.value}% OFF` : `₹${code.value} OFF`}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {code.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">{code.description}</div>
+                                  )}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-sm text-muted-foreground p-2 bg-muted/50 rounded-md border border-dashed border-muted-foreground/20">
+                        No promocodes available
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Applied promocode */}
                   {appliedPromoCode && (
@@ -2229,7 +2268,7 @@ export default function RegisterEventClientPage() {
                   </div>
                 )}
 
-                <div className="space-y-2 mt-6">
+                <div className="space-y-2 mt-8 border-t pt-6">
                   <Label>Payment Method</Label>
                   <div className="p-4 rounded-lg border border-dashed border-primary/20 bg-white/80 space-y-4 mb-2">
                     <div className="flex items-center justify-center">
