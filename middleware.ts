@@ -242,7 +242,7 @@ export const config = {
      * - assets/ (static assets)
      * - public/ (public files)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/|images/|assets/|public/|_vercel/|health).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|images/|assets/|public/|_vercel/|health|payment-callback).*)',
     // Explicitly include admin paths to ensure they're handled
     '/admin/:path*',
     '/superadmin/:path*',
