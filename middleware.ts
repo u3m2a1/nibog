@@ -35,7 +35,8 @@ const publicPaths = [
   '/public',
   '/_vercel',
   '/api/health',
-  '/superadmin/login'  // Add superadmin login page to public paths
+  '/superadmin/login',  // Add superadmin login page to public paths
+  '/payment-callback'    // Add payment callback page to public paths
 ];
 
 // Admin and superadmin paths that require admin/superadmin authentication
@@ -113,6 +114,7 @@ export async function middleware(request: NextRequest) {
     '/public',
     '/_vercel',
     '/api/health',
+    '/payment-callback', // Add payment callback page to public paths
   ];
 
   // Define admin paths that require admin/superadmin role
